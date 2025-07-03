@@ -1,25 +1,26 @@
 {
-  "name": "my-concept-cloud",
-  "version": "0.1.0",
-  "private": true,
-  "homepage": "https://concept-cloud.github.io",
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/concept-cloud.github.io/concept-cloud.github.io.git"
+  "name": "recipiebook",
+  "version": "1.0.0",
+  "main": "expo-router/entry",
+  "scripts": {
+    "start": "expo start",
+    "android": "expo start --android",
+    "ios": "expo start --ios",
+    "web": "expo start --web"
   },
   "dependencies": {
-    "gh-pages": "^5.0.0",
-    "react": "^18.2.0",
-    "react-dom": "^18.2.0",
-    "react-router-dom": "^6.14.1",
-    "react-scripts": "5.0.1"
+    "expo": "~53.0.13",
+    "expo-constants": "~17.1.6",
+    "expo-linking": "~7.1.6",
+    "expo-router": "~5.1.2",
+    "expo-status-bar": "~2.2.3",
+    "react": "19.0.0",
+    "react-native": "0.79.4",
+    "react-native-safe-area-context": "5.4.0",
+    "react-native-screens": "~4.11.1"
   },
-  "scripts": {
-    "start": "react-scripts start",
-    "build": "react-scripts build",
-    "predeploy": "npm run build",
-    "deploy": "gh-pages -d build",
-    "test": "react-scripts test",
-    "eject": "react-scripts eject"
-  }
+  "devDependencies": {
+    "@babel/core": "^7.20.0"
+  },
+  "private": true
 }
