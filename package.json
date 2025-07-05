@@ -9,11 +9,7 @@
     "web": "expo start --web"
   },
   "dependencies": {
-<<<<<<< HEAD
-    "expo": "~53.0.13",
-=======
-    "expo": "^53.0.15",
->>>>>>> TopBarAdded
+   "expo": "^53.0.15",
     "expo-constants": "~17.1.6",
     "expo-linking": "~7.1.6",
     "expo-router": "~5.1.2",

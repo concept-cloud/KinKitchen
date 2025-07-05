@@ -9,6 +9,7 @@ const Home = () => {
       <Text style={styles.title}>Where Family Recipies live forever.</Text>
       <Link href="/about" style={styles.link}>About</Link>
       <Link href="/Contact" style={styles.link}>Contact Us</Link>
+      <Link href="/recipie" style={styles.link}>Recipie card</Link>
     </View>
   )
 }
