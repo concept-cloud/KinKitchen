@@ -22,3 +22,6 @@
   
 Recipie Book for Family Recipies and potential foundraising printing function.
 renamed
+
+
+subscribe to cookbooks (paid or free) 
