@@ -1,102 +1,16 @@
-import { SafeAreaView, StatusBar, ScrollView, View, Text, Image, TouchableOpacity, StyleSheet } from 'react-native'
+import { View, Text, StyleSheet } from 'react-native'
+import CustomHeader from '../components/CustomHeader';
 
 export default function RecipeCardScreen() {
-  const categories = ['Special Diets']
-  const ingredients = [
-    '1 cup all-purpose flour',
-    '2 tbsp sugar',
-    '1 tsp baking powder',
-    'Pinch of salt',
-    '1 cup milk',
-    '1 egg',
-    '2 tbsp melted butter',
-  ]
-  const directions = [
-    'Preheat oven to 350°F (175°C).',
-    'In a bowl, whisk together flour, sugar, baking powder, and salt.',
-    'In another bowl, beat egg with milk and melted butter.',
-    'Pour wet ingredients into dry and stir until just combined.',
-    'Pour batter into greased muffin tin.',
-    'Bake for 18–20 minutes, or until golden brown.',
-    'Let cool before serving.',
-  ]
+
 
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <StatusBar barStyle="dark-content" />
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity style={styles.headerButton} onPress={() => {}}>
-          <Text style={styles.headerButtonText}>Back</Text>
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Recipe Title</Text>
-        <TouchableOpacity style={styles.headerButton} onPress={() => {}}>
-          <Text style={styles.headerButtonText}>Edit</Text>
-        </TouchableOpacity>
-      </View>
-
-      {/* Content */}
-      <ScrollView contentContainerStyle={styles.container}>
-        <Image
-          source={{ uri: 'https://source.unsplash.com/featured/?recipe' }}
-          style={styles.image}
-          resizeMode="cover"
-        />
-
-        {/* Categories Scroll */}
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          style={styles.categoryScroll}
-        >
-          {categories.map((cat, i) => (
-            <TouchableOpacity key={i} style={styles.categoryItem} onPress={() => {}}>
-              <View style={styles.categoryIcon} />
-              <Text style={styles.categoryText}>{cat} →</Text>
-            </TouchableOpacity>
-          ))}
-        </ScrollView>
-
-        {/* Ingredients */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Ingredients</Text>
-          <View style={styles.content}>
-            {ingredients.map((item, idx) => (
-              <Text key={idx} style={styles.itemText}>• {item}</Text>
-            ))}
-          </View>
-        </View>
-
-        {/* Instructions */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Instructions</Text>
-          <View style={styles.content}>
-            {directions.map((step, idx) => (
-              <Text key={idx} style={styles.itemText}>{idx + 1}. {step}</Text>
-            ))}
-          </View>
-        </View>
-      </ScrollView>
-
-      {/* Handle Indicator */}
-      <View style={styles.handle} />
-
-      {/* Footer Actions */}
-      <View style={styles.footer}>
-        <TouchableOpacity style={styles.footerButton} onPress={() => {}}>
-          <View style={styles.footerIcon} />
-          <Text style={styles.footerText}>Share</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.footerButton} onPress={() => {}}>
-          <View style={styles.footerIcon} />
-          <Text style={styles.footerText}>Add to Project</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.footerButton} onPress={() => {}}>
-          <View style={styles.footerIcon} />
-          <Text style={styles.footerText}>Print</Text>
-        </TouchableOpacity>
-      </View>
-    </SafeAreaView>
+   <View style={{ flex: 1 }}>
+         <CustomHeader />
+         <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+           <Text style={styles.title}>Currently Under Construction</Text>
+         </View>
+         </View>
   )
 }
 

@@ -2,6 +2,7 @@
 import React from 'react';
 import { View, StyleSheet } from 'react-native';
 import EditableProfileSheet from '../components/EditableProfileSheet';
+import CustomHeader from '../components/CustomHeader';
 
 export default function ProfileScreen() {
   const userData = {
@@ -13,8 +14,11 @@ export default function ProfileScreen() {
   };
 
   return (
+    <View style={{ flex: 1 }}>
+             <CustomHeader />
     <View style={styles.container}>
       <EditableProfileSheet initialUser={userData} />
+    </View>
     </View>
   );
 }

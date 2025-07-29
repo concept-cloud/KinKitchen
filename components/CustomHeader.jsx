@@ -1,80 +1,54 @@
-import React, { useState } from 'react';
-import {
-  View,
-  Text,
-  TouchableOpacity,
-  StyleSheet,
-  Modal,
-  Pressable,
-} from 'react-native';
-import { useFonts, Lobster_400Regular } from '@expo-google-fonts/lobster';
-import { useRouter } from 'expo-router';
+import React from 'react';
+import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { useNavigation, useRoute, DrawerActions } from '@react-navigation/native';
+import { Ionicons } from '@expo/vector-icons'; // uses built-in expo icons
 
-const CustomHeader = () => {
-  const [open, setOpen] = useState(false);
-  const router = useRouter();
+// Friendly screen title mappings
+const screenTitles = {
+  index: 'Kin-Kitchen',
+  about: 'About Us',
+  Contact: 'Contact Us',
+  recipie: 'Recipe Card',
+  profile: 'Profile',
+};
 
-  const [fontsLoaded] = useFonts({
-    Lobster_400Regular,
-  });
+export default function CustomHeader() {
+  const navigation = useNavigation();
+  const route = useRoute();
 
-  if (!fontsLoaded) return null;
+  const isHome = route.name === 'index';
+  const title = screenTitles[route.name] || route.name;
 
-  const navigateTo = (path) => {
-    setOpen(false); // close menu first
-    router.push(path);
+  const handleDrawerOpen = () => {
+    navigation.dispatch(DrawerActions.openDrawer());
   };
 
   return (
-    <>
-      {/* 🔘 Dropdown menu using Modal */}
-      <Modal
-        transparent
-        visible={open}
-        animationType="fade"
-        onRequestClose={() => setOpen(false)}
-      >
-        <Pressable style={styles.modalOverlay} onPress={() => setOpen(false)}>
-          <View style={styles.dropdown}>
-            <TouchableOpacity onPress={() => navigateTo('/profile')}>
-              <Text style={styles.item}>Profile</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity onPress={() => navigateTo('/settings')}>
-              <Text style={styles.item}>Settings</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity onPress={() => {
-              setOpen(false);
-              // Add logout logic here if needed
-              alert('Logged out!');
-              router.push('/'); // or /login if you have one
-            }}>
-              <Text style={styles.item}>Logout</Text>
-            </TouchableOpacity>
-          </View>
-        </Pressable>
-      </Modal>
-
-      {/* 🔝 Header */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.push('/')}>
-          <Text style={styles.logo}>Kin-Kitchen</Text>
+    <View style={styles.header}>
+      {/* Back Arrow if not Home */}
+      {!isHome ? (
+        <TouchableOpacity onPress={() => navigation.goBack()}>
+          <Ionicons name="arrow-back" size={28} color="#000" />
         </TouchableOpacity>
+      ) : (
+        // Spacer to keep title centered
+        <View style={{ width: 28 }} />
+      )}
 
-        <TouchableOpacity onPress={() => setOpen(!open)}>
-          <Text style={styles.menu}>☰</Text>
-        </TouchableOpacity>
-      </View>
-    </>
+      {/* Page Title */}
+      <Text style={styles.title}>{title}</Text>
+
+      {/* Drawer Button */}
+      <TouchableOpacity onPress={handleDrawerOpen}>
+        <Ionicons name="menu" size={32} color="#000" />
+      </TouchableOpacity>
+    </View>
   );
-};
-
-export default CustomHeader;
+}
 
 const styles = StyleSheet.create({
   header: {
-    backgroundColor: '#fae3d9',
+    backgroundColor: '#91b87d',
     paddingTop: 60,
     paddingBottom: 10,
     paddingHorizontal: 15,
@@ -83,35 +57,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     zIndex: 10,
   },
-  logo: {
+  title: {
     fontSize: 35,
     fontFamily: 'Lobster_400Regular',
     color: '#000',
-  },
-  menu: {
-    fontSize: 40,
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'transparent',
-    justifyContent: 'flex-start',
-    alignItems: 'flex-end',
-    paddingTop: 115,
-    paddingRight: 15,
-  },
-  dropdown: {
-    width: 160,
-    backgroundColor: '#fff',
-    borderWidth: 1,
-    borderColor: '#ccc',
-    borderRadius: 5,
-    elevation: 5,
-    zIndex: 20,
-  },
-  item: {
-    padding: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#eee',
-    backgroundColor: '#fae3d9',
   },
 });

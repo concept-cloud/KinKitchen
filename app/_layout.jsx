@@ -1,19 +1,43 @@
-import { StyleSheet, Text, View } from 'react-native'
-import { Tabs } from 'expo-router'
-import CustomHeaderLayout from '../components/CustomHeaderLayout'
+// app/_layout.jsx
+import { Drawer } from 'expo-router/drawer';
+import { useFonts } from 'expo-font';
+import { Lobster_400Regular } from '@expo-google-fonts/lobster';
+import { View, ActivityIndicator, StyleSheet } from 'react-native';
+import CustomDrawerContent from '../components/CustomDrawerContent';
 
-const RootLayout = () => {
+export default function RootLayout() {
+  const [fontsLoaded] = useFonts({
+    Lobster_400Regular,
+  });
+
+  if (!fontsLoaded) {
+    return (
+      <View style={styles.loading}>
+        <ActivityIndicator size="large" />
+      </View>
+    );
+  }
+
   return (
-    <CustomHeaderLayout>
-   <Tabs screenOptions={{headerShown: false}}>
-      <Tabs.Screen name="index" options={{ title: 'Home' }} />
-      <Tabs.Screen name="about" options={{ title: 'About Us' }} />
-      <Tabs.Screen name="recipie" options={{ title: 'Recipe Card' }} />
-    </Tabs>
-    </CustomHeaderLayout>
-  )
+    <Drawer
+  screenOptions={({ route }) => ({
+    headerShown: false,
+    title: route?.params?.drawerLabel ?? route.name,
+    drawerPosition: 'right',
+    drawerStyle: {
+      backgroundColor: '#c8dbbe',
+      width: 240,
+    },
+  })}
+  drawerContent={(props) => <CustomDrawerContent {...props} />}
+/>
+  );
 }
 
-export default RootLayout
-
-const styles = StyleSheet.create({})
+const styles = StyleSheet.create({
+  loading: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+});

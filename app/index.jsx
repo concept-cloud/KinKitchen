@@ -1,46 +1,107 @@
 // app/index.jsx
-import { StyleSheet, Text, View, Image } from 'react-native';
-import { Link } from 'expo-router'; // ✅ Required for navigation
+import { StyleSheet, Text, View, Image, FlatList, Dimensions, TouchableOpacity } from 'react-native';
 import Logo from '../assets/images/Kin-Kitchen.png';
+import CustomHeader from '../components/CustomHeader';
+import { useRouter } from 'expo-router';
+
+const recipes = [
+  { id: '1', title: 'Spaghetti Bolognese', image: { uri: 'https://via.placeholder.com/160x100?text=Spaghetti' } },
+  { id: '2', title: 'Chicken Alfredo', image: { uri: 'https://via.placeholder.com/160x100?text=Alfredo' } },
+  { id: '3', title: 'Beef Stroganoff', image: { uri: 'https://via.placeholder.com/160x100?text=Beef' } },
+];
 
 const Home = () => {
-  return (
-      <View style={styles.container}>
-        <Image source={Logo} style={styles.img} />
-        <Text style={styles.title}>Where Family Recipes live forever.</Text>
 
-        <Link href="/about" style={styles.link}>About</Link>
-        <Link href="/Contact" style={styles.link}>Contact Us</Link>
-        <Link href="/recipie" style={styles.link}>Recipe Card</Link>
+   const router = useRouter();
+
+  const renderItem = ({ item }) => (
+    <View style={styles.card}>
+      <Image source={item.image} style={styles.image} />
+      <Text style={styles.title}>{item.title}</Text>
+    </View>
+  );
+
+  return (
+    <View style={{ flex: 1 }}>
+              <CustomHeader />
+    <View style={styles.container}>
+      {/* Top Half: Recipe Cards */}
+      <View style={styles.topHalf}>
+        <FlatList
+          data={recipes}
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          renderItem={renderItem}
+          keyExtractor={(item) => item.id}
+          contentContainerStyle={styles.list}
+        />
       </View>
+      </View>
+
+      {/* Bottom Half: Button */}
+      <View style={styles.bottomHalf}>
+        <TouchableOpacity
+          style={styles.button}
+          onPress={() => router.navigate('/create')} // 🔁 Push to create recipe screen
+        >
+          <Text style={styles.buttonText}>Create New Recipe</Text>
+        </TouchableOpacity>
+      </View>
+    </View>
   );
 };
 
 export default Home;
 
+export const drawerLabel = 'Home';
+
+const { height } = Dimensions.get('window');
+
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingTop: 10,
+    backgroundColor: '#fff',
   },
-  img: {
-    marginVertical: 20,
-    width: 200,
-    height: 200,
-    resizeMode: 'contain',
+  topHalf: {
+    height: height * 0.5,
+    justifyContent: 'center',
+  },
+  bottomHalf: {
+    height: height * 0.5,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#fae3d9',
+  },
+  list: {
+    paddingHorizontal: 16,
+  },
+  card: {
+    marginRight: 16,
+    width: 160,
+    backgroundColor: '#fff',
+    borderRadius: 10,
+    overflow: 'hidden',
+    elevation: 3,
+  },
+  image: {
+    width: '100%',
+    height: 100,
   },
   title: {
-    fontWeight: 'bold',
-    fontSize: 18,
-    marginBottom: 20,
-    textAlign: 'center',
+    padding: 10,
+    fontSize: 16,
+    fontWeight: '500',
   },
-  link: {
-    marginVertical: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: '#999',
-    padding: 5,
+  button: {
+    backgroundColor: '#c8dbbe',
+    paddingVertical: 14,
+    paddingHorizontal: 30,
+    borderRadius: 8,
+    elevation: 2,
+  },
+  buttonText: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#000',
   },
 });
