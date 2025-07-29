@@ -21,4 +21,9 @@
       - Profile
   
 Recipie Book for Family Recipies and potential foundraising printing function.
-rule test
+renamed
+
+
+subscribe to cookbooks (paid or free) 
+
+cook out requests between fmailies!! next family cook out you can request a certian dish.
