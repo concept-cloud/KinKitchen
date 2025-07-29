@@ -1,24 +1,38 @@
 # RecipieBook
 1. [ ] Recipie Card
-   - Name
+   - Title
+   - Image
+   - Durations
    - Special Diet election
-   - Picture
-   - Ingreedients (this could be a class in itself)
-       - Measurement
+   - Ingreedients
        - Item
+       - Measurement
    - Directions
-       - Direction
-       - Duration
+     - Step
+     - Direction
+     
     
 2. [ ] Login Page
    - User Name
    - Password
    - Login Button
   
-3. [ ] Home Page
-   - Top Bar
+
+3. [ ] Top Bar
+      - ~~Logo to Home Screen~~
       - Drop Down
-      - Profile
+        - Profile
+          - ~~First Name~~
+          - ~~Lastname~~
+          - Age
+          - ~~Email~~
+          - ~~Location~~
+          - Diet Resctircions
+          - Bio
+          - Favorite Type of Cooking
+        - Settings
+        - Login / Logout
+  
   
 Recipie Book for Family Recipies and potential foundraising printing function.
 renamed
@@ -27,5 +41,3 @@ renamed
 subscribe to cookbooks (paid or free) 
 
 cook out requests between fmailies!! next family cook out you can request a certian dish.
-
-Merge with Main
