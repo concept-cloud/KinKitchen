@@ -1,12 +1,21 @@
 import React, { useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { useFonts, Lobster_400Regular } from '@expo-google-fonts/lobster';
 
  const CustomHeader = () => {
   const [open, setOpen] = useState(false);
 
+  const [fontsLoaded] = useFonts({
+    Lobster_400Regular,
+  });
+
+  if (!fontsLoaded) {
+    return null; // Optionally return a loading spinner
+  }
+
   return (
     <View style={styles.header}>
-      <Text style={styles.logo}>KinKitchen</Text>
+      <Text style={styles.logo}>Kin-Kitchen</Text>
       <TouchableOpacity onPress={() => setOpen(!open)}>
         <Text style={styles.menu}>☰  </Text>
       </TouchableOpacity>
@@ -25,7 +34,7 @@ export default CustomHeader
 const styles = StyleSheet.create({
   header: {
     backgroundColor: '#fae3d9',
-    paddingTop: 40,
+    paddingTop: 60,
     paddingBottom: 10,
     paddingHorizontal: 15,
     flexDirection: 'row',
@@ -35,13 +44,14 @@ const styles = StyleSheet.create({
   logo: {
     fontSize: 20,
     fontWeight: 'bold',
+    fontFamily: 'Lobster_400Regular',
   },
   menu: {
     fontSize: 24,
   },
   dropdown: {
     position: 'absolute',
-    top: 70,
+    top: 96,
     right: 15,
     backgroundColor: '#fff',
     borderWidth: 1,

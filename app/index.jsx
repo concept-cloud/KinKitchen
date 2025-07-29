@@ -1,12 +1,10 @@
 // app/index.jsx
 import { StyleSheet, Text, View, Image } from 'react-native';
 import { Link } from 'expo-router'; // ✅ Required for navigation
-import CustomHeaderLayout from '../components/CustomHeaderLayout';
 import Logo from '../assets/images/Kin-Kitchen.png';
 
 const Home = () => {
   return (
-    <CustomHeaderLayout>
       <View style={styles.container}>
         <Image source={Logo} style={styles.img} />
         <Text style={styles.title}>Where Family Recipes live forever.</Text>
@@ -15,7 +13,6 @@ const Home = () => {
         <Link href="/Contact" style={styles.link}>Contact Us</Link>
         <Link href="/recipie" style={styles.link}>Recipe Card</Link>
       </View>
-    </CustomHeaderLayout>
   );
 };
 
