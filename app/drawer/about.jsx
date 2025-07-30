@@ -1,5 +1,5 @@
 import { StyleSheet, Text, View } from 'react-native'
-import CustomHeader from '../components/CustomHeader';
+import CustomHeader from '../../components/CustomHeader';
 
 
 const About = () => {

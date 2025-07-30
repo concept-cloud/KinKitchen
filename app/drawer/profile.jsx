@@ -1,8 +1,8 @@
 // app/profile.jsx
 import React from 'react';
 import { View, StyleSheet } from 'react-native';
-import EditableProfileSheet from '../components/EditableProfileSheet';
-import CustomHeader from '../components/CustomHeader';
+import EditableProfileSheet from '../../components/EditableProfileSheet';
+import CustomHeader from '../../components/CustomHeader';
 
 export default function ProfileScreen() {
   const userData = {

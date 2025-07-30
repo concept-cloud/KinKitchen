@@ -1,7 +1,7 @@
 // app/create.jsx
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
-import CustomHeader from '../components/CustomHeader';
+import CustomHeader from '../../components/CustomHeader';
 
 export default function CreateScreen() {
   return (
