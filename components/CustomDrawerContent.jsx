@@ -45,7 +45,7 @@ export default function CustomDrawerContent(props) {
       <View style={styles.bottomItems}>
         <TouchableOpacity
           style={styles.bottomItem}
-          onPress={() => router.push('/Contact')}
+          onPress={() => router.push('../drawer/Contact')}
         >
           <Ionicons name="mail-outline" size={20} color="#000" />
           <Text style={styles.bottomLabel}>Contact Us</Text>
@@ -53,7 +53,7 @@ export default function CustomDrawerContent(props) {
 
         <TouchableOpacity
           style={styles.bottomItem}
-          onPress={() => router.push('/profile')}
+          onPress={() => router.push('../drawer/profile')}
         >
           <Ionicons name="settings-outline" size={20} color="#000" />
           <Text style={styles.bottomLabel}>Settings</Text>

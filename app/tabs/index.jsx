@@ -1,33 +1,10 @@
-// app/drawer/tabs/index.jsx
-import React from 'react';
-import {
-  StyleSheet,
-  Text,
-  View,
-  Image,
-  FlatList,
-  Dimensions,
-  TouchableOpacity,
-} from 'react-native';
+import { StyleSheet, Text, View, Image, FlatList, Dimensions, TouchableOpacity } from 'react-native';
 import { useRouter } from 'expo-router';
-import CustomHeader from '../../components/CustomHeader';
 
 const recipes = [
-  {
-    id: '1',
-    title: 'Spaghetti Bolognese',
-    image: { uri: 'https://via.placeholder.com/160x100?text=Spaghetti' },
-  },
-  {
-    id: '2',
-    title: 'Chicken Alfredo',
-    image: { uri: 'https://via.placeholder.com/160x100?text=Alfredo' },
-  },
-  {
-    id: '3',
-    title: 'Beef Stroganoff',
-    image: { uri: 'https://via.placeholder.com/160x100?text=Beef' },
-  },
+  { id: '1', title: 'Spaghetti Bolognese', image: { uri: 'https://via.placeholder.com/160x100?text=Spaghetti' } },
+  { id: '2', title: 'Chicken Alfredo', image: { uri: 'https://via.placeholder.com/160x100?text=Alfredo' } },
+  { id: '3', title: 'Beef Stroganoff', image: { uri: 'https://via.placeholder.com/160x100?text=Beef' } },
 ];
 
 export default function TabsHome() {
@@ -41,11 +18,8 @@ export default function TabsHome() {
   );
 
   return (
-    <View style={styles.wrapper}>
-      {/* ← Your custom header back */}
-      <CustomHeader />
-
-      {/* ← Top half: Recipe cards */}
+    <View style={{ flex: 1, backgroundColor: '#fff' }}>
+      {/* Top Half: Recipe Cards */}
       <View style={styles.topHalf}>
         <FlatList
           data={recipes}
@@ -57,11 +31,11 @@ export default function TabsHome() {
         />
       </View>
 
-      {/* ← Bottom half: Create button */}
+      {/* Bottom Half: Button */}
       <View style={styles.bottomHalf}>
         <TouchableOpacity
           style={styles.button}
-          onPress={() => router.push('/drawer/create')}
+          onPress={() => router.navigate('/create')}
         >
           <Text style={styles.buttonText}>Create New Recipe</Text>
         </TouchableOpacity>
@@ -73,10 +47,6 @@ export default function TabsHome() {
 const { height } = Dimensions.get('window');
 
 const styles = StyleSheet.create({
-  wrapper: {
-    flex: 1,
-    backgroundColor: '#fff',
-  },
   topHalf: {
     height: height * 0.5,
     justifyContent: 'center',
