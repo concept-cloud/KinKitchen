@@ -1,8 +1,8 @@
 {
   "expo": {
-    "scheme": "RecipieBook",
-    "name": "RecipieBook",
-    "slug": "RecipieBook",
+    "scheme": "Kin-Kitchen",
+    "name": "Kin-Kitchen",
+    "slug": "Kin-Kitchen",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",

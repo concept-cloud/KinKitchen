@@ -1,6 +1,5 @@
 // app/index.jsx
 import { StyleSheet, Text, View, Image, FlatList, Dimensions, TouchableOpacity } from 'react-native';
-import Logo from '../assets/images/Kin-Kitchen.png';
 import CustomHeader from '../components/CustomHeader';
 import { useRouter } from 'expo-router';
 
