@@ -46,7 +46,7 @@ struct ContentView: View {
                     Text("Gatherings")
                     
                 case 2:
-                    Text("Recipes")
+                    RecipesView()
                     
                 case 3:
                     Text("Cookbooks")
