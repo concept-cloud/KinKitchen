@@ -49,7 +49,7 @@ struct ContentView: View {
                     RecipesView()
                     
                 case 3:
-                    Text("Cookbooks")
+                    CookbooksView()
                     
                 case 4:
                     Text("Profile")
