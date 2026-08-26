@@ -52,7 +52,7 @@ struct ContentView: View {
                     CookbooksView()
                     
                 case 4:
-                    Text("Profile")
+                    ProfileView()
                     
                 default:
                     Text("Home")
