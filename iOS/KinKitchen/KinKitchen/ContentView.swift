@@ -6,79 +6,195 @@
 //
 
 import SwiftUI
+import PhotosUI
 
 struct ContentView: View {
 
+    @State private var textFieldText = ""
+    @State private var secureText = ""
+    @State private var editorText = "This is a KinTextEditor test."
+    @State private var searchText = ""
+    @State private var selectedItem: PhotosPickerItem?
+    @State private var selectedTab = 0
+
+    private let tabItems = [
+        KinTabBarItem(title: "Home", icon: KinIcons.home),
+        KinTabBarItem(title: "Gatherings", icon: KinIcons.gatherings),
+        KinTabBarItem(title: "Recipes", icon: KinIcons.recipes),
+        KinTabBarItem(title: "Cookbooks", icon: KinIcons.cookbooks),
+        KinTabBarItem(title: "Profile", icon: KinIcons.profile)
+    ]
+
     var body: some View {
         ScrollView {
-            VStack(spacing: KinSpacing.xLarge) {
+            VStack(alignment: .leading, spacing: KinSpacing.xLarge) {
 
-                // MARK: - Typography
+                // MARK: - Buttons
 
-                Text("Typography")
-                    .font(KinTypography.title2)
-                    .foregroundStyle(KinColors.primaryText)
+                KinSectionHeader(title: "Buttons")
 
-                Text("Arvo Bold")
-                    .font(.custom("Arvo-Bold", size: 28))
-                    .foregroundStyle(KinColors.primaryText)
+                KinPrimaryButton(title: "Primary Button") {
+                    print("Primary tapped")
+                }
 
-                Text("Arvo Regular")
-                    .font(.custom("Arvo-Regular", size: 22))
-                    .foregroundStyle(KinColors.primaryText)
+                KinSecondaryButton(title: "Secondary Button") {
+                    print("Secondary tapped")
+                }
 
-                Text("Lora Bold")
-                    .font(.custom("Lora-Bold", size: 22))
-                    .foregroundStyle(KinColors.primaryText)
+                KinDestructiveButton(title: "Delete") {
+                    print("Destructive tapped")
+                }
 
-                Text("Lora Regular")
-                    .font(.custom("Lora-Regular", size: 17))
-                    .foregroundStyle(KinColors.primaryText)
+                HStack {
+                    KinIconButton(icon: KinIcons.add) {
+                        print("Add tapped")
+                    }
 
-                Divider()
+                    KinIconButton(icon: KinIcons.edit) {
+                        print("Edit tapped")
+                    }
 
-                // MARK: - Spacing & Radius
-
-                Text("Spacing & Radius")
-                    .font(KinTypography.title2)
-                    .foregroundStyle(KinColors.primaryText)
-
-                HStack(spacing: KinSpacing.large) {
-
-                    RoundedRectangle(cornerRadius: KinRadius.small)
-                        .fill(KinColors.primary)
-                        .frame(width: 60, height: 60)
-
-                    RoundedRectangle(cornerRadius: KinRadius.medium)
-                        .fill(KinColors.secondary)
-                        .frame(width: 60, height: 60)
-
-                    RoundedRectangle(cornerRadius: KinRadius.large)
-                        .fill(KinColors.accent)
-                        .frame(width: 60, height: 60)
-
-                    RoundedRectangle(cornerRadius: KinRadius.xLarge)
-                        .fill(KinColors.success)
-                        .frame(width: 60, height: 60)
+                    KinIconButton(icon: KinIcons.favorite) {
+                        print("Favorite tapped")
+                    }
                 }
 
                 Divider()
 
-                // MARK: - Icons
+                // MARK: - Inputs
 
-                Text("Icons")
-                    .font(KinTypography.title2)
-                    .foregroundStyle(KinColors.primaryText)
+                KinSectionHeader(title: "Inputs")
 
-                HStack(spacing: KinSpacing.xLarge) {
-                    Image(systemName: KinIcons.home)
-                    Image(systemName: KinIcons.gatherings)
-                    Image(systemName: KinIcons.recipes)
-                    Image(systemName: KinIcons.cookbooks)
-                    Image(systemName: KinIcons.profile)
+                KinTextField(
+                    title: "Enter text",
+                    text: $textFieldText
+                )
+
+                KinSecureField(
+                    title: "Password",
+                    text: $secureText
+                )
+
+                KinTextEditor(
+                    text: $editorText
+                )
+
+                KinSearchBar(
+                    text: $searchText,
+                    placeholder: "Search recipes"
+                )
+
+                KinPhotoPicker(
+                    selectedItem: $selectedItem
+                )
+
+                Divider()
+
+                // MARK: - Labels
+
+                KinSectionHeader(title: "Labels")
+
+                HStack {
+                    KinChip(title: "Gluten-Free")
+                    KinChip(title: "Selected", isSelected: true)
                 }
-                .font(.title2)
-                .foregroundStyle(KinColors.primary)
+
+                HStack {
+                    KinBadge(
+                        title: "Private",
+                        color: KinColors.secondary
+                    )
+
+                    KinStatusBadge(
+                        title: "Success",
+                        status: .success
+                    )
+
+                    KinStatusBadge(
+                        title: "Warning",
+                        status: .warning
+                    )
+
+                    KinStatusBadge(
+                        title: "Error",
+                        status: .error
+                    )
+                }
+
+                Divider()
+
+                // MARK: - Cards
+
+                KinSectionHeader(title: "Cards")
+
+                KinCard {
+                    VStack(alignment: .leading) {
+                        Text("KinCard")
+                            .font(KinTypography.title3)
+
+                        Text("Reusable card content.")
+                            .font(KinTypography.body)
+                    }
+                }
+
+                KinImageCard(
+                    image: Image(systemName: KinIcons.photo),
+                    title: "KinImageCard",
+                    subtitle: "Image, title, and subtitle"
+                )
+
+                Divider()
+
+                // MARK: - Navigation
+
+                KinSectionHeader(title: "Navigation")
+
+                KinNavigationBar(
+                    title: "Recipe Detail",
+                    showBackButton: true,
+                    actionIcon: KinIcons.share,
+                    backAction: {
+                        print("Back tapped")
+                    },
+                    action: {
+                        print("Share tapped")
+                    }
+                )
+
+                KinTabBar(
+                    items: tabItems,
+                    selectedIndex: $selectedTab
+                )
+
+                Text("Selected Tab: \(selectedTab)")
+                    .font(KinTypography.body)
+
+                Divider()
+
+                // MARK: - Feedback
+
+                KinSectionHeader(title: "Feedback")
+
+                KinWarning(
+                    title: "Allergen Warning",
+                    message: "This recipe may contain peanuts."
+                )
+
+                KinEmptyState(
+                    icon: KinIcons.recipes,
+                    title: "No Recipes Yet",
+                    message: "Create your first recipe to get started."
+                )
+
+                KinLoadingView(
+                    message: "Loading recipes..."
+                )
+
+                KinErrorView(
+                    message: "Unable to load data."
+                ) {
+                    print("Retry tapped")
+                }
             }
             .padding(KinSpacing.large)
         }
