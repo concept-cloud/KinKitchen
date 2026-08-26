@@ -43,7 +43,7 @@ struct ContentView: View {
                     HomeView()
                     
                 case 1:
-                    Text("Gatherings")
+                    GatheringsView()
                     
                 case 2:
                     RecipesView()
