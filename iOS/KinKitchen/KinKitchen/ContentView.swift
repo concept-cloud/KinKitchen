@@ -40,7 +40,7 @@ struct ContentView: View {
             Group {
                 switch selectedTab {
                 case 0:
-                    Text("Home")
+                    HomeView()
                     
                 case 1:
                     Text("Gatherings")
