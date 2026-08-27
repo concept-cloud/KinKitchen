@@ -6,6 +6,11 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		D1D44D3B303FA9D30080E250 /* Supabase in Frameworks */ = {isa = PBXBuildFile; productRef = D1D44D3A303FA9D30080E250 /* Supabase */; };
+		D1D44D3D303FDE250080E250 /* Config.xcconfig in Resources */ = {isa = PBXBuildFile; fileRef = D1D44D3C303FDE250080E250 /* Config.xcconfig */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXContainerItemProxy section */
 		D1D44C09303F63660080E250 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
@@ -27,6 +32,7 @@
 		D1D44BFB303F63640080E250 /* KinKitchen.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = KinKitchen.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		D1D44C08303F63660080E250 /* KinKitchenTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = KinKitchenTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		D1D44C12303F63660080E250 /* KinKitchenUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = KinKitchenUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		D1D44D3C303FDE250080E250 /* Config.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Config.xcconfig; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -65,6 +71,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				D1D44D3B303FA9D30080E250 /* Supabase in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -92,6 +99,7 @@
 				D1D44C0B303F63660080E250 /* KinKitchenTests */,
 				D1D44C15303F63660080E250 /* KinKitchenUITests */,
 				D1D44BFC303F63640080E250 /* Products */,
+				D1D44D3C303FDE250080E250 /* Config.xcconfig */,
 			);
 			sourceTree = "<group>";
 		};
@@ -125,6 +133,7 @@
 			);
 			name = KinKitchen;
 			packageProductDependencies = (
+				D1D44D3A303FA9D30080E250 /* Supabase */,
 			);
 			productName = KinKitchen;
 			productReference = D1D44BFB303F63640080E250 /* KinKitchen.app */;
@@ -208,6 +217,9 @@
 			);
 			mainGroup = D1D44BF2303F63640080E250;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				D1D44D39303FA9D30080E250 /* XCRemoteSwiftPackageReference "supabase-swift" */,
+			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = D1D44BFC303F63640080E250 /* Products */;
 			projectDirPath = "";
@@ -225,6 +237,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				D1D44D3D303FDE250080E250 /* Config.xcconfig in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -284,6 +297,7 @@
 /* Begin XCBuildConfiguration section */
 		D1D44C1A303F63660080E250 /* Debug */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = D1D44D3C303FDE250080E250 /* Config.xcconfig */;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
 				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
@@ -348,6 +362,7 @@
 		};
 		D1D44C1B303F63660080E250 /* Release */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = D1D44D3C303FDE250080E250 /* Config.xcconfig */;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
 				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
@@ -593,6 +608,25 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		D1D44D39303FA9D30080E250 /* XCRemoteSwiftPackageReference "supabase-swift" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/supabase/supabase-swift";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 2.5.1;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		D1D44D3A303FA9D30080E250 /* Supabase */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = D1D44D39303FA9D30080E250 /* XCRemoteSwiftPackageReference "supabase-swift" */;
+			productName = Supabase;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = D1D44BF3303F63640080E250 /* Project object */;
 }

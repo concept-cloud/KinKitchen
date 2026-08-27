@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import Supabase
 
 struct ContentView: View {
     
@@ -69,7 +70,26 @@ struct ContentView: View {
             )
         }
         .ignoresSafeArea(.keyboard)
+        .task {
+            do {
+                let allergens: [AllergenTest] = try await SupabaseManager.client
+                    .from("allergens")
+                    .select()
+                    .limit(1)
+                    .execute()
+                    .value
+
+                print("Supabase connection successful:", allergens)
+            } catch {
+                print("Supabase connection failed:", error)
+            }
+        }
     }
+}
+
+struct AllergenTest: Decodable {
+    let id: UUID
+    let name: String
 }
 
 #Preview {

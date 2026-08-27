@@ -8,6 +8,8 @@ xcuserdata/
 ## Obj-C/Swift specific
 *.hmap
 
+
+
 ## App packaging
 *.ipa
 *.dSYM.zip
@@ -16,6 +18,13 @@ xcuserdata/
 ## Playgrounds
 timeline.xctimeline
 playground.xcworkspace
+
+# macOS
+.DS_Store
+
+# Local Supabase configuration
+iOS/KinKitchen/Config.xcconfig
+
 
 # Swift Package Manager
 #
