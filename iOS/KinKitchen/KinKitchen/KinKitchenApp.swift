@@ -11,7 +11,7 @@ import SwiftUI
 struct KinKitchenApp: App {
     var body: some Scene {
         WindowGroup {
-            SignUpView().preferredColorScheme(.light)
+            ContentView().preferredColorScheme(.light)
         }
     }
 }

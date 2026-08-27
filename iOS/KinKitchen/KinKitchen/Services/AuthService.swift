@@ -39,6 +39,13 @@ final class AuthService: ObservableObject {
             }
         }
     }
+    
+    func signUp(email: String, password: String) async throws {
+        try await SupabaseManager.client.auth.signUp(
+            email: email,
+            password: password
+        )
+    }
 
     deinit {
         authTask?.cancel()
