@@ -8,17 +8,21 @@
 import SwiftUI
 
 struct KinPrimaryButton: View {
+
     let title: String
+    var color: Color = KinColors.primary
     let action: () -> Void
 
     var body: some View {
+
         Button(action: action) {
+
             Text(title)
                 .font(KinTypography.button)
                 .foregroundStyle(KinColors.background)
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, KinSpacing.medium)
-                .background(KinColors.primary)
+                .background(color)
                 .clipShape(
                     RoundedRectangle(cornerRadius: KinRadius.medium)
                 )
