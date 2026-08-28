@@ -23,9 +23,21 @@ struct ProfileView: View {
                 .foregroundStyle(KinColors.secondaryText)
                 .multilineTextAlignment(.center)
                 .padding(.horizontal, KinSpacing.large)
+
+            Button {
+                Task {
+                    do {
+                        try await AuthService.shared.signOut()
+                    } catch {
+                        print("Sign out failed: \(error.localizedDescription)")
+                    }
+                }
+            } label: {
+                Text("Sign Out")
+                    .font(KinTypography.body)
+                    .foregroundStyle(KinColors.error)
+            }
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(KinColors.background)
     }
 }
 

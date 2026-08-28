@@ -53,6 +53,10 @@ final class AuthService: ObservableObject {
             password: password
         )
     }
+    
+    func signOut() async throws {
+        try await SupabaseManager.client.auth.signOut()
+    }
 
     deinit {
         authTask?.cancel()
