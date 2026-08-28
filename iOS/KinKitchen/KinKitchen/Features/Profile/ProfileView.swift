@@ -7,6 +7,7 @@
 
 import SwiftUI
 import PhotosUI
+import UIKit
 
 
 struct ProfileView: View {
@@ -15,6 +16,7 @@ struct ProfileView: View {
     @State private var errorMessage: String?
     @State private var isLoading = true
     @State private var selectedPhotoItem: PhotosPickerItem?
+    @State private var profilePhotoData: Data?
     
     
     var body: some View {
@@ -27,9 +29,20 @@ struct ProfileView: View {
                         .fill(KinColors.surface)
                         .frame(width: 120, height: 120)
 
-                    Image(systemName: KinIcons.profile)
-                        .font(.system(size: 48))
-                        .foregroundStyle(KinColors.secondaryText)
+                    if
+                        let profilePhotoData,
+                        let uiImage = UIImage(data: profilePhotoData)
+                    {
+                        Image(uiImage: uiImage)
+                            .resizable()
+                            .scaledToFill()
+                            .frame(width: 120, height: 120)
+                            .clipShape(Circle())
+                    } else {
+                        Image(systemName: KinIcons.profile)
+                            .font(.system(size: 48))
+                            .foregroundStyle(KinColors.secondaryText)
+                    }
                 }
                 
                 KinPhotoPicker(
@@ -106,6 +119,14 @@ struct ProfileView: View {
 
         do {
             profile = try await ProfileService.fetchCurrentProfile()
+
+            if let path = profile?.profilePhotoPath {
+                do {
+                    profilePhotoData = try await ProfileService.fetchProfilePhoto(path: path)
+                } catch {
+                    profilePhotoData = nil
+                }
+            }
         } catch {
             errorMessage = "Unable to load your profile."
         }

@@ -76,6 +76,12 @@ enum ProfileService {
 
         return path
     }
+    
+    static func fetchProfilePhoto(path: String) async throws -> Data {
+        try await SupabaseManager.client.storage
+            .from("profile-photos")
+            .download(path: path)
+    }
 }
 
 private struct ProfileUpdate: Encodable {
