@@ -43,6 +43,39 @@ enum ProfileService {
             .eq("id", value: user.id)
             .execute()
     }
+    
+    static func uploadProfilePhoto(_ imageData: Data) async throws -> String {
+        let user = try await SupabaseManager.client.auth.session.user
+
+        let path = "\(user.id.uuidString.lowercased())/profile.jpg"
+
+
+        try await SupabaseManager.client.storage
+            .from("profile-photos")
+            .upload(
+                path,
+                data: imageData,
+                options: FileOptions(
+                    contentType: "image/jpeg",
+                    upsert: true
+                )
+            )
+
+
+        let updates = ProfilePhotoUpdate(
+            profilePhotoPath: path
+        )
+
+
+        try await SupabaseManager.client
+            .from("profiles")
+            .update(updates)
+            .eq("id", value: user.id)
+            .execute()
+
+
+        return path
+    }
 }
 
 private struct ProfileUpdate: Encodable {
@@ -54,5 +87,13 @@ private struct ProfileUpdate: Encodable {
         case displayName = "display_name"
         case username
         case bio
+    }
+}
+
+private struct ProfilePhotoUpdate: Encodable {
+    let profilePhotoPath: String
+
+    enum CodingKeys: String, CodingKey {
+        case profilePhotoPath = "profile_photo_path"
     }
 }

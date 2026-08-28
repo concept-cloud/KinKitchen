@@ -6,7 +6,7 @@
 //
 
 import SwiftUI
-
+import PhotosUI
 
 
 struct ProfileView: View {
@@ -14,6 +14,7 @@ struct ProfileView: View {
     @State private var profile: Profile?
     @State private var errorMessage: String?
     @State private var isLoading = true
+    @State private var selectedPhotoItem: PhotosPickerItem?
     
     
     var body: some View {
@@ -30,6 +31,10 @@ struct ProfileView: View {
                         .font(.system(size: 48))
                         .foregroundStyle(KinColors.secondaryText)
                 }
+                
+                KinPhotoPicker(
+                    selectedItem: $selectedPhotoItem
+                )
 
                 // Identity
                 VStack(spacing: KinSpacing.small) {
@@ -85,6 +90,13 @@ struct ProfileView: View {
         .task {
             await loadProfile()
         }
+        .onChange(of: selectedPhotoItem) { _, newItem in
+            guard let newItem else { return }
+
+            Task {
+                await uploadSelectedPhoto(newItem)
+            }
+        }
     }
     
     @MainActor
@@ -99,6 +111,26 @@ struct ProfileView: View {
         }
 
         isLoading = false
+    }
+    
+    @MainActor
+    private func uploadSelectedPhoto(_ item: PhotosPickerItem) async {
+        do {
+            guard let imageData = try await item.loadTransferable(type: Data.self) else {
+                errorMessage = "Unable to load the selected photo."
+                return
+            }
+            
+
+            
+            let path = try await ProfileService.uploadProfilePhoto(imageData)
+
+
+            await loadProfile()
+        } catch {
+            errorMessage = "Unable to upload profile photo."
+            print("Profile photo upload failed:", error.localizedDescription)
+        }
     }
 }
 
