@@ -7,7 +7,15 @@
 
 import SwiftUI
 
+
+
 struct ProfileView: View {
+    
+    @State private var profile: Profile?
+    @State private var errorMessage: String?
+    @State private var isLoading = true
+    
+    
     var body: some View {
         ScrollView {
             VStack(spacing: KinSpacing.xLarge) {
@@ -25,13 +33,15 @@ struct ProfileView: View {
 
                 // Identity
                 VStack(spacing: KinSpacing.small) {
-                    Text("Display Name")
+                    Text(profile?.displayName ?? "Display Name")
                         .font(KinTypography.largeTitle)
                         .foregroundStyle(KinColors.primaryText)
 
-                    Text("@username")
-                        .font(KinTypography.body)
-                        .foregroundStyle(KinColors.secondaryText)
+                    if let username = profile?.username {
+                        Text("@\(username)")
+                            .font(KinTypography.body)
+                            .foregroundStyle(KinColors.secondaryText)
+                    }
                 }
 
                 // Bio
@@ -40,7 +50,7 @@ struct ProfileView: View {
                         .font(KinTypography.title)
                         .foregroundStyle(KinColors.primaryText)
 
-                    Text("Your bio will appear here.")
+                    Text(profile?.bio ?? "Your bio will appear here.")
                         .font(KinTypography.body)
                         .foregroundStyle(KinColors.secondaryText)
                 }
@@ -72,6 +82,23 @@ struct ProfileView: View {
             .padding(KinSpacing.xLarge)
         }
         .background(KinColors.background)
+        .task {
+            await loadProfile()
+        }
+    }
+    
+    @MainActor
+    private func loadProfile() async {
+        isLoading = true
+        errorMessage = nil
+
+        do {
+            profile = try await ProfileService.fetchCurrentProfile()
+        } catch {
+            errorMessage = "Unable to load your profile."
+        }
+
+        isLoading = false
     }
 }
 
