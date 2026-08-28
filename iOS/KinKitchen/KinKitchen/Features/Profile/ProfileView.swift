@@ -6,53 +6,72 @@
 //
 
 import SwiftUI
-import Supabase
 
 struct ProfileView: View {
     var body: some View {
-        VStack(spacing: KinSpacing.large) {
-            Image(systemName: KinIcons.profile)
-                .font(.system(size: 48))
-                .foregroundStyle(KinColors.primary)
+        ScrollView {
+            VStack(spacing: KinSpacing.xLarge) {
 
-            Text("Profile")
-                .font(KinTypography.largeTitle)
-                .foregroundStyle(KinColors.primaryText)
+                // Profile Photo
+                ZStack {
+                    Circle()
+                        .fill(KinColors.surface)
+                        .frame(width: 120, height: 120)
 
-            Text("Your profile and account settings will appear here.")
-                .font(KinTypography.body)
-                .foregroundStyle(KinColors.secondaryText)
-                .multilineTextAlignment(.center)
-                .padding(.horizontal, KinSpacing.large)
-
-            Button {
-                Task {
-                    do {
-                        try await AuthService.shared.signOut()
-                    } catch {
-                        print("Sign out failed: \(error.localizedDescription)")
-                    }
+                    Image(systemName: KinIcons.profile)
+                        .font(.system(size: 48))
+                        .foregroundStyle(KinColors.secondaryText)
                 }
-            } label: {
-                Text("Sign Out")
-                    .font(KinTypography.body)
-                    .foregroundStyle(KinColors.error)
-            }
-        }
-        .task {
-            do {
-                let profiles: [Profile] = try await SupabaseManager.client
-                    .from("profiles")
-                    .select()
-                    .limit(1)
-                    .execute()
-                    .value
 
-                print("Profile model decode successful:", profiles)
-            } catch {
-                print("Profile model decode failed:", error)
+                // Identity
+                VStack(spacing: KinSpacing.small) {
+                    Text("Display Name")
+                        .font(KinTypography.largeTitle)
+                        .foregroundStyle(KinColors.primaryText)
+
+                    Text("@username")
+                        .font(KinTypography.body)
+                        .foregroundStyle(KinColors.secondaryText)
+                }
+
+                // Bio
+                VStack(alignment: .leading, spacing: KinSpacing.small) {
+                    Text("About")
+                        .font(KinTypography.title)
+                        .foregroundStyle(KinColors.primaryText)
+
+                    Text("Your bio will appear here.")
+                        .font(KinTypography.body)
+                        .foregroundStyle(KinColors.secondaryText)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+
+                // Edit Profile
+                KinSecondaryButton(
+                    title: "Edit Profile",
+                    color: KinColors.success
+                ) {
+                    print("Navigate to Edit Profile")
+                }
+
+                // Sign Out
+                Button {
+                    Task {
+                        do {
+                            try await AuthService.shared.signOut()
+                        } catch {
+                            print("Sign out failed: \(error.localizedDescription)")
+                        }
+                    }
+                } label: {
+                    Text("Sign Out")
+                        .font(KinTypography.body)
+                        .foregroundStyle(KinColors.error)
+                }
             }
+            .padding(KinSpacing.xLarge)
         }
+        .background(KinColors.background)
     }
 }
 
