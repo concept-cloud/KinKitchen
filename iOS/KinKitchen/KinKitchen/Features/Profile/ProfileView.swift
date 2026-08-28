@@ -104,6 +104,63 @@ struct ProfileView: View {
         .task {
             await loadProfile()
         }
+        .task {
+            do {
+                let allergens = try await DietaryService.fetchAllergens()
+
+                print("Available allergens:", allergens.map(\.name))
+
+                guard allergens.count >= 2 else {
+                    print("Not enough allergens for test")
+                    return
+                }
+
+                let first = allergens[0]
+                let second = allergens[1]
+
+                // Start from a clean test state
+                try? await DietaryService.removeAllergen(first.id)
+                try? await DietaryService.removeAllergen(second.id)
+
+                // Add first allergen
+                try await DietaryService.addAllergen(first.id)
+
+                // Verify duplicate prevention
+                do {
+                    try await DietaryService.addAllergen(first.id)
+                    print("Duplicate allergen test failed: duplicate was allowed")
+                } catch {
+                    print("Duplicate allergen prevented successfully")
+                }
+
+                // Add second allergen
+                try await DietaryService.addAllergen(second.id)
+
+                // Verify multiple selections are stored
+                let selected = try await DietaryService.fetchSelectedAllergens()
+
+                print("Selected allergen IDs:", selected)
+                print(
+                    "Multiple allergen test:",
+                    selected.contains(first.id) && selected.contains(second.id)
+                )
+
+                // Remove first allergen
+                try await DietaryService.removeAllergen(first.id)
+
+                // Verify removal and remaining selection
+                let afterRemoval = try await DietaryService.fetchSelectedAllergens()
+
+                print("Removal test:", !afterRemoval.contains(first.id))
+                print("Remaining allergen test:", afterRemoval.contains(second.id))
+
+            } catch {
+                print(
+                    "KINKIT-34 allergen test failed:",
+                    error.localizedDescription
+                )
+            }
+        }
         .onChange(of: selectedPhotoItem) { _, newItem in
             guard let newItem else { return }
 
