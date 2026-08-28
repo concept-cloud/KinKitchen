@@ -16,6 +16,7 @@ final class AuthService: ObservableObject {
 
     @Published private(set) var isAuthenticated = false
     @Published private(set) var currentUser: User?
+    @Published private(set) var isLoadingSession = true
 
     private var authTask: Task<Void, Never>?
 
@@ -36,6 +37,7 @@ final class AuthService: ObservableObject {
             for await (_, session) in await SupabaseManager.client.auth.authStateChanges {
                 self.currentUser = session?.user
                 self.isAuthenticated = session != nil && session?.isExpired == false
+                self.isLoadingSession = false
             }
         }
     }

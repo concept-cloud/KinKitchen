@@ -14,7 +14,9 @@ struct KinKitchenApp: App {
     var body: some Scene {
         WindowGroup {
             Group {
-                if authService.isAuthenticated {
+                if authService.isLoadingSession {
+                    ProgressView()
+                } else if authService.isAuthenticated {
                     ContentView()
                 } else {
                     SignInView()
