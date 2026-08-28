@@ -80,6 +80,12 @@ struct SignInView: View {
             errorMessage = "Please enter your email and password."
             return
         }
+        
+        guard cleanEmail.contains("@"),
+              cleanEmail.contains(".") else {
+            errorMessage = "Please enter a valid email address."
+            return
+        }
 
         isSigningIn = true
         defer {
