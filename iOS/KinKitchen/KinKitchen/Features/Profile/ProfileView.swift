@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import Supabase
 
 struct ProfileView: View {
     var body: some View {
@@ -36,6 +37,20 @@ struct ProfileView: View {
                 Text("Sign Out")
                     .font(KinTypography.body)
                     .foregroundStyle(KinColors.error)
+            }
+        }
+        .task {
+            do {
+                let profiles: [Profile] = try await SupabaseManager.client
+                    .from("profiles")
+                    .select()
+                    .limit(1)
+                    .execute()
+                    .value
+
+                print("Profile model decode successful:", profiles)
+            } catch {
+                print("Profile model decode failed:", error)
             }
         }
     }
