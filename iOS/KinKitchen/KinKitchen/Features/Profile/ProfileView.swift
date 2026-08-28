@@ -17,6 +17,7 @@ struct ProfileView: View {
     @State private var isLoading = true
     @State private var selectedPhotoItem: PhotosPickerItem?
     @State private var profilePhotoData: Data?
+    @State private var isEditingProfile = false
     
     
     var body: some View {
@@ -79,7 +80,7 @@ struct ProfileView: View {
                     title: "Edit Profile",
                     color: KinColors.success
                 ) {
-                    print("Navigate to Edit Profile")
+                    isEditingProfile = true
                 }
 
                 // Sign Out
@@ -108,6 +109,20 @@ struct ProfileView: View {
 
             Task {
                 await uploadSelectedPhoto(newItem)
+            }
+        }
+        .sheet(isPresented: $isEditingProfile) {
+            EditProfileView(
+                displayName: profile?.displayName ?? "",
+                username: profile?.username ?? "",
+                bio: profile?.bio ?? ""
+            )
+        }
+        .onChange(of: isEditingProfile) { _, isEditing in
+            if !isEditing {
+                Task {
+                    await loadProfile()
+                }
             }
         }
     }
