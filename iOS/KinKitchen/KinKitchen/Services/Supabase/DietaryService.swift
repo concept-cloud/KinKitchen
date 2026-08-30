@@ -103,6 +103,53 @@ enum DietaryService {
             .eq("restriction_id", value: restrictionId)
             .execute()
     }
+    
+    static func fetchDietaryPreferences() async throws -> [DietaryPreference] {
+        try await SupabaseManager.client
+            .from("dietary_preferences")
+            .select()
+            .order("name")
+            .execute()
+            .value
+    }
+
+    static func fetchSelectedDietaryPreferences() async throws -> [UUID] {
+        let user = try await SupabaseManager.client.auth.session.user
+
+        let selections: [UserDietaryPreferenceSelection] = try await SupabaseManager.client
+            .from("user_dietary_preferences")
+            .select()
+            .eq("user_id", value: user.id)
+            .execute()
+            .value
+
+        return selections.map(\.preferenceId)
+    }
+
+    static func addDietaryPreference(_ preferenceId: UUID) async throws {
+        let user = try await SupabaseManager.client.auth.session.user
+
+        let selection = UserDietaryPreferenceSelection(
+            userId: user.id,
+            preferenceId: preferenceId
+        )
+
+        try await SupabaseManager.client
+            .from("user_dietary_preferences")
+            .insert(selection)
+            .execute()
+    }
+
+    static func removeDietaryPreference(_ preferenceId: UUID) async throws {
+        let user = try await SupabaseManager.client.auth.session.user
+
+        try await SupabaseManager.client
+            .from("user_dietary_preferences")
+            .delete()
+            .eq("user_id", value: user.id)
+            .eq("preference_id", value: preferenceId)
+            .execute()
+    }
 }
 
 private struct UserAllergenSelection: Codable {
@@ -122,5 +169,15 @@ private struct UserDietaryRestrictionSelection: Codable {
     enum CodingKeys: String, CodingKey {
         case userId = "user_id"
         case restrictionId = "restriction_id"
+    }
+}
+
+private struct UserDietaryPreferenceSelection: Codable {
+    let userId: UUID
+    let preferenceId: UUID
+
+    enum CodingKeys: String, CodingKey {
+        case userId = "user_id"
+        case preferenceId = "preference_id"
     }
 }
