@@ -24,6 +24,22 @@ enum ProfileService {
         return profile
     }
 
+    static func isCurrentProfileComplete() async throws -> Bool {
+        let profile = try await fetchCurrentProfile()
+
+        let displayName =
+            profile.displayName?
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+                ?? ""
+
+        let username =
+            profile.username?
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+                ?? ""
+
+        return !displayName.isEmpty && !username.isEmpty
+    }
+
     static func updateProfile(
         displayName: String,
         username: String,
@@ -43,12 +59,14 @@ enum ProfileService {
             .eq("id", value: user.id)
             .execute()
     }
-    
-    static func uploadProfilePhoto(_ imageData: Data) async throws -> String {
+
+    static func uploadProfilePhoto(
+        _ imageData: Data
+    ) async throws -> String {
         let user = try await SupabaseManager.client.auth.session.user
 
-        let path = "\(user.id.uuidString.lowercased())/profile.jpg"
-
+        let path =
+            "\(user.id.uuidString.lowercased())/profile.jpg"
 
         try await SupabaseManager.client.storage
             .from("profile-photos")
@@ -61,11 +79,9 @@ enum ProfileService {
                 )
             )
 
-
         let updates = ProfilePhotoUpdate(
             profilePhotoPath: path
         )
-
 
         try await SupabaseManager.client
             .from("profiles")
@@ -73,11 +89,12 @@ enum ProfileService {
             .eq("id", value: user.id)
             .execute()
 
-
         return path
     }
-    
-    static func fetchProfilePhoto(path: String) async throws -> Data {
+
+    static func fetchProfilePhoto(
+        path: String
+    ) async throws -> Data {
         try await SupabaseManager.client.storage
             .from("profile-photos")
             .download(path: path)
@@ -85,6 +102,7 @@ enum ProfileService {
 }
 
 private struct ProfileUpdate: Encodable {
+
     let displayName: String
     let username: String
     let bio: String
@@ -97,6 +115,7 @@ private struct ProfileUpdate: Encodable {
 }
 
 private struct ProfilePhotoUpdate: Encodable {
+
     let profilePhotoPath: String
 
     enum CodingKeys: String, CodingKey {
