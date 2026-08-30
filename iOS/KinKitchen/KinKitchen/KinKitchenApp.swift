@@ -24,6 +24,10 @@ struct KinKitchenApp: App {
     @State private var onboardingStep:
         OnboardingStep = .checking
 
+    @AppStorage("kinAppearanceMode")
+    private var appearanceMode = "light"
+    
+    
     var body: some Scene {
 
         WindowGroup {
@@ -43,7 +47,11 @@ struct KinKitchenApp: App {
                     authenticatedContent
                 }
             }
-            .preferredColorScheme(.light)
+            .preferredColorScheme(
+                appearanceMode == "dark"
+                    ? .dark
+                    : .light
+            )
             .task(id: authService.isAuthenticated) {
 
                 guard authService.isAuthenticated else {

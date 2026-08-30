@@ -11,303 +11,736 @@ import UIKit
 
 struct ProfileView: View {
 
+    // MARK: - Appearance
+
+    @AppStorage("kinAppearanceMode")
+    private var appearanceMode = "light"
+    
+    // MARK: - Profile
+
     @State private var profile: Profile?
     @State private var errorMessage: String?
     @State private var isLoading = true
+
+    // MARK: - Profile Photo
+
     @State private var selectedPhotoItem: PhotosPickerItem?
     @State private var profilePhotoData: Data?
+
+    // MARK: - Navigation
+
     @State private var isEditingProfile = false
     @State private var isEditingDietaryProfile = false
-
-    @State private var selectedAllergens: [Allergen] = []
-    @State private var selectedRestrictions: [DietaryRestriction] = []
-    @State private var selectedPreferences: [DietaryPreference] = []
+    @State private var isShowingSettings = false
 
     var body: some View {
+
         NavigationStack {
-            ScrollView {
-                VStack(spacing: KinSpacing.xLarge) {
 
-                    // Profile Photo
-                    ZStack {
-                        Circle()
-                            .fill(KinColors.surface)
-                            .frame(width: 120, height: 120)
+            GeometryReader { geometry in
 
-                        if
-                            let profilePhotoData,
-                            let uiImage = UIImage(data: profilePhotoData)
-                        {
-                            Image(uiImage: uiImage)
-                                .resizable()
-                                .scaledToFill()
-                                .frame(width: 120, height: 120)
-                                .clipShape(Circle())
+                ScrollView {
+
+                    VStack(
+                        alignment: .leading,
+                        spacing: KinSpacing.xLarge
+                    ) {
+
+                        if isLoading {
+
+                            loadingSection
+
                         } else {
-                            Image(systemName: KinIcons.profile)
-                                .font(.system(size: 48))
-                                .foregroundStyle(KinColors.secondaryText)
-                        }
-                    }
 
-                    KinPhotoPicker(
-                        selectedItem: $selectedPhotoItem
-                    )
+                            // MARK: - Identity
 
-                    // Identity
-                    VStack(spacing: KinSpacing.small) {
-                        Text(profile?.displayName ?? "Display Name")
-                            .font(KinTypography.largeTitle)
-                            .foregroundStyle(KinColors.primaryText)
+                            profileHeader
 
-                        if let username = profile?.username {
-                            Text("@\(username)")
-                                .font(KinTypography.body)
-                                .foregroundStyle(KinColors.secondaryText)
-                        }
-                    }
+                            // MARK: - About
 
-                    // Bio
-                    VStack(
-                        alignment: .leading,
-                        spacing: KinSpacing.small
-                    ) {
-                        Text("About")
-                            .font(KinTypography.title)
-                            .foregroundStyle(KinColors.primaryText)
+                            profileDetails
 
-                        Text(
-                            profile?.bio ?? "Your bio will appear here."
-                        )
-                        .font(KinTypography.body)
-                        .foregroundStyle(KinColors.secondaryText)
-                    }
-                    .frame(
-                        maxWidth: .infinity,
-                        alignment: .leading
-                    )
+                            // MARK: - Error
 
-                    // Dietary Information
-                    VStack(
-                        alignment: .leading,
-                        spacing: KinSpacing.large
-                    ) {
-                        Text("Dietary Information")
-                            .font(KinTypography.title)
-                            .foregroundStyle(KinColors.primaryText)
+                            if let errorMessage {
 
-                        dietarySection(
-                            title: "Allergens",
-                            items: selectedAllergens.map(\.name)
-                        )
-
-                        dietarySection(
-                            title: "Dietary Restrictions",
-                            items: selectedRestrictions.map(\.name)
-                        )
-
-                        dietarySection(
-                            title: "Dietary Preferences",
-                            items: selectedPreferences.map(\.name)
-                        )
-                    }
-                    .frame(
-                        maxWidth: .infinity,
-                        alignment: .leading
-                    )
-
-                    // Edit Profile
-                    KinSecondaryButton(
-                        title: "Edit Profile",
-                        color: KinColors.success
-                    ) {
-                        isEditingProfile = true
-                    }
-
-                    // Edit Dietary Information
-                    KinSecondaryButton(
-                        title: "Edit Dietary Information",
-                        color: KinColors.success
-                    ) {
-                        isEditingDietaryProfile = true
-                    }
-
-                    // Sign Out
-                    Button {
-                        Task {
-                            do {
-                                try await AuthService.shared.signOut()
-                            } catch {
-                                print(
-                                    "Sign out failed: \(error.localizedDescription)"
-                                )
+                                Text(errorMessage)
+                                    .font(KinTypography.caption)
+                                    .foregroundStyle(KinColors.error)
+                                    .frame(
+                                        maxWidth: .infinity,
+                                        alignment: .leading
+                                    )
                             }
+
+                            // MARK: - Profile Sections
+
+                            profileNavigation
+
+                            Spacer(
+                                minLength: KinSpacing.small
+                            )
+
+                            // MARK: - Sign Out
+
+                            signOutButton
                         }
-                    } label: {
-                        Text("Sign Out")
-                            .font(KinTypography.body)
-                            .foregroundStyle(KinColors.error)
                     }
+                    .padding(KinSpacing.xLarge)
+                    .frame(
+                        maxWidth: .infinity,
+                        minHeight: geometry.size.height,
+                        alignment: .top
+                    )
                 }
-                .padding(KinSpacing.xLarge)
+                .background(KinColors.background)
             }
-            .background(KinColors.background)
+
+            // MARK: - Load Profile
+
             .task {
+
                 await loadProfile()
-                await loadDietaryInformation()
             }
-            
-            .onChange(of: selectedPhotoItem) { _, newItem in
+
+            // MARK: - Photo Selection
+
+            .onChange(
+                of: selectedPhotoItem
+            ) { _, newItem in
+
                 guard let newItem else {
                     return
                 }
 
                 Task {
-                    await uploadSelectedPhoto(newItem)
+
+                    await uploadSelectedPhoto(
+                        newItem
+                    )
                 }
             }
-            .sheet(isPresented: $isEditingProfile) {
+
+            // MARK: - Edit Profile
+
+            .sheet(
+                isPresented: $isEditingProfile
+            ) {
+
                 EditProfileView()
             }
-            .onChange(of: isEditingProfile) { _, isEditing in
+
+            .onChange(
+                of: isEditingProfile
+            ) { _, isEditing in
+
                 if !isEditing {
+
                     Task {
+
                         await loadProfile()
                     }
                 }
             }
+
+            // MARK: - Dietary Profile
+
             .navigationDestination(
-                isPresented: $isEditingDietaryProfile
+                isPresented:
+                    $isEditingDietaryProfile
             ) {
+
                 EditDietaryProfileView()
             }
-            .onChange(of: isEditingDietaryProfile) { _, isEditing in
-                if !isEditing {
-                    Task {
-                        await loadDietaryInformation()
-                    }
-                }
+            .navigationDestination(
+                isPresented: $isShowingSettings
+            ) {
+                SettingsView()
             }
         }
     }
 
+    // MARK: - Profile Header
+
+    private var profileHeader: some View {
+
+        HStack(
+            alignment: .top,
+            spacing: KinSpacing.large
+        ) {
+
+            // MARK: Photo
+
+            PhotosPicker(
+                selection: $selectedPhotoItem,
+                matching: .images
+            ) {
+
+                ZStack(
+                    alignment: .bottomTrailing
+                ) {
+
+                    ZStack {
+
+                        Circle()
+                            .fill(KinColors.surface)
+                            .frame(
+                                width: 120,
+                                height: 120
+                            )
+
+                        if
+                            let profilePhotoData,
+                            let uiImage = UIImage(
+                                data: profilePhotoData
+                            )
+                        {
+
+                            Image(uiImage: uiImage)
+                                .resizable()
+                                .scaledToFill()
+                                .frame(
+                                    width: 120,
+                                    height: 120
+                                )
+                                .clipShape(Circle())
+
+                        } else {
+
+                            Image(
+                                systemName:
+                                    KinIcons.profile
+                            )
+                            .font(
+                                .system(size: 48)
+                            )
+                            .foregroundStyle(
+                                KinColors.secondaryText
+                            )
+                        }
+                    }
+
+                    Image(
+                        systemName: "camera.fill"
+                    )
+                    .font(
+                        .system(size: 12)
+                    )
+                    .foregroundStyle(
+                        KinColors.background
+                    )
+                    .frame(
+                        width: 30,
+                        height: 30
+                    )
+                    .background(
+                        KinColors.primary
+                    )
+                    .clipShape(Circle())
+                }
+            }
+            .buttonStyle(.plain)
+
+            // MARK: Identity
+
+            VStack(
+                alignment: .leading,
+                spacing: KinSpacing.medium
+            ) {
+
+                // Display Name
+
+                Text(displayName)
+                    .font(
+                        KinTypography.largeTitle
+                    )
+                    .foregroundStyle(
+                        KinColors.primaryText
+                    )
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
+                    .frame(
+                        maxWidth: .infinity,
+                        alignment: .leading
+                    )
+
+                // Username + Edit
+
+                HStack(
+                    alignment: .center,
+                    spacing: KinSpacing.medium
+                ) {
+
+                    if let username =
+                        profile?.username?
+                            .trimmingCharacters(
+                                in:
+                                    .whitespacesAndNewlines
+                            ),
+                       !username.isEmpty
+                    {
+
+                        Text("@\(username)")
+                            .font(
+                                KinTypography.body
+                            )
+                            .foregroundStyle(
+                                KinColors.secondaryText
+                            )
+                            .lineLimit(1)
+                    }
+
+                    Spacer(
+                        minLength: KinSpacing.small
+                    )
+
+                    Button {
+
+                        isEditingProfile = true
+
+                    } label: {
+
+                        HStack(
+                            spacing: KinSpacing.small
+                        ) {
+
+                            Image(
+                                systemName: "pencil"
+                            )
+
+                            Text("Edit")
+                        }
+                        .font(
+                            KinTypography.caption
+                        )
+                        .foregroundStyle(
+                            KinColors.primary
+                        )
+                    }
+                    .buttonStyle(.plain)
+                }
+
+                // Location
+
+                if let location =
+                    profile?.location?
+                        .trimmingCharacters(
+                            in:
+                                .whitespacesAndNewlines
+                        ),
+                   !location.isEmpty
+                {
+
+                    HStack(
+                        spacing: KinSpacing.small
+                    ) {
+
+                        Image(
+                            systemName:
+                                "mappin.and.ellipse"
+                        )
+
+                        Text(location)
+                            .lineLimit(1)
+                    }
+                    .font(
+                        KinTypography.caption
+                    )
+                    .foregroundStyle(
+                        KinColors.secondaryText
+                    )
+                }
+            }
+            .frame(
+                maxWidth: .infinity,
+                minHeight: 120,
+                alignment: .topLeading
+            )
+        }
+        .frame(
+            maxWidth: .infinity,
+            alignment: .leading
+        )
+    }
+
+    // MARK: - Profile Details
+
     @ViewBuilder
-    private func dietarySection(
-        title: String,
-        items: [String]
-    ) -> some View {
+    private var profileDetails: some View {
+
+        if let bio =
+            profile?.bio?
+                .trimmingCharacters(
+                    in: .whitespacesAndNewlines
+                ),
+           !bio.isEmpty
+        {
+
+            VStack(
+                alignment: .leading,
+                spacing: KinSpacing.small
+            ) {
+
+                Text("About")
+                    .font(
+                        KinTypography.title
+                    )
+                    .foregroundStyle(
+                        KinColors.primaryText
+                    )
+
+                Text(bio)
+                    .font(
+                        KinTypography.body
+                    )
+                    .foregroundStyle(
+                        KinColors.secondaryText
+                    )
+                    .frame(
+                        maxWidth: .infinity,
+                        alignment: .leading
+                    )
+            }
+            .frame(
+                maxWidth: .infinity,
+                alignment: .leading
+            )
+        }
+    }
+
+
+    // MARK: - Profile Navigation
+
+    private var profileNavigation: some View {
 
         VStack(
-            alignment: .leading,
             spacing: KinSpacing.small
         ) {
+
+            // Dietary Profile
+
+            profileNavigationRow(
+                title: "Dietary Profile",
+                systemImage: "fork.knife"
+            ) {
+
+                isEditingDietaryProfile = true
+            }
+
+            // Future Profile Destinations
+
+            placeholderNavigationRow(
+                title: "My Recipes",
+                systemImage: "book.closed"
+            )
+
+            placeholderNavigationRow(
+                title: "My Cookbooks",
+                systemImage: "books.vertical"
+            )
+
+            placeholderNavigationRow(
+                title: "Saved Recipes",
+                systemImage: "bookmark"
+            )
+
+            // Settings
+
+            profileNavigationRow(
+                title: "Settings",
+                systemImage: "gearshape"
+            ) {
+                isShowingSettings = true
+            }
+
+            placeholderNavigationRow(
+                title: "App Info",
+                systemImage: "info.circle"
+            )
+        }
+    }
+
+    // MARK: - Navigation Row
+
+    private func profileNavigationRow(
+        title: String,
+        systemImage: String,
+        action: @escaping () -> Void
+    ) -> some View {
+
+        Button(
+            action: action
+        ) {
+
+            HStack(
+                spacing: KinSpacing.medium
+            ) {
+
+                Image(
+                    systemName: systemImage
+                )
+                .font(.body)
+                .foregroundStyle(
+                    KinColors.primary
+                )
+                .frame(width: 24)
+
+                Text(title)
+                    .font(
+                        KinTypography.body
+                    )
+                    .foregroundStyle(
+                        KinColors.primaryText
+                    )
+
+                Spacer()
+
+                Image(
+                    systemName:
+                        "chevron.right"
+                )
+                .font(.caption)
+                .foregroundStyle(
+                    KinColors.secondaryText
+                )
+            }
+            .padding(
+                KinSpacing.medium
+            )
+            .frame(
+                maxWidth: .infinity
+            )
+            .background(
+                KinColors.surface
+            )
+            .clipShape(
+                RoundedRectangle(
+                    cornerRadius:
+                        KinRadius.medium
+                )
+            )
+        }
+        .buttonStyle(.plain)
+    }
+    
+    // MARK: - Placeholder Navigation Row
+
+    private func placeholderNavigationRow(
+        title: String,
+        systemImage: String
+    ) -> some View {
+
+        HStack(
+            spacing: KinSpacing.medium
+        ) {
+
+            Image(systemName: systemImage)
+                .font(.body)
+                .foregroundStyle(KinColors.primary)
+                .frame(width: 24)
+
             Text(title)
                 .font(KinTypography.body)
                 .foregroundStyle(KinColors.primaryText)
 
-            if items.isEmpty {
-                Text("None selected")
-                    .font(KinTypography.caption)
-                    .foregroundStyle(KinColors.secondaryText)
-            } else {
-                KinFlowLayout(spacing: KinSpacing.small) {
-                    ForEach(items, id: \.self) { item in
-                        KinChip(
-                            title: item,
-                            isSelected: true
-                        )
-                    }
+            Spacer()
+
+            Text("Coming Soon")
+                .font(KinTypography.caption)
+                .foregroundStyle(KinColors.secondaryText)
+        }
+        .padding(KinSpacing.medium)
+        .frame(maxWidth: .infinity)
+        .background(KinColors.surface)
+        .clipShape(
+            RoundedRectangle(
+                cornerRadius: KinRadius.medium
+            )
+        )
+    }
+
+    // MARK: - Sign Out
+
+    private var signOutButton: some View {
+
+        Button {
+
+            Task {
+
+                do {
+
+                    try await
+                        AuthService.shared
+                            .signOut()
+
+                } catch {
+
+                    errorMessage =
+                        "Unable to sign out. Please try again."
+
+                    print(
+                        "SIGN OUT ERROR:",
+                        error.localizedDescription
+                    )
                 }
             }
+
+        } label: {
+
+            HStack {
+
+                Image(
+                    systemName:
+                        "rectangle.portrait.and.arrow.right"
+                )
+
+                Text("Sign Out")
+
+                Spacer()
+            }
+            .font(
+                KinTypography.body
+            )
+            .foregroundStyle(
+                KinColors.error
+            )
+            .padding(
+                KinSpacing.medium
+            )
+            .frame(
+                maxWidth: .infinity
+            )
+            .background(
+                KinColors.surface
+            )
+            .clipShape(
+                RoundedRectangle(
+                    cornerRadius:
+                        KinRadius.medium
+                )
+            )
         }
+        .buttonStyle(.plain)
     }
+
+    // MARK: - Loading
+
+    private var loadingSection: some View {
+
+        VStack {
+
+            Spacer()
+
+            ProgressView()
+
+            Spacer()
+        }
+        .frame(
+            maxWidth: .infinity
+        )
+    }
+
+    // MARK: - Display Name
+
+    private var displayName: String {
+
+        let storedDisplayName =
+            profile?.displayName?
+                .trimmingCharacters(
+                    in: .whitespacesAndNewlines
+                ) ?? ""
+
+        if !storedDisplayName.isEmpty {
+
+            return storedDisplayName
+        }
+
+        let firstName =
+            profile?.firstName?
+                .trimmingCharacters(
+                    in: .whitespacesAndNewlines
+                ) ?? ""
+
+        let lastName =
+            profile?.lastName?
+                .trimmingCharacters(
+                    in: .whitespacesAndNewlines
+                ) ?? ""
+
+        let fullName =
+            "\(firstName) \(lastName)"
+                .trimmingCharacters(
+                    in: .whitespacesAndNewlines
+                )
+
+        if !fullName.isEmpty {
+
+            return fullName
+        }
+
+        return "Your Profile"
+    }
+
+    // MARK: - Load Profile
 
     @MainActor
     private func loadProfile() async {
+
         isLoading = true
         errorMessage = nil
 
-        do {
-            profile = try await ProfileService.fetchCurrentProfile()
+        defer {
 
-            if let path = profile?.profilePhotoPath {
-                do {
-                    profilePhotoData =
-                        try await ProfileService.fetchProfilePhoto(
-                            path: path
-                        )
-                } catch {
-                    profilePhotoData = nil
-                }
-            }
-
-        } catch {
-            errorMessage = "Unable to load your profile."
+            isLoading = false
         }
 
-        isLoading = false
-    }
-
-    @MainActor
-    private func loadDietaryInformation() async {
         do {
-            async let allAllergens =
-                DietaryService.fetchAllergens()
 
-            async let allRestrictions =
-                DietaryService.fetchDietaryRestrictions()
+            profile =
+                try await ProfileService
+                    .fetchCurrentProfile()
 
-            async let allPreferences =
-                DietaryService.fetchDietaryPreferences()
+            if let path =
+                profile?
+                    .profilePhotoPath
+            {
 
-            async let selectedAllergenIds =
-                DietaryService.fetchSelectedAllergens()
+                do {
 
-            async let selectedRestrictionIds =
-                DietaryService.fetchSelectedDietaryRestrictions()
+                    profilePhotoData =
+                        try await ProfileService
+                            .fetchProfilePhoto(
+                                path: path
+                            )
 
-            async let selectedPreferenceIds =
-                DietaryService.fetchSelectedDietaryPreferences()
+                } catch {
 
-            let allergens = try await allAllergens
-            let restrictions = try await allRestrictions
-            let preferences = try await allPreferences
+                    profilePhotoData = nil
 
-            let allergenIds = Set(
-                try await selectedAllergenIds
-            )
+                    print(
+                        "PROFILE PHOTO LOAD ERROR:",
+                        error.localizedDescription
+                    )
+                }
 
-            let restrictionIds = Set(
-                try await selectedRestrictionIds
-            )
+            } else {
 
-            let preferenceIds = Set(
-                try await selectedPreferenceIds
-            )
-
-            selectedAllergens = allergens.filter {
-                allergenIds.contains($0.id)
-            }
-
-            selectedRestrictions = restrictions.filter {
-                restrictionIds.contains($0.id)
-            }
-
-            selectedPreferences = preferences.filter {
-                preferenceIds.contains($0.id)
+                profilePhotoData = nil
             }
 
         } catch {
-            selectedAllergens = []
-            selectedRestrictions = []
-            selectedPreferences = []
+
+            errorMessage =
+                "Unable to load your profile."
 
             print(
-                "Unable to load dietary information:",
+                "PROFILE LOAD ERROR:",
                 error.localizedDescription
             )
         }
     }
+
+    // MARK: - Upload Profile Photo
 
     @MainActor
     private func uploadSelectedPhoto(
@@ -315,33 +748,41 @@ struct ProfileView: View {
     ) async {
 
         defer {
+
             selectedPhotoItem = nil
         }
 
         do {
+
             guard
                 let imageData =
-                    try await item.loadTransferable(
-                        type: Data.self
-                    )
+                    try await item
+                        .loadTransferable(
+                            type: Data.self
+                        )
             else {
+
                 errorMessage =
                     "Unable to load the selected photo."
+
                 return
             }
 
-            _ = try await ProfileService.uploadProfilePhoto(
-                imageData
-            )
+            _ =
+                try await ProfileService
+                    .uploadProfilePhoto(
+                        imageData
+                    )
 
             await loadProfile()
 
         } catch {
+
             errorMessage =
                 "Unable to upload profile photo."
 
             print(
-                "Profile photo upload failed:",
+                "PROFILE PHOTO UPLOAD ERROR:",
                 error.localizedDescription
             )
         }
@@ -349,5 +790,6 @@ struct ProfileView: View {
 }
 
 #Preview {
+
     ProfileView()
 }
