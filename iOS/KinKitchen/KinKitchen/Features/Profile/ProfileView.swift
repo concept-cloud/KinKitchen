@@ -161,6 +161,56 @@ struct ProfileView: View {
                 )
             }
         }
+        .task {
+            do {
+                let restrictions = try await DietaryService.fetchDietaryRestrictions()
+
+                print("Available restrictions:", restrictions.map(\.name))
+
+                guard restrictions.count >= 2 else {
+                    print("Not enough dietary restrictions for test")
+                    return
+                }
+
+                let first = restrictions[0]
+                let second = restrictions[1]
+
+                try? await DietaryService.removeDietaryRestriction(first.id)
+                try? await DietaryService.removeDietaryRestriction(second.id)
+
+                try await DietaryService.addDietaryRestriction(first.id)
+
+                do {
+                    try await DietaryService.addDietaryRestriction(first.id)
+                    print("Duplicate restriction test failed: duplicate was allowed")
+                } catch {
+                    print("Duplicate restriction prevented successfully")
+                }
+
+                try await DietaryService.addDietaryRestriction(second.id)
+
+                let selected = try await DietaryService.fetchSelectedDietaryRestrictions()
+
+                print("Selected restriction IDs:", selected)
+                print(
+                    "Multiple restriction test:",
+                    selected.contains(first.id) && selected.contains(second.id)
+                )
+
+                try await DietaryService.removeDietaryRestriction(first.id)
+
+                let afterRemoval = try await DietaryService.fetchSelectedDietaryRestrictions()
+
+                print("Restriction removal test:", !afterRemoval.contains(first.id))
+                print("Remaining restriction test:", afterRemoval.contains(second.id))
+
+            } catch {
+                print(
+                    "KINKIT-35 restriction test failed:",
+                    error.localizedDescription
+                )
+            }
+        }
         .onChange(of: selectedPhotoItem) { _, newItem in
             guard let newItem else { return }
 

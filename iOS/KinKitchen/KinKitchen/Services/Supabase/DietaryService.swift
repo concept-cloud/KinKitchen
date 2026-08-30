@@ -56,6 +56,53 @@ enum DietaryService {
             .eq("allergen_id", value: allergenId)
             .execute()
     }
+    
+    static func fetchDietaryRestrictions() async throws -> [DietaryRestriction] {
+        try await SupabaseManager.client
+            .from("dietary_restrictions")
+            .select()
+            .order("name")
+            .execute()
+            .value
+    }
+
+    static func fetchSelectedDietaryRestrictions() async throws -> [UUID] {
+        let user = try await SupabaseManager.client.auth.session.user
+
+        let selections: [UserDietaryRestrictionSelection] = try await SupabaseManager.client
+            .from("user_dietary_restrictions")
+            .select()
+            .eq("user_id", value: user.id)
+            .execute()
+            .value
+
+        return selections.map(\.restrictionId)
+    }
+
+    static func addDietaryRestriction(_ restrictionId: UUID) async throws {
+        let user = try await SupabaseManager.client.auth.session.user
+
+        let selection = UserDietaryRestrictionSelection(
+            userId: user.id,
+            restrictionId: restrictionId
+        )
+
+        try await SupabaseManager.client
+            .from("user_dietary_restrictions")
+            .insert(selection)
+            .execute()
+    }
+
+    static func removeDietaryRestriction(_ restrictionId: UUID) async throws {
+        let user = try await SupabaseManager.client.auth.session.user
+
+        try await SupabaseManager.client
+            .from("user_dietary_restrictions")
+            .delete()
+            .eq("user_id", value: user.id)
+            .eq("restriction_id", value: restrictionId)
+            .execute()
+    }
 }
 
 private struct UserAllergenSelection: Codable {
@@ -65,5 +112,15 @@ private struct UserAllergenSelection: Codable {
     enum CodingKeys: String, CodingKey {
         case userId = "user_id"
         case allergenId = "allergen_id"
+    }
+}
+
+private struct UserDietaryRestrictionSelection: Codable {
+    let userId: UUID
+    let restrictionId: UUID
+
+    enum CodingKeys: String, CodingKey {
+        case userId = "user_id"
+        case restrictionId = "restriction_id"
     }
 }
