@@ -10,89 +10,234 @@ import SwiftUI
 @main
 struct KinKitchenApp: App {
 
-    @StateObject private var authService = AuthService.shared
+    enum OnboardingStep {
+        case checking
+        case profile
+        case dietaryRestrictions
+        case dietaryPreferences
+        case complete
+    }
 
-    @State private var isProfileComplete: Bool?
-    @State private var isCheckingProfile = false
+    @StateObject private var authService =
+        AuthService.shared
+
+    @State private var onboardingStep:
+        OnboardingStep = .checking
 
     var body: some Scene {
+
         WindowGroup {
+
             Group {
+
                 if authService.isLoadingSession {
+
                     ProgressView()
 
                 } else if !authService.isAuthenticated {
+
                     SignInView()
 
-                } else if isCheckingProfile {
-                    ProgressView()
-
-                } else if let isProfileComplete {
-                    if isProfileComplete {
-                        ContentView()
-                    } else {
-                        profileSetupRequiredView
-                    }
-
                 } else {
-                    ProgressView()
+
+                    authenticatedContent
                 }
             }
             .preferredColorScheme(.light)
             .task(id: authService.isAuthenticated) {
+
                 guard authService.isAuthenticated else {
-                    isProfileComplete = nil
+
+                    onboardingStep = .checking
                     return
                 }
 
-                await checkProfileCompletion()
+                await checkOnboardingStatus()
             }
         }
     }
 
-    private var profileSetupRequiredView: some View {
-        VStack(spacing: KinSpacing.large) {
-            Text("Complete Your Profile")
-                .font(KinTypography.largeTitle)
-                .foregroundStyle(KinColors.primaryText)
+    // MARK: - Authenticated Routing
 
-            Text(
-                "Your profile must be completed before continuing to Kin Kitchen."
-            )
-            .font(KinTypography.body)
-            .foregroundStyle(KinColors.secondaryText)
-            .multilineTextAlignment(.center)
+    @ViewBuilder
+    private var authenticatedContent: some View {
+
+        switch onboardingStep {
+
+        case .checking:
+
+            ProgressView()
+
+        case .profile:
+
+            ProfileSetupView {
+
+                Task {
+                    await profileSetupCompleted()
+                }
+            }
+
+        case .dietaryRestrictions:
+
+            DietaryRestrictionsSetupView {
+
+                onboardingStep =
+                    .dietaryPreferences
+            }
+
+        case .dietaryPreferences:
+
+            DietaryPreferencesSetupView {
+
+                Task {
+                    await dietarySetupCompleted()
+                }
+            }
+
+        case .complete:
+
+            ContentView()
         }
-        .padding(KinSpacing.xLarge)
-        .frame(
-            maxWidth: .infinity,
-            maxHeight: .infinity
-        )
-        .background(KinColors.background)
     }
 
-    @MainActor
-    private func checkProfileCompletion() async {
-        isCheckingProfile = true
+    // MARK: - Check Onboarding Status
 
-        defer {
-            isCheckingProfile = false
-        }
+    @MainActor
+    private func checkOnboardingStatus() async {
+
+        onboardingStep = .checking
 
         do {
-            isProfileComplete =
-                try await ProfileService.isCurrentProfileComplete()
+
+            let isProfileComplete =
+                try await ProfileService
+                    .isCurrentProfileComplete()
 
             print(
                 "PROFILE CHECK:",
-                isProfileComplete == true ? "COMPLETE" : "INCOMPLETE"
+                isProfileComplete
+                    ? "COMPLETE"
+                    : "INCOMPLETE"
             )
 
-        } catch {
-            isProfileComplete = false
+            guard isProfileComplete else {
+
+                onboardingStep = .profile
+                return
+            }
+
+            let isDietarySetupComplete =
+                try await ProfileService
+                    .isDietarySetupComplete()
 
             print(
-                "PROFILE CHECK ERROR:",
+                "DIETARY SETUP CHECK:",
+                isDietarySetupComplete
+                    ? "COMPLETE"
+                    : "INCOMPLETE"
+            )
+
+            guard isDietarySetupComplete else {
+
+                onboardingStep =
+                    .dietaryRestrictions
+
+                return
+            }
+
+            let isDietaryReviewDue =
+                try await ProfileService
+                    .isDietaryReviewDue()
+
+            print(
+                "DIETARY REVIEW:",
+                isDietaryReviewDue
+                    ? "DUE"
+                    : "CURRENT"
+            )
+
+            if isDietaryReviewDue {
+
+                onboardingStep =
+                    .dietaryRestrictions
+
+            } else {
+
+                onboardingStep =
+                    .complete
+            }
+
+        } catch {
+
+            onboardingStep = .profile
+
+            print(
+                "ONBOARDING CHECK ERROR:",
+                error.localizedDescription
+            )
+        }
+    }
+
+    // MARK: - Profile Setup Completed
+
+    @MainActor
+    private func profileSetupCompleted() async {
+
+        do {
+
+            let isProfileComplete =
+                try await ProfileService
+                    .isCurrentProfileComplete()
+
+            guard isProfileComplete else {
+
+                onboardingStep = .profile
+
+                print(
+                    "PROFILE CHECK: INCOMPLETE"
+                )
+
+                return
+            }
+
+            print(
+                "PROFILE CHECK: COMPLETE"
+            )
+
+            onboardingStep =
+                .dietaryRestrictions
+
+        } catch {
+
+            onboardingStep = .profile
+
+            print(
+                "PROFILE COMPLETION ERROR:",
+                error.localizedDescription
+            )
+        }
+    }
+
+    // MARK: - Dietary Setup Completed
+
+    @MainActor
+    private func dietarySetupCompleted() async {
+
+        do {
+
+            try await ProfileService
+                .markDietarySetupReviewed()
+
+            print(
+                "DIETARY SETUP: COMPLETE"
+            )
+
+            onboardingStep = .complete
+
+        } catch {
+
+            print(
+                "DIETARY SETUP COMPLETION ERROR:",
                 error.localizedDescription
             )
         }

@@ -156,6 +156,7 @@ struct ProfileView: View {
                 await loadProfile()
                 await loadDietaryInformation()
             }
+            
             .onChange(of: selectedPhotoItem) { _, newItem in
                 guard let newItem else {
                     return
@@ -166,11 +167,7 @@ struct ProfileView: View {
                 }
             }
             .sheet(isPresented: $isEditingProfile) {
-                EditProfileView(
-                    displayName: profile?.displayName ?? "",
-                    username: profile?.username ?? "",
-                    bio: profile?.bio ?? ""
-                )
+                EditProfileView()
             }
             .onChange(of: isEditingProfile) { _, isEditing in
                 if !isEditing {
