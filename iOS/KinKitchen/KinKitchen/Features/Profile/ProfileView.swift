@@ -19,6 +19,10 @@ struct ProfileView: View {
     @State private var isEditingProfile = false
     @State private var isEditingDietaryProfile = false
 
+    @State private var selectedAllergens: [Allergen] = []
+    @State private var selectedRestrictions: [DietaryRestriction] = []
+    @State private var selectedPreferences: [DietaryPreference] = []
+
     var body: some View {
         NavigationStack {
             ScrollView {
@@ -83,6 +87,35 @@ struct ProfileView: View {
                         alignment: .leading
                     )
 
+                    // Dietary Information
+                    VStack(
+                        alignment: .leading,
+                        spacing: KinSpacing.large
+                    ) {
+                        Text("Dietary Information")
+                            .font(KinTypography.title)
+                            .foregroundStyle(KinColors.primaryText)
+
+                        dietarySection(
+                            title: "Allergens",
+                            items: selectedAllergens.map(\.name)
+                        )
+
+                        dietarySection(
+                            title: "Dietary Restrictions",
+                            items: selectedRestrictions.map(\.name)
+                        )
+
+                        dietarySection(
+                            title: "Dietary Preferences",
+                            items: selectedPreferences.map(\.name)
+                        )
+                    }
+                    .frame(
+                        maxWidth: .infinity,
+                        alignment: .leading
+                    )
+
                     // Edit Profile
                     KinSecondaryButton(
                         title: "Edit Profile",
@@ -121,6 +154,7 @@ struct ProfileView: View {
             .background(KinColors.background)
             .task {
                 await loadProfile()
+                await loadDietaryInformation()
             }
             .onChange(of: selectedPhotoItem) { _, newItem in
                 guard let newItem else {
@@ -150,6 +184,44 @@ struct ProfileView: View {
             ) {
                 EditDietaryProfileView()
             }
+            .onChange(of: isEditingDietaryProfile) { _, isEditing in
+                if !isEditing {
+                    Task {
+                        await loadDietaryInformation()
+                    }
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func dietarySection(
+        title: String,
+        items: [String]
+    ) -> some View {
+
+        VStack(
+            alignment: .leading,
+            spacing: KinSpacing.small
+        ) {
+            Text(title)
+                .font(KinTypography.body)
+                .foregroundStyle(KinColors.primaryText)
+
+            if items.isEmpty {
+                Text("None selected")
+                    .font(KinTypography.caption)
+                    .foregroundStyle(KinColors.secondaryText)
+            } else {
+                KinFlowLayout(spacing: KinSpacing.small) {
+                    ForEach(items, id: \.self) { item in
+                        KinChip(
+                            title: item,
+                            isSelected: true
+                        )
+                    }
+                }
+            }
         }
     }
 
@@ -177,6 +249,67 @@ struct ProfileView: View {
         }
 
         isLoading = false
+    }
+
+    @MainActor
+    private func loadDietaryInformation() async {
+        do {
+            async let allAllergens =
+                DietaryService.fetchAllergens()
+
+            async let allRestrictions =
+                DietaryService.fetchDietaryRestrictions()
+
+            async let allPreferences =
+                DietaryService.fetchDietaryPreferences()
+
+            async let selectedAllergenIds =
+                DietaryService.fetchSelectedAllergens()
+
+            async let selectedRestrictionIds =
+                DietaryService.fetchSelectedDietaryRestrictions()
+
+            async let selectedPreferenceIds =
+                DietaryService.fetchSelectedDietaryPreferences()
+
+            let allergens = try await allAllergens
+            let restrictions = try await allRestrictions
+            let preferences = try await allPreferences
+
+            let allergenIds = Set(
+                try await selectedAllergenIds
+            )
+
+            let restrictionIds = Set(
+                try await selectedRestrictionIds
+            )
+
+            let preferenceIds = Set(
+                try await selectedPreferenceIds
+            )
+
+            selectedAllergens = allergens.filter {
+                allergenIds.contains($0.id)
+            }
+
+            selectedRestrictions = restrictions.filter {
+                restrictionIds.contains($0.id)
+            }
+
+            selectedPreferences = preferences.filter {
+                preferenceIds.contains($0.id)
+            }
+
+        } catch {
+            selectedAllergens = []
+            selectedRestrictions = []
+            selectedPreferences = []
+
+            print(
+                "Unable to load dietary information:",
+                error.localizedDescription
+            )
+        }
     }
 
     @MainActor
