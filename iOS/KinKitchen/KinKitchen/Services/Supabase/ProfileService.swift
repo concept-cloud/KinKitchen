@@ -270,6 +270,14 @@ enum ProfileService {
 
         return Date() >= reviewDate
     }
+    
+    static func fetchDietaryLastUpdated() async throws -> Date? {
+
+        let status =
+            try await fetchDietarySetupStatus()
+
+        return status.dietarySetupCompletedAt
+    }
 
     static func markDietarySetupReviewed() async throws {
 

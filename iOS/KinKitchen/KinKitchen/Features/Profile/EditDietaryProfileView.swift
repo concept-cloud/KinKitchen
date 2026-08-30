@@ -28,12 +28,13 @@ struct EditDietaryProfileView: View {
     @State private var errorMessage: String?
 
     var body: some View {
-        NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: KinSpacing.xLarge) {
 
                     if isLoading {
+
                         KinLoadingView()
+
                     } else {
 
                         dietarySection(
@@ -74,18 +75,11 @@ struct EditDietaryProfileView: View {
                 .padding(KinSpacing.xLarge)
             }
             .background(KinColors.background)
-            .navigationTitle("Dietary Information")
-            .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
-                    Button("Cancel") {
-                        dismiss()
-                    }
-                }
-            }
+            .navigationTitle("Edit Dietary Profile")
+            .navigationBarTitleDisplayMode(.inline)
             .task {
                 await loadDietaryInformation()
             }
-        }
     }
 
     private func dietarySection<Item: Identifiable>(

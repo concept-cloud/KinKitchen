@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import UIKit
 
 @main
 struct KinKitchenApp: App {
@@ -26,8 +27,27 @@ struct KinKitchenApp: App {
 
     @AppStorage("kinAppearanceMode")
     private var appearanceMode = "light"
-    
-    
+
+    init() {
+
+        let appearance = UINavigationBarAppearance()
+
+        appearance.configureWithOpaqueBackground()
+
+        appearance.backgroundColor = UIColor(
+            KinColors.background
+        )
+
+        UINavigationBar.appearance()
+            .standardAppearance = appearance
+
+        UINavigationBar.appearance()
+            .scrollEdgeAppearance = appearance
+
+        UINavigationBar.appearance()
+            .compactAppearance = appearance
+    }
+
     var body: some Scene {
 
         WindowGroup {

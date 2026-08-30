@@ -11,16 +11,12 @@ import UIKit
 
 struct ProfileView: View {
 
-    // MARK: - Appearance
-
-    @AppStorage("kinAppearanceMode")
-    private var appearanceMode = "light"
-    
     // MARK: - Profile
 
     @State private var profile: Profile?
     @State private var errorMessage: String?
     @State private var isLoading = true
+    @State private var hasLoadedProfile = false
 
     // MARK: - Profile Photo
 
@@ -37,70 +33,80 @@ struct ProfileView: View {
 
         NavigationStack {
 
-            GeometryReader { geometry in
-
-                ScrollView {
-
-                    VStack(
-                        alignment: .leading,
-                        spacing: KinSpacing.xLarge
-                    ) {
-
-                        if isLoading {
-
-                            loadingSection
-
-                        } else {
-
-                            // MARK: - Identity
-
-                            profileHeader
-
-                            // MARK: - About
-
-                            profileDetails
-
-                            // MARK: - Error
-
-                            if let errorMessage {
-
-                                Text(errorMessage)
-                                    .font(KinTypography.caption)
-                                    .foregroundStyle(KinColors.error)
-                                    .frame(
-                                        maxWidth: .infinity,
-                                        alignment: .leading
-                                    )
+            ZStack{
+                KinColors.background
+                    .ignoresSafeArea()
+                
+                GeometryReader { geometry in
+                    
+                    ScrollView {
+                        
+                        VStack(
+                            alignment: .leading,
+                            spacing: KinSpacing.xLarge
+                        ) {
+                            
+                            if isLoading {
+                                
+                                loadingSection
+                                
+                            } else {
+                                
+                                // MARK: - Identity
+                                
+                                profileHeader
+                                
+                                // MARK: - About
+                                
+                                profileDetails
+                                
+                                // MARK: - Error
+                                
+                                if let errorMessage {
+                                    
+                                    Text(errorMessage)
+                                        .font(KinTypography.caption)
+                                        .foregroundStyle(KinColors.error)
+                                        .frame(
+                                            maxWidth: .infinity,
+                                            alignment: .leading
+                                        )
+                                }
+                                
+                                // MARK: - Profile Sections
+                                
+                                profileNavigation
+                                
+                                Spacer(
+                                    minLength: KinSpacing.small
+                                )
+                                
+                                // MARK: - Sign Out
+                                
+                                signOutButton
                             }
-
-                            // MARK: - Profile Sections
-
-                            profileNavigation
-
-                            Spacer(
-                                minLength: KinSpacing.small
-                            )
-
-                            // MARK: - Sign Out
-
-                            signOutButton
                         }
+                        .padding(KinSpacing.xLarge)
+                        .frame(
+                            maxWidth: .infinity,
+                            minHeight: geometry.size.height,
+                            alignment: .top
+                        )
                     }
-                    .padding(KinSpacing.xLarge)
-                    .frame(
-                        maxWidth: .infinity,
-                        minHeight: geometry.size.height,
-                        alignment: .top
-                    )
+                    .background(KinColors.background)
                 }
-                .background(KinColors.background)
             }
-
             // MARK: - Load Profile
 
             .task {
 
+                guard !hasLoadedProfile else {
+                    return
+                }
+
                 await loadProfile()
+
+                hasLoadedProfile = true
             }
 
             // MARK: - Photo Selection
@@ -150,7 +156,7 @@ struct ProfileView: View {
                     $isEditingDietaryProfile
             ) {
 
-                EditDietaryProfileView()
+                DietaryProfileView()
             }
             .navigationDestination(
                 isPresented: $isShowingSettings
@@ -158,7 +164,20 @@ struct ProfileView: View {
                 SettingsView()
             }
         }
+        .toolbarBackground(
+            KinColors.background,
+            for: .navigationBar
+        )
+        .toolbarBackground(
+            .visible,
+            for: .navigationBar
+        )
+        .background(
+            KinColors.background
+                .ignoresSafeArea()
+        )
     }
+   
 
     // MARK: - Profile Header
 

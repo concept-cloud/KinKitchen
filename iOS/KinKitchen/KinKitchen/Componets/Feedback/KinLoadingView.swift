@@ -8,16 +8,32 @@
 import SwiftUI
 
 struct KinLoadingView: View {
+
     var message: String = "Loading..."
 
     var body: some View {
-        VStack(spacing: KinSpacing.medium) {
+
+        VStack(
+            spacing: KinSpacing.medium
+        ) {
+
             ProgressView()
 
             Text(message)
                 .font(KinTypography.body)
-                .foregroundStyle(KinColors.secondaryText)
+                .foregroundStyle(
+                    KinColors.secondaryText
+                )
         }
-        .padding(KinSpacing.large)
+        .frame(
+            maxWidth: .infinity,
+            maxHeight: .infinity
+        )
     }
+}
+
+#Preview {
+
+    KinLoadingView()
+        .background(KinColors.background)
 }

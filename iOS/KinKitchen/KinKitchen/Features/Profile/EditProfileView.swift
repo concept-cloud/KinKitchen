@@ -32,7 +32,8 @@ struct EditProfileView: View {
                     .foregroundStyle(KinColors.primaryText)
 
                 if isLoading {
-                    ProgressView()
+
+                    KinLoadingView()
 
                 } else {
                     profileForm

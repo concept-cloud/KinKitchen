@@ -6,92 +6,87 @@
 //
 
 import SwiftUI
-import Supabase
 
 struct ContentView: View {
-    
+
     @State private var selectedTab = 0
-    
+
     private let tabItems = [
+
         KinTabBarItem(
             title: "Home",
             icon: KinIcons.home
         ),
+
         KinTabBarItem(
             title: "Gatherings",
             icon: KinIcons.gatherings
         ),
+
         KinTabBarItem(
             title: "Recipes",
             icon: KinIcons.recipes
         ),
+
         KinTabBarItem(
             title: "Cookbooks",
             icon: KinIcons.cookbooks
         ),
+
         KinTabBarItem(
             title: "Profile",
             icon: KinIcons.profile
         )
     ]
-    
+
     var body: some View {
+
         VStack(spacing: 0) {
-            
-            Group {
-                switch selectedTab {
-                case 0:
-                    HomeView()
-                    
-                case 1:
-                    GatheringsView()
-                    
-                case 2:
-                    RecipesView()
-                    
-                case 3:
-                    CookbooksView()
-                    
-                case 4:
-                    ProfileView()
-                    
-                default:
-                    Text("Home")
-                }
+
+            ZStack {
+
+                HomeView()
+                    .opacity(selectedTab == 0 ? 1 : 0)
+                    .allowsHitTesting(selectedTab == 0)
+
+                GatheringsView()
+                    .opacity(selectedTab == 1 ? 1 : 0)
+                    .allowsHitTesting(selectedTab == 1)
+
+                RecipesView()
+                    .opacity(selectedTab == 2 ? 1 : 0)
+                    .allowsHitTesting(selectedTab == 2)
+
+                CookbooksView()
+                    .opacity(selectedTab == 3 ? 1 : 0)
+                    .allowsHitTesting(selectedTab == 3)
+
+                ProfileView()
+                    .opacity(selectedTab == 4 ? 1 : 0)
+                    .allowsHitTesting(selectedTab == 4)
             }
-            .font(KinTypography.largeTitle)
-            .foregroundStyle(KinColors.primaryText)
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .background(KinColors.background)
-            
+            .frame(
+                maxWidth: .infinity,
+                maxHeight: .infinity
+            )
+            .background(
+                KinColors.background
+            )
+
             KinTabBar(
                 items: tabItems,
                 selectedIndex: $selectedTab
             )
         }
+        .background(
+            KinColors.background
+                .ignoresSafeArea()
+        )
         .ignoresSafeArea(.keyboard)
-        .task {
-            do {
-                let allergens: [AllergenTest] = try await SupabaseManager.client
-                    .from("allergens")
-                    .select()
-                    .limit(1)
-                    .execute()
-                    .value
-
-                print("Supabase connection successful:", allergens)
-            } catch {
-                print("Supabase connection failed:", error)
-            }
-        }
     }
 }
 
-struct AllergenTest: Decodable {
-    let id: UUID
-    let name: String
-}
-
 #Preview {
+
     ContentView()
 }
