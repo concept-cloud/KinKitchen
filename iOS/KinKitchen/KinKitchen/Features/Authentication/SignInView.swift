@@ -14,6 +14,8 @@ struct SignInView: View {
     
     @State private var isSigningIn = false
     @State private var errorMessage: String?
+    
+    @State private var isShowingSignUp = false
 
     var body: some View {
         ScrollView {
@@ -57,17 +59,20 @@ struct SignInView: View {
                     }
                 }
                 .disabled(isSigningIn)
-
+                
                 KinSecondaryButton(
                     title: "Don't have an account? Sign Up",
                     color: KinColors.success
                 ) {
-                    print("Navigate to Sign Up")
+                    isShowingSignUp = true
                 }
             }
             .padding(KinSpacing.xLarge)
         }
         .background(KinColors.background)
+        .sheet(isPresented: $isShowingSignUp) {
+            SignUpView()
+        }
     }
     
     @MainActor

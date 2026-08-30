@@ -8,12 +8,15 @@
 import SwiftUI
 
 struct SignUpView: View {
+    @Environment(\.dismiss) private var dismiss
+    
     @State private var email = ""
     @State private var password = ""
     @State private var confirmPassword = ""
     @State private var isCreatingAccount = false
     @State private var errorMessage: String?
     @State private var successMessage: String?
+    
 
     var body: some View {
         ScrollView {
@@ -73,7 +76,7 @@ struct SignUpView: View {
                     title: "Already have an account? Sign In",
                     color: KinColors.success
                 ) {
-                    print("Navigate to Sign In")
+                    dismiss()
                 }
             }
             .padding(KinSpacing.xLarge)
