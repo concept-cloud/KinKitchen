@@ -24,18 +24,22 @@ struct ProfileSetupView: View {
         case update
     }
 
+
     // MARK: - Focus
 
     @FocusState private var focusedField: ProfileFormField?
     @State private var fieldToFocus: ProfileFormField?
 
+
     // MARK: - Setup Mode
 
     @State private var mode: ProfileSetupMode = .create
 
+
     // MARK: - Completion
 
     let onProfileCompleted: () -> Void
+
 
     // MARK: - Profile Fields
 
@@ -52,6 +56,7 @@ struct ProfileSetupView: View {
             to: Date()
         ) ?? Date()
 
+
     // Tracks which required fields already existed in Supabase.
     // Existing values are displayed read-only during profile completion.
 
@@ -59,17 +64,19 @@ struct ProfileSetupView: View {
     @State private var hadExistingLastName = false
     @State private var hadExistingUsername = false
     @State private var hasExistingBirthDate = false
-    
-    
+
+
     // MARK: - Photo
 
     @State private var selectedPhotoItem: PhotosPickerItem?
     @State private var profilePhotoData: Data?
 
+
     // MARK: - Username Availability
 
     @State private var usernameAvailability:
         UsernameAvailability = .unknown
+
 
     // MARK: - Alerts / Errors
 
@@ -77,9 +84,11 @@ struct ProfileSetupView: View {
     @State private var isShowingErrorAlert = false
     @State private var isShowingParentPermissionAlert = false
 
+
     // MARK: - Saving
 
     @State private var isSaving = false
+
 
     // MARK: - Body
 
@@ -123,12 +132,14 @@ struct ProfileSetupView: View {
                     )
                 }
 
+
                 // MARK: - Profile Photo
 
                 if mode == .create {
 
                     profilePhotoSection
                 }
+
 
                 // MARK: - Profile Information
 
@@ -137,7 +148,7 @@ struct ProfileSetupView: View {
                     spacing: KinSpacing.large
                 ) {
 
-                    // First Name
+                    // MARK: First Name
 
                     if mode == .update &&
                         hadExistingFirstName {
@@ -171,7 +182,8 @@ struct ProfileSetupView: View {
                         }
                     }
 
-                    // Last Name
+
+                    // MARK: Last Name
 
                     if mode == .update &&
                         hadExistingLastName {
@@ -204,7 +216,46 @@ struct ProfileSetupView: View {
                             )
                         }
                     }
-                    // Birthday
+
+
+                    // MARK: Username
+
+                    if mode == .update &&
+                        hadExistingUsername {
+
+                        profileValueRow(
+                            title: "Username",
+                            value: "@\(username)"
+                        )
+
+                    } else {
+
+                        VStack(
+                            alignment: .leading,
+                            spacing: KinSpacing.small
+                        ) {
+
+                            Text("Username")
+                                .font(KinTypography.caption)
+                                .foregroundStyle(
+                                    KinColors.secondaryText
+                                )
+
+                            KinTextField(
+                                title: "Choose Username",
+                                text: $username
+                            )
+                            .focused(
+                                $focusedField,
+                                equals: .username
+                            )
+
+                            usernameAvailabilityView
+                        }
+                    }
+
+
+                    // MARK: Birthday
 
                     if mode == .update &&
                         hasExistingBirthDate {
@@ -221,6 +272,7 @@ struct ProfileSetupView: View {
 
                         birthdaySection
                     }
+
 
                     // MARK: - Optional Information
 
@@ -251,6 +303,7 @@ struct ProfileSetupView: View {
                             )
                         }
 
+
                         // Existing Bio
 
                         if !bio.trimmingCharacters(
@@ -262,6 +315,7 @@ struct ProfileSetupView: View {
                                 value: bio
                             )
                         }
+
 
                         // Edit Profile Note
 
@@ -279,6 +333,7 @@ struct ProfileSetupView: View {
                     }
                 }
 
+
                 // MARK: - Inline Error
 
                 if let errorMessage {
@@ -292,6 +347,7 @@ struct ProfileSetupView: View {
                         )
                 }
 
+
                 // MARK: - Continue Button
 
                 KinPrimaryButton(
@@ -300,6 +356,7 @@ struct ProfileSetupView: View {
                 ) {
 
                     Task {
+
                         await completeProfile()
                     }
                 }
@@ -309,17 +366,22 @@ struct ProfileSetupView: View {
         }
         .background(KinColors.background)
 
+
         // MARK: - Load Existing Profile
 
         .task {
+
             await loadExistingProfile()
         }
+
 
         // MARK: - Username Availability
 
         .task(id: username) {
+
             await checkUsernameAvailability()
         }
+
 
         // MARK: - Photo Selection
 
@@ -328,13 +390,16 @@ struct ProfileSetupView: View {
         ) { _, newItem in
 
             guard let newItem else {
+
                 return
             }
 
             Task {
+
                 await loadSelectedPhoto(newItem)
             }
         }
+
 
         // MARK: - Parent Permission Alert
 
@@ -354,6 +419,7 @@ struct ProfileSetupView: View {
                 "Kin Kitchen requires a parent or guardian to create and manage accounts for children under 13."
             )
         }
+
 
         // MARK: - General Error Alert
 
@@ -383,6 +449,7 @@ struct ProfileSetupView: View {
         }
     }
 
+
     // MARK: - Button Title
 
     private var buttonTitle: String {
@@ -397,6 +464,7 @@ struct ProfileSetupView: View {
         return "Continue"
     }
 
+
     // MARK: - Completed Required Field
 
     private func shouldDisplayAsCompleted(
@@ -404,6 +472,7 @@ struct ProfileSetupView: View {
     ) -> Bool {
 
         guard mode == .update else {
+
             return false
         }
 
@@ -414,6 +483,7 @@ struct ProfileSetupView: View {
 
         return !cleanValue.isEmpty
     }
+
 
     // MARK: - Read-Only Profile Row
 
@@ -444,6 +514,7 @@ struct ProfileSetupView: View {
                 )
         }
     }
+
 
     // MARK: - Profile Photo
 
@@ -518,6 +589,7 @@ struct ProfileSetupView: View {
         )
     }
 
+
     // MARK: - Birthday
 
     private var birthdaySection: some View {
@@ -557,6 +629,7 @@ struct ProfileSetupView: View {
         }
     }
 
+
     // MARK: - Birth Date Range
 
     private var allowedBirthDateRange:
@@ -573,6 +646,7 @@ struct ProfileSetupView: View {
 
         return oldest...Date()
     }
+
 
     // MARK: - Bio
 
@@ -605,12 +679,14 @@ struct ProfileSetupView: View {
         }
     }
 
+
     // MARK: - Complete Profile
 
     @MainActor
     private func completeProfile() async {
 
         guard !isSaving else {
+
             return
         }
 
@@ -631,6 +707,7 @@ struct ProfileSetupView: View {
                 in: .whitespacesAndNewlines
             )
 
+
         // MARK: First Name Validation
 
         guard !cleanFirstName.isEmpty else {
@@ -643,6 +720,7 @@ struct ProfileSetupView: View {
 
             return
         }
+
 
         // MARK: Last Name Validation
 
@@ -657,6 +735,7 @@ struct ProfileSetupView: View {
             return
         }
 
+
         // MARK: Username Validation
 
         guard !cleanUsername.isEmpty else {
@@ -670,10 +749,12 @@ struct ProfileSetupView: View {
             return
         }
 
+
         // Existing users keep their current username.
         // Only new / missing usernames need availability validation.
 
-        if mode == .create || !hadExistingUsername {
+        if mode == .create ||
+            !hadExistingUsername {
 
             guard cleanUsername.count >= 3 else {
 
@@ -708,6 +789,7 @@ struct ProfileSetupView: View {
             }
         }
 
+
         // MARK: Age Validation
 
         guard isAtLeast13(birthDate) else {
@@ -717,11 +799,13 @@ struct ProfileSetupView: View {
             return
         }
 
+
         // MARK: Save
 
         isSaving = true
 
         defer {
+
             isSaving = false
         }
 
@@ -760,6 +844,7 @@ struct ProfileSetupView: View {
             )
         }
     }
+
 
     // MARK: - Load Existing Profile
 
@@ -867,6 +952,7 @@ struct ProfileSetupView: View {
         }
     }
 
+
     // MARK: - Username Availability
 
     @MainActor
@@ -891,6 +977,7 @@ struct ProfileSetupView: View {
         }
 
         guard cleanUsername.count >= 3 else {
+
             return
         }
 
@@ -928,6 +1015,7 @@ struct ProfileSetupView: View {
         }
     }
 
+
     // MARK: - Age Check
 
     private func isAtLeast13(
@@ -948,6 +1036,7 @@ struct ProfileSetupView: View {
 
         return birthDate <= cutoff
     }
+
 
     // MARK: - Load Photo
 
@@ -971,6 +1060,7 @@ struct ProfileSetupView: View {
             isShowingErrorAlert = true
         }
     }
+
 
     // MARK: - Username Availability View
 
@@ -1026,6 +1116,7 @@ struct ProfileSetupView: View {
         )
     }
 }
+
 
 // MARK: - Preview
 
