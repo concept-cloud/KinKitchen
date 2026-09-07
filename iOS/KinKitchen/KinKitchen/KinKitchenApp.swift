@@ -29,7 +29,7 @@ struct KinKitchenApp: App {
     private var appearanceMode = "light"
 
     init() {
-
+        
         let appearance = UINavigationBarAppearance()
 
         appearance.configureWithOpaqueBackground()
