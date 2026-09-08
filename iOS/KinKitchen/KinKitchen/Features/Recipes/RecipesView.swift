@@ -96,7 +96,13 @@ struct RecipesView: View {
                 isPresented: $showingAddRecipe
             ) {
 
-                AddRecipePlaceholderView()
+                AddRecipeView { recipe in
+
+                    recipes.insert(
+                        recipe,
+                        at: 0
+                    )
+                }
             }
 
             // MARK: - Load
@@ -687,46 +693,6 @@ private struct RecipeDetailPlaceholderView:
             KinColors.background
         )
         .navigationTitle("Recipe")
-        .navigationBarTitleDisplayMode(.inline)
-    }
-}
-
-
-// MARK: - Temporary Add Recipe
-
-private struct AddRecipePlaceholderView:
-    View {
-
-    var body: some View {
-
-        VStack(
-            spacing: KinSpacing.large
-        ) {
-
-            Text("Add Recipe")
-                .font(
-                    KinTypography.largeTitle
-                )
-
-            Text(
-                "The Add Recipe workflow will be implemented in its production ticket."
-            )
-            .font(
-                KinTypography.body
-            )
-            .foregroundStyle(
-                KinColors.secondaryText
-            )
-        }
-        .padding(KinSpacing.large)
-        .frame(
-            maxWidth: .infinity,
-            maxHeight: .infinity
-        )
-        .background(
-            KinColors.background
-        )
-        .navigationTitle("Add Recipe")
         .navigationBarTitleDisplayMode(.inline)
     }
 }
