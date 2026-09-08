@@ -218,7 +218,183 @@ enum RecipeService {
         return recipe
     }
 
+    // MARK: - Fetch Recipe Ratings
 
+    static func fetchRecipeRatings(
+        recipeId: UUID
+    ) async throws -> [RecipeRating] {
+
+        let ratings: [RecipeRating] =
+            try await SupabaseManager.client
+                .from("recipe_ratings")
+                .select()
+                .eq("recipe_id", value: recipeId)
+                .execute()
+                .value
+
+        return ratings
+    }
+
+
+    // MARK: - Fetch Current User Rating
+
+    static func fetchCurrentUserRating(
+        recipeId: UUID
+    ) async throws -> RecipeRating? {
+
+        let user =
+            try await SupabaseManager.client
+                .auth
+                .session
+                .user
+
+        let ratings: [RecipeRating] =
+            try await SupabaseManager.client
+                .from("recipe_ratings")
+                .select()
+                .eq("recipe_id", value: recipeId)
+                .eq("user_id", value: user.id)
+                .limit(1)
+                .execute()
+                .value
+
+        return ratings.first
+    }
+
+
+    // MARK: - Fetch Rating Summary
+
+    static func fetchRecipeRatingSummary(
+        recipeId: UUID
+    ) async throws -> RecipeRatingSummary {
+
+        async let ratings =
+            fetchRecipeRatings(
+                recipeId: recipeId
+            )
+
+        async let currentUserRating =
+            fetchCurrentUserRating(
+                recipeId: recipeId
+            )
+
+        let allRatings =
+            try await ratings
+
+        let personalRating =
+            try await currentUserRating
+
+        let averageRating: Double?
+
+        if allRatings.isEmpty {
+            averageRating = nil
+        } else {
+            let total =
+                allRatings.reduce(0) {
+                    $0 + $1.rating
+                }
+
+            averageRating =
+                Double(total) /
+                Double(allRatings.count)
+        }
+
+        return RecipeRatingSummary(
+            averageRating: averageRating,
+            ratingCount: allRatings.count,
+            currentUserRating:
+                personalRating?.rating
+        )
+    }
+
+
+    // MARK: - Set Current User Rating
+
+    static func setCurrentUserRating(
+        recipeId: UUID,
+        rating: Int
+    ) async throws -> RecipeRating {
+
+        guard (1...5).contains(rating) else {
+            throw RecipeServiceError.invalidRating
+        }
+
+        let user =
+            try await SupabaseManager.client
+                .auth
+                .session
+                .user
+
+        struct RatingUpsert: Encodable {
+            let recipeId: UUID
+            let userId: UUID
+            let rating: Int
+
+            enum CodingKeys:
+                String,
+                CodingKey {
+
+                case recipeId =
+                    "recipe_id"
+
+                case userId =
+                    "user_id"
+
+                case rating
+            }
+        }
+
+        let payload =
+            RatingUpsert(
+                recipeId: recipeId,
+                userId: user.id,
+                rating: rating
+            )
+
+        let savedRating: RecipeRating =
+            try await SupabaseManager.client
+                .from("recipe_ratings")
+                .upsert(
+                    payload,
+                    onConflict:
+                        "recipe_id,user_id"
+                )
+                .select()
+                .single()
+                .execute()
+                .value
+
+        return savedRating
+    }
+
+
+    // MARK: - Delete Current User Rating
+
+    static func deleteCurrentUserRating(
+        recipeId: UUID
+    ) async throws {
+
+        let user =
+            try await SupabaseManager.client
+                .auth
+                .session
+                .user
+
+        try await SupabaseManager.client
+            .from("recipe_ratings")
+            .delete()
+            .eq(
+                "recipe_id",
+                value: recipeId
+            )
+            .eq(
+                "user_id",
+                value: user.id
+            )
+            .execute()
+    }
+    
+    
     // MARK: - Delete Recipe
 
     static func deleteRecipe(
@@ -511,6 +687,60 @@ enum RecipeService {
             ? nil
             : cleaned
     }
+    
+    // MARK: - Fetch Recipe Stories
+
+    static func fetchRecipeStories(
+        recipeId: UUID
+    ) async throws -> [RecipeStory] {
+        let stories: [RecipeStory] =
+            try await SupabaseManager.client
+                .from("recipe_stories")
+                .select()
+                .eq("recipe_id", value: recipeId)
+                .order("created_at", ascending: false)
+                .execute()
+                .value
+
+        return stories
+    }
+
+
+    // MARK: - Create Recipe Story
+
+    static func createRecipeStory(
+        recipeId: UUID,
+        story: String
+    ) async throws -> RecipeStory {
+        let user =
+            try await SupabaseManager.client
+                .auth
+                .session
+                .user
+
+        let cleanStory =
+            story.trimmingCharacters(
+                in: .whitespacesAndNewlines
+            )
+
+        let payload =
+            RecipeStoryCreate(
+                recipeId: recipeId,
+                story: cleanStory,
+                contributorUserId: user.id
+            )
+
+        let createdStory: RecipeStory =
+            try await SupabaseManager.client
+                .from("recipe_stories")
+                .insert(payload)
+                .select()
+                .single()
+                .execute()
+                .value
+
+        return createdStory
+    }
 }
 
 
@@ -543,18 +773,23 @@ struct RecipeIngredientInput {
 
 enum RecipeServiceError:
     LocalizedError {
-
+    
     case recipeNotOwnedByCurrentUser
-
-
+    case invalidRating
+    
     var errorDescription: String? {
-
+        
         switch self {
-
+            
         case .recipeNotOwnedByCurrentUser:
-
+            
             return
-                "The current user does not own this recipe."
+            "The current user does not own this recipe."
+            
+        case .invalidRating:
+            
+            return
+            "Recipe ratings must be between 1 and 5."
         }
     }
 }

@@ -85,8 +85,8 @@ struct RecipesView: View {
                 item: $selectedRecipe
             ) { recipe in
 
-                RecipeDetailPlaceholderView(
-                    recipe: recipe
+                RecipeDetailView(
+                    recipeId: recipe.id
                 )
             }
 
@@ -652,48 +652,6 @@ struct RecipesView: View {
                 error.localizedDescription
             )
         }
-    }
-}
-
-
-// MARK: - Temporary Recipe Detail
-
-private struct RecipeDetailPlaceholderView:
-    View {
-
-    let recipe: Recipe
-
-    var body: some View {
-
-        VStack(
-            spacing: KinSpacing.large
-        ) {
-
-            Text(recipe.name)
-                .font(
-                    KinTypography.largeTitle
-                )
-
-            Text(
-                "Recipe Detail will be implemented in the next ticket."
-            )
-            .font(
-                KinTypography.body
-            )
-            .foregroundStyle(
-                KinColors.secondaryText
-            )
-        }
-        .padding(KinSpacing.large)
-        .frame(
-            maxWidth: .infinity,
-            maxHeight: .infinity
-        )
-        .background(
-            KinColors.background
-        )
-        .navigationTitle("Recipe")
-        .navigationBarTitleDisplayMode(.inline)
     }
 }
 

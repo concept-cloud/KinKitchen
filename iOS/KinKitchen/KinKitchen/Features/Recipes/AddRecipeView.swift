@@ -768,7 +768,9 @@ struct AddRecipeView: View {
 
         for ingredient in validIngredients {
             if !ingredient.quantity.isEmpty &&
-                parseQuantity(ingredient.quantity) == nil {
+                IngredientQuantityFormatter.parse(
+                    ingredient.quantity
+                ) == nil {
                 return "One or more ingredient quantities are invalid."
             }
         }
@@ -814,7 +816,9 @@ struct AddRecipeView: View {
             let ingredientInputs = cleanedIngredients.map { ingredient in
                 RecipeIngredientInput(
                     name: ingredient.name,
-                    quantity: parseQuantity(ingredient.quantity),
+                    quantity: IngredientQuantityFormatter.parse(
+                        ingredient.quantity
+                    ),
                     unit: cleanedOptionalString(ingredient.unit)
                 )
             }
@@ -886,31 +890,6 @@ struct AddRecipeView: View {
             .joined(separator: "\n")
     }
 
-    private func parseQuantity(_ value: String) -> Double? {
-        let cleanValue =
-            value.trimmingCharacters(in: .whitespacesAndNewlines)
-
-        guard !cleanValue.isEmpty else {
-            return nil
-        }
-
-        if let number = Double(cleanValue) {
-            return number
-        }
-
-        let parts = cleanValue.split(separator: "/")
-
-        if
-            parts.count == 2,
-            let numerator = Double(parts[0]),
-            let denominator = Double(parts[1]),
-            denominator != 0
-        {
-            return numerator / denominator
-        }
-
-        return nil
-    }
 
     private func cleanedOptionalString(_ value: String) -> String? {
         let cleaned =
