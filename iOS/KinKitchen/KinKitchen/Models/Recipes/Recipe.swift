@@ -22,7 +22,10 @@ struct Recipe: Codable, Identifiable, Hashable {
 
     var photoPath: String?
     var category: String?
-
+    
+    var sourceRecipeId: UUID?
+    var originalRecipeId: UUID?
+    
     let createdAt: String
     var updatedAt: String
 
@@ -30,34 +33,19 @@ struct Recipe: Codable, Identifiable, Hashable {
     enum CodingKeys: String, CodingKey {
 
         case id
-
-        case ownerId =
-            "owner_id"
-
+        case ownerId = "owner_id"
         case name
-
         case description
-
         case instructions
-
         case servings
-
-        case prepTimeMinutes =
-            "prep_time_minutes"
-
-        case cookTimeMinutes =
-            "cook_time_minutes"
-
-        case photoPath =
-            "photo_path"
-
+        case prepTimeMinutes = "prep_time_minutes"
+        case cookTimeMinutes = "cook_time_minutes"
+        case photoPath = "photo_path"
         case category
-
-        case createdAt =
-            "created_at"
-
-        case updatedAt =
-            "updated_at"
+        case sourceRecipeId = "source_recipe_id"
+        case originalRecipeId = "original_recipe_id"
+        case createdAt = "created_at"
+        case updatedAt = "updated_at"
     }
 }
 
@@ -65,44 +53,56 @@ struct Recipe: Codable, Identifiable, Hashable {
 // MARK: - Recipe Create
 
 struct RecipeCreate: Encodable {
-
     let ownerId: UUID
     let name: String
-
     let description: String?
     let instructions: String?
     let servings: Int?
-
     let prepTimeMinutes: Int?
     let cookTimeMinutes: Int?
-
     let photoPath: String?
     let category: String?
+    let sourceRecipeId: UUID?
+    let originalRecipeId: UUID?
 
+    init(
+        ownerId: UUID,
+        name: String,
+        description: String?,
+        instructions: String?,
+        servings: Int?,
+        prepTimeMinutes: Int?,
+        cookTimeMinutes: Int?,
+        photoPath: String?,
+        category: String?,
+        sourceRecipeId: UUID?,
+        originalRecipeId: UUID?
+    ) {
+        self.ownerId = ownerId
+        self.name = name
+        self.description = description
+        self.instructions = instructions
+        self.servings = servings
+        self.prepTimeMinutes = prepTimeMinutes
+        self.cookTimeMinutes = cookTimeMinutes
+        self.photoPath = photoPath
+        self.category = category
+        self.sourceRecipeId = sourceRecipeId
+        self.originalRecipeId = originalRecipeId
+    }
 
     enum CodingKeys: String, CodingKey {
-
-        case ownerId =
-            "owner_id"
-
+        case ownerId = "owner_id"
         case name
-
         case description
-
         case instructions
-
         case servings
-
-        case prepTimeMinutes =
-            "prep_time_minutes"
-
-        case cookTimeMinutes =
-            "cook_time_minutes"
-
-        case photoPath =
-            "photo_path"
-
+        case prepTimeMinutes = "prep_time_minutes"
+        case cookTimeMinutes = "cook_time_minutes"
+        case photoPath = "photo_path"
         case category
+        case sourceRecipeId = "source_recipe_id"
+        case originalRecipeId = "original_recipe_id"
     }
 }
 

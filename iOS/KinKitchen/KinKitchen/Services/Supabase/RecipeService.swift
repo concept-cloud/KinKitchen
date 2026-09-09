@@ -58,7 +58,9 @@ enum RecipeService {
                 category:
                     cleanedOptionalString(
                         category
-                    )
+                    ),
+                sourceRecipeId: nil,
+                originalRecipeId: nil
             )
 
         let recipe: Recipe =
@@ -394,6 +396,137 @@ enum RecipeService {
             .execute()
     }
     
+    
+    // MARK: - Fetch Original Recipe
+
+    static func fetchOriginalRecipe(
+        for recipe: Recipe
+    ) async throws -> Recipe? {
+        guard let originalRecipeId = recipe.originalRecipeId else {
+            return nil
+        }
+
+        return try await fetchRecipe(
+            id: originalRecipeId
+        )
+    }
+
+
+    // MARK: - Fetch Recipe Versions
+
+    static func fetchRecipeVersions(
+        for recipe: Recipe
+    ) async throws -> [Recipe] {
+        let rootRecipeId =
+            recipe.originalRecipeId ?? recipe.id
+
+        let versions: [Recipe] =
+            try await SupabaseManager.client
+                .from("recipes")
+                .select()
+                .eq(
+                    "original_recipe_id",
+                    value: rootRecipeId
+                )
+                .order(
+                    "created_at",
+                    ascending: true
+                )
+                .execute()
+                .value
+
+        return versions
+    }
+
+
+    // MARK: - Fetch Version Count
+
+    static func fetchVersionCount(
+        for recipe: Recipe
+    ) async throws -> Int {
+        let versions =
+            try await fetchRecipeVersions(
+                for: recipe
+            )
+
+        return versions.count
+    }
+
+
+    // MARK: - Create Version
+
+    static func createVersion(
+        from sourceRecipe: Recipe
+    ) async throws -> Recipe {
+        let user =
+            try await SupabaseManager.client
+                .auth
+                .session
+                .user
+
+        let sourceWithIngredients =
+            try await fetchRecipeWithIngredients(
+                id: sourceRecipe.id
+            )
+
+        let originalRecipeId =
+            sourceRecipe.originalRecipeId
+            ?? sourceRecipe.id
+
+        let newRecipeCreate =
+            RecipeCreate(
+                ownerId: user.id,
+                name: sourceRecipe.name,
+                description: sourceRecipe.description,
+                instructions: sourceRecipe.instructions,
+                servings: sourceRecipe.servings,
+                prepTimeMinutes:
+                    sourceRecipe.prepTimeMinutes,
+                cookTimeMinutes:
+                    sourceRecipe.cookTimeMinutes,
+                photoPath:
+                    sourceRecipe.photoPath,
+                category:
+                    sourceRecipe.category,
+                sourceRecipeId:
+                    sourceRecipe.id,
+                originalRecipeId:
+                    originalRecipeId
+            )
+
+        let newRecipe: Recipe =
+            try await SupabaseManager.client
+                .from("recipes")
+                .insert(newRecipeCreate)
+                .select()
+                .single()
+                .execute()
+                .value
+
+        let ingredientInputs =
+            sourceWithIngredients
+                .orderedIngredients
+                .map { ingredient in
+                    RecipeIngredientInput(
+                        name: ingredient.name,
+                        quantity:
+                            ingredient.quantity,
+                        unit:
+                            ingredient.unit,
+                        offProductId:
+                            ingredient.offProductId
+                    )
+                }
+
+        _ =
+            try await createIngredients(
+                recipeId: newRecipe.id,
+                ingredients:
+                    ingredientInputs
+            )
+
+        return newRecipe
+    }
     
     // MARK: - Delete Recipe
 
