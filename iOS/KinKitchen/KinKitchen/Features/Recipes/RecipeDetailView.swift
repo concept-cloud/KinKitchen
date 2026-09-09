@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import Supabase
 
 struct RecipeDetailView: View {
 
@@ -31,6 +32,22 @@ struct RecipeDetailView: View {
     @State private var showingAddNote = false
     @State private var newNoteText = ""
     @State private var isSavingNote = false
+    
+    @State private var versions: [Recipe] = []
+    @State private var showingVersions = false
+    @State private var selectedVersionId: UUID?
+    @State private var showingSelectedVersion = false
+
+    @State private var originalRecipe: Recipe?
+    @State private var showingOriginal = false
+
+    @State private var currentUserId: UUID?
+    @State private var isCreatingVersion = false
+    @State private var createdVersionId: UUID?
+    @State private var showingCreatedVersion = false
+    
+    @State private var showingEditRecipe = false
+    @State private var recipeWasDeleted = false
     
     var body: some View {
         ZStack {
@@ -59,6 +76,65 @@ struct RecipeDetailView: View {
             isPresented: $showingAddNote
         ) {
             addNoteSheet
+        }
+        .sheet(
+            isPresented: $showingVersions
+        ) {
+            versionsSheet
+        }
+
+        .navigationDestination(
+            isPresented: $showingOriginal
+        ) {
+            if let originalRecipe {
+                RecipeDetailView(
+                    recipeId: originalRecipe.id
+                )
+            }
+        }
+
+        .navigationDestination(
+            isPresented: $showingSelectedVersion
+        ) {
+            if let selectedVersionId {
+                RecipeDetailView(
+                    recipeId: selectedVersionId
+                )
+            }
+        }
+
+        .navigationDestination(
+            isPresented: $showingCreatedVersion
+        ) {
+            if let createdVersionId {
+                RecipeDetailView(
+                    recipeId: createdVersionId
+                )
+            }
+        }
+        
+        .navigationDestination(
+            isPresented: $showingEditRecipe
+        ) {
+            EditRecipeView(
+                recipeId: recipeId,
+                onDeleted: {
+                    recipeWasDeleted = true
+                }
+            )
+        }
+        .onChange(of: showingEditRecipe) { _, isShowing in
+            guard !isShowing else {
+                return
+            }
+
+            if recipeWasDeleted {
+                dismiss()
+            } else {
+                Task {
+                    await loadRecipe()
+                }
+            }
         }
     }
 
@@ -158,9 +234,28 @@ struct RecipeDetailView: View {
             alignment: .leading,
             spacing: KinSpacing.medium
         ) {
-            Text(recipe.name)
-                .font(KinTypography.largeTitle)
-                .foregroundStyle(KinColors.primaryText)
+            HStack(alignment: .center, spacing: KinSpacing.medium) {
+                Text(recipe.name)
+                    .font(KinTypography.largeTitle)
+                    .foregroundStyle(KinColors.primaryText)
+
+                Spacer()
+
+                if currentUserId == recipe.ownerId {
+                    Button {
+                        showingEditRecipe = true
+                    } label: {
+                        Image(systemName: "pencil")
+                            .font(.title3)
+                            .foregroundStyle(KinColors.primary)
+                            .frame(width: 44, height: 44)
+                            .background(KinColors.surface)
+                            .clipShape(Circle())
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Edit Recipe")
+                }
+            }
 
             if let description = cleaned(recipe.description) {
                 Text(description)
@@ -194,9 +289,11 @@ struct RecipeDetailView: View {
             timeDetails(recipe)
 
             ratingSection
+
+            lineageActions(recipe)
+
         }
     }
-
     // MARK: - Prep / Cook Time
 
     private func timeDetails(
@@ -241,28 +338,35 @@ struct RecipeDetailView: View {
         )
     }
 
-    // MARK: - Rating
+    // MARK: - Rating / Versions
 
     private var ratingSection: some View {
         VStack(
             alignment: .leading,
             spacing: KinSpacing.medium
         ) {
-            HStack {
+            HStack(
+                alignment: .top,
+                spacing: KinSpacing.large
+            ) {
                 VStack(
                     alignment: .leading,
                     spacing: 2
                 ) {
                     Text("Overall Rating")
                         .font(KinTypography.caption)
-                        .foregroundStyle(KinColors.secondaryText)
+                        .foregroundStyle(
+                            KinColors.secondaryText
+                        )
 
                     if let average =
                         ratingSummary?.averageRating {
 
                         HStack(spacing: KinSpacing.small) {
                             Image(systemName: "star.fill")
-                                .foregroundStyle(KinColors.primary)
+                                .foregroundStyle(
+                                    KinColors.primary
+                                )
 
                             Text(
                                 String(
@@ -271,24 +375,66 @@ struct RecipeDetailView: View {
                                 )
                             )
                             .font(KinTypography.title3)
-                            .foregroundStyle(KinColors.primaryText)
+                            .foregroundStyle(
+                                KinColors.primaryText
+                            )
 
                             Text(
                                 "(\(ratingSummary?.ratingCount ?? 0))"
                             )
                             .font(KinTypography.caption)
-                            .foregroundStyle(KinColors.secondaryText)
+                            .foregroundStyle(
+                                KinColors.secondaryText
+                            )
                         }
 
                     } else {
                         Text("Not rated yet")
                             .font(KinTypography.body)
-                            .foregroundStyle(KinColors.secondaryText)
+                            .foregroundStyle(
+                                KinColors.secondaryText
+                            )
                     }
                 }
 
                 Spacer()
+
+                Button {
+                    showingVersions = true
+                } label: {
+                    VStack(
+                        alignment: .trailing,
+                        spacing: 2
+                    ) {
+                        Text("Versions")
+                            .font(KinTypography.caption)
+                            .foregroundStyle(
+                                KinColors.secondaryText
+                            )
+
+                        HStack(spacing: KinSpacing.small) {
+                            Text(
+                                "\(versions.count) \(versions.count == 1 ? "Version" : "Versions")"
+                            )
+                            .font(KinTypography.title3)
+                            .foregroundStyle(
+                                KinColors.primaryText
+                            )
+
+                            Image(
+                                systemName: "chevron.right"
+                            )
+                            .font(.caption)
+                            .foregroundStyle(
+                                KinColors.primary
+                            )
+                        }
+                    }
+                }
+                .buttonStyle(.plain)
             }
+
+            Divider()
 
             VStack(
                 alignment: .leading,
@@ -296,7 +442,9 @@ struct RecipeDetailView: View {
             ) {
                 Text("Your Rating")
                     .font(KinTypography.caption)
-                    .foregroundStyle(KinColors.secondaryText)
+                    .foregroundStyle(
+                        KinColors.secondaryText
+                    )
 
                 HStack(spacing: KinSpacing.small) {
                     ForEach(1...5, id: \.self) { rating in
@@ -308,12 +456,15 @@ struct RecipeDetailView: View {
                             Image(
                                 systemName:
                                     rating <=
-                                    (ratingSummary?.currentUserRating ?? 0)
+                                    (ratingSummary?
+                                        .currentUserRating ?? 0)
                                         ? "star.fill"
                                         : "star"
                             )
                             .font(.title2)
-                            .foregroundStyle(KinColors.primary)
+                            .foregroundStyle(
+                                KinColors.primary
+                            )
                         }
                         .buttonStyle(.plain)
                         .disabled(isSavingRating)
@@ -335,6 +486,35 @@ struct RecipeDetailView: View {
         )
     }
 
+
+    // MARK: - Recipe Lineage Actions
+
+    @ViewBuilder
+    private func lineageActions(
+        _ recipe: Recipe
+    ) -> some View {
+        if recipe.originalRecipeId != nil {
+            Button {
+                showingOriginal = true
+            } label: {
+                Label(
+                    "Show Original",
+                    systemImage: "arrow.uturn.backward"
+                )
+                .font(KinTypography.button)
+                .foregroundStyle(KinColors.primary)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, KinSpacing.medium)
+                .background(KinColors.surface)
+                .clipShape(
+                    RoundedRectangle(
+                        cornerRadius: KinRadius.medium
+                    )
+                )
+            }
+            .buttonStyle(.plain)
+        }
+    }
     // MARK: - Metadata Chip
 
     private func metadataChip(
@@ -678,28 +858,61 @@ struct RecipeDetailView: View {
         }
 
         do {
-            async let detailResult =
-                RecipeService
+            let loadedDetail =
+                try await RecipeService
                     .fetchRecipeWithIngredients(
                         id: recipeId
                     )
+
+            detail = loadedDetail
+
+            let recipe =
+                loadedDetail.recipe
 
             async let ratingResult =
                 RecipeService
                     .fetchRecipeRatingSummary(
                         recipeId: recipeId
                     )
-            
+
             async let storyResult =
                 RecipeService
                     .fetchRecipeStories(
                         recipeId: recipeId
                     )
 
-            detail = try await detailResult
-            ratingSummary = try await ratingResult
-            stories = try await storyResult
-            
+            async let versionResult =
+                RecipeService
+                    .fetchRecipeVersions(
+                        for: recipe
+                    )
+
+            ratingSummary =
+                try await ratingResult
+
+            stories =
+                try await storyResult
+
+            versions =
+                try await versionResult
+
+            currentUserId =
+                try await SupabaseManager.client
+                    .auth
+                    .session
+                    .user
+                    .id
+
+            if recipe.originalRecipeId != nil {
+                originalRecipe =
+                    try await RecipeService
+                        .fetchOriginalRecipe(
+                            for: recipe
+                        )
+            } else {
+                originalRecipe = nil
+            }
+
         } catch {
             errorMessage =
                 "Please check your connection and try again."
@@ -744,6 +957,53 @@ struct RecipeDetailView: View {
         } catch {
             print(
                 "RECIPE RATING ERROR:",
+                error.localizedDescription
+            )
+        }
+    }
+    
+    // MARK: - Make My Version
+
+    @MainActor
+    private func makeMyVersion(
+        from recipe: Recipe
+    ) async {
+        guard !isCreatingVersion else {
+            return
+        }
+
+        guard currentUserId != recipe.ownerId else {
+            return
+        }
+
+        isCreatingVersion = true
+
+        defer {
+            isCreatingVersion = false
+        }
+
+        do {
+            let created =
+                try await RecipeService
+                    .createVersion(
+                        from: recipe
+                    )
+
+            createdVersionId =
+                created.id
+
+            versions =
+                try await RecipeService
+                    .fetchRecipeVersions(
+                        for: recipe
+                    )
+
+            showingCreatedVersion =
+                true
+
+        } catch {
+            print(
+                "CREATE RECIPE VERSION ERROR:",
                 error.localizedDescription
             )
         }
@@ -879,6 +1139,101 @@ struct RecipeDetailView: View {
                             )
                             .isEmpty
                     )
+                }
+            }
+        }
+    }
+    
+    // MARK: - Versions Sheet
+
+    private var versionsSheet: some View {
+        NavigationStack {
+            ZStack {
+                KinColors.background
+                    .ignoresSafeArea()
+
+                if versions.isEmpty {
+                    emptySection(
+                        icon: "square.stack.3d.up",
+                        title: "No Versions Yet",
+                        message:
+                            "When someone creates their own version of this recipe, it will appear here."
+                    )
+                    .padding(KinSpacing.large)
+
+                } else {
+                    ScrollView {
+                        VStack(
+                            alignment: .leading,
+                            spacing: KinSpacing.medium
+                        ) {
+                            ForEach(versions) { version in
+                                Button {
+                                    selectedVersionId =
+                                        version.id
+
+                                    showingVersions = false
+
+                                    DispatchQueue.main.async {
+                                        showingSelectedVersion =
+                                            true
+                                    }
+                                } label: {
+                                    KinCard {
+                                        HStack(
+                                            spacing:
+                                                KinSpacing.medium
+                                        ) {
+                                            VStack(
+                                                alignment: .leading,
+                                                spacing:
+                                                    KinSpacing.small
+                                            ) {
+                                                Text(version.name)
+                                                    .font(
+                                                        KinTypography.title3
+                                                    )
+                                                    .foregroundStyle(
+                                                        KinColors.primaryText
+                                                    )
+
+                                                Text("View Version")
+                                                    .font(
+                                                        KinTypography.caption
+                                                    )
+                                                    .foregroundStyle(
+                                                        KinColors.secondaryText
+                                                    )
+                                            }
+
+                                            Spacer()
+
+                                            Image(
+                                                systemName:
+                                                    "chevron.right"
+                                            )
+                                            .foregroundStyle(
+                                                KinColors.primary
+                                            )
+                                        }
+                                    }
+                                }
+                                .buttonStyle(.plain)
+                            }
+                        }
+                        .padding(KinSpacing.large)
+                    }
+                }
+            }
+            .navigationTitle("Versions")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(
+                    placement: .cancellationAction
+                ) {
+                    Button("Done") {
+                        showingVersions = false
+                    }
                 }
             }
         }

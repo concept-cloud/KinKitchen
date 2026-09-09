@@ -6,7 +6,6 @@
 //
 
 import SwiftUI
-import UniformTypeIdentifiers
 
 struct AddRecipeView: View {
     @Environment(\.dismiss) private var dismiss
@@ -26,12 +25,14 @@ struct AddRecipeView: View {
 
     @State private var draggedIngredientID: UUID?
     @State private var ingredientDropTargetID: UUID?
-    @State private var ingredientDropPosition: DropPosition?
+    @State private var ingredientDropPosition: RecipeDropPosition?
+    @State private var ingredientEndDropTargeted = false
 
     @State private var draggedInstructionID: UUID?
     @State private var instructionDropTargetID: UUID?
-    @State private var instructionDropPosition: DropPosition?
-
+    @State private var instructionDropPosition: RecipeDropPosition?
+    @State private var instructionEndDropTargeted = false
+    
     @State private var isSaving = false
     @State private var errorMessage: String?
     @State private var showingError = false
@@ -94,11 +95,14 @@ struct AddRecipeView: View {
                         }
                         
                         Button {
-                            Task { await saveRecipe() }
+                            Task {
+                                await saveRecipe()
+                            }
                         } label: {
                             Group {
                                 if isSaving {
-                                    ProgressView().tint(.white)
+                                    ProgressView()
+                                        .tint(.white)
                                 } else {
                                     Text("Save Recipe")
                                         .font(KinTypography.button)
@@ -106,10 +110,19 @@ struct AddRecipeView: View {
                             }
                             .foregroundStyle(.white)
                             .frame(maxWidth: .infinity)
+                            .padding(.vertical, KinSpacing.medium)
+                            .background(KinColors.primary)
+                            .clipShape(
+                                RoundedRectangle(
+                                    cornerRadius: KinRadius.medium
+                                )
+                            )
+                            .contentShape(
+                                RoundedRectangle(
+                                    cornerRadius: KinRadius.medium
+                                )
+                            )
                         }
-                        .padding(.vertical, KinSpacing.medium)
-                        .background(KinColors.primary)
-                        .clipShape(RoundedRectangle(cornerRadius: KinRadius.medium))
                         .buttonStyle(.plain)
                         .disabled(isSaving)
                     }
@@ -284,7 +297,12 @@ struct AddRecipeView: View {
     }
 
     private var ingredientsSection: some View {
-        VStack(alignment: .leading, spacing: KinSpacing.medium) {
+
+        VStack(
+            alignment: .leading,
+            spacing: KinSpacing.medium
+        ) {
+
             Text("Ingredients")
                 .font(KinTypography.title)
                 .foregroundStyle(KinColors.primaryText)
@@ -298,18 +316,78 @@ struct AddRecipeView: View {
                 }
             }
 
-            Button {
-                ingredients.append(IngredientDraft())
-            } label: {
-                Label("Add Ingredient", systemImage: "plus")
-                    .font(KinTypography.button)
-                    .foregroundStyle(KinColors.primary)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, KinSpacing.medium)
-                    .overlay {
-                        RoundedRectangle(cornerRadius: KinRadius.medium)
-                            .stroke(KinColors.primary, lineWidth: 1)
+            // MARK: - Bottom Drop Zone
+            Rectangle()
+                .fill(
+                    ingredientEndDropTargeted
+                        ? KinColors.error
+                        : Color.clear
+                )
+                .frame(height: 6)
+                .contentShape(Rectangle())
+                .dropDestination(
+                    for: IngredientDragItem.self
+                ) { items, _ in
+
+                    guard
+                        let draggedItem = items.first,
+                        let sourceIndex = ingredients.firstIndex(
+                            where: {
+                                $0.id == draggedItem.id
+                            }
+                        )
+                    else {
+                        clearIngredientDragState()
+                        return false
                     }
+
+                    withAnimation {
+                        let moved = ingredients.remove(
+                            at: sourceIndex
+                        )
+
+                        ingredients.append(moved)
+                    }
+
+                    ingredientEndDropTargeted = false
+                    clearIngredientDragState()
+
+                    return true
+
+                } isTargeted: { targeted in
+                    ingredientEndDropTargeted = targeted
+                }
+
+            Button {
+                ingredients.append(
+                    IngredientDraft()
+                )
+            } label: {
+                Label(
+                    "Add Ingredient",
+                    systemImage: "plus"
+                )
+                .font(KinTypography.button)
+                .foregroundStyle(KinColors.primary)
+                .frame(maxWidth: .infinity)
+                .padding(
+                    .vertical,
+                    KinSpacing.medium
+                )
+                .overlay {
+                    RoundedRectangle(
+                        cornerRadius: KinRadius.medium
+                    )
+                    .stroke(
+                        KinColors.primary,
+                        lineWidth: 1
+                    )
+                }
+                .contentShape(
+                        RoundedRectangle(
+                            cornerRadius: KinRadius.medium
+                        )
+                    )
             }
             .buttonStyle(.plain)
         }
@@ -415,7 +493,7 @@ struct AddRecipeView: View {
 
             let draggedID = draggedItem.id
 
-            let position: DropPosition =
+            let position: RecipeDropPosition =
                 location.y > 44
                     ? .below
                     : .above
@@ -480,7 +558,7 @@ struct AddRecipeView: View {
     private func moveIngredient(
         draggedID: UUID,
         targetID: UUID,
-        position: DropPosition
+        position: RecipeDropPosition
     ) {
         guard
             draggedID != targetID,
@@ -514,7 +592,12 @@ struct AddRecipeView: View {
     }
 
     private var instructionsSection: some View {
-        VStack(alignment: .leading, spacing: KinSpacing.medium) {
+
+        VStack(
+            alignment: .leading,
+            spacing: KinSpacing.medium
+        ) {
+
             Text("Instructions")
                 .font(KinTypography.title)
                 .foregroundStyle(KinColors.primaryText)
@@ -528,18 +611,78 @@ struct AddRecipeView: View {
                 }
             }
 
-            Button {
-                instructions.append(InstructionDraft())
-            } label: {
-                Label("Add Instruction", systemImage: "plus")
-                    .font(KinTypography.button)
-                    .foregroundStyle(KinColors.primary)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, KinSpacing.medium)
-                    .overlay {
-                        RoundedRectangle(cornerRadius: KinRadius.medium)
-                            .stroke(KinColors.primary, lineWidth: 1)
+            // MARK: - Bottom Drop Zone
+            Rectangle()
+                .fill(
+                    instructionEndDropTargeted
+                        ? KinColors.error
+                        : Color.clear
+                )
+                .frame(height: 6)
+                .contentShape(Rectangle())
+                .dropDestination(
+                    for: InstructionDragItem.self
+                ) { items, _ in
+
+                    guard
+                        let draggedItem = items.first,
+                        let sourceIndex = instructions.firstIndex(
+                            where: {
+                                $0.id == draggedItem.id
+                            }
+                        )
+                    else {
+                        clearInstructionDragState()
+                        return false
                     }
+
+                    withAnimation {
+                        let moved = instructions.remove(
+                            at: sourceIndex
+                        )
+
+                        instructions.append(moved)
+                    }
+
+                    instructionEndDropTargeted = false
+                    clearInstructionDragState()
+
+                    return true
+
+                } isTargeted: { targeted in
+                    instructionEndDropTargeted = targeted
+                }
+
+            Button {
+                instructions.append(
+                    InstructionDraft()
+                )
+            } label: {
+                Label(
+                    "Add Instruction",
+                    systemImage: "plus"
+                )
+                .font(KinTypography.button)
+                .foregroundStyle(KinColors.primary)
+                .frame(maxWidth: .infinity)
+                .padding(
+                    .vertical,
+                    KinSpacing.medium
+                )
+                .overlay {
+                    RoundedRectangle(
+                        cornerRadius: KinRadius.medium
+                    )
+                    .stroke(
+                        KinColors.primary,
+                        lineWidth: 1
+                    )
+                }
+                .contentShape(
+                        RoundedRectangle(
+                            cornerRadius: KinRadius.medium
+                        )
+                    )
             }
             .buttonStyle(.plain)
         }
@@ -619,7 +762,7 @@ struct AddRecipeView: View {
 
             let draggedID = draggedItem.id
 
-            let position: DropPosition =
+            let position: RecipeDropPosition =
                 location.y > 44
                     ? .below
                     : .above
@@ -690,7 +833,7 @@ struct AddRecipeView: View {
     private func moveInstruction(
         draggedID: UUID,
         targetID: UUID,
-        position: DropPosition
+        position: RecipeDropPosition
     ) {
         guard
             draggedID != targetID,
@@ -909,10 +1052,6 @@ struct AddRecipeView: View {
     
 }
 
-private enum DropPosition {
-    case above
-    case below
-}
 
 private struct IngredientDraft: Identifiable {
     let id: UUID
@@ -946,107 +1085,8 @@ private struct InstructionDraft: Identifiable {
     }
 }
 
-private struct IngredientHoverDropDelegate: DropDelegate {
-    let targetID: UUID
-    let onDragLocationChanged: (CGPoint) -> Void
-    @Binding var draggedID: UUID?
-    @Binding var targetIDBinding: UUID?
-    @Binding var position: DropPosition?
-
-    func dropEntered(info: DropInfo) {
-        guard draggedID != nil, draggedID != targetID else { return }
-        targetIDBinding = targetID
-        position = info.location.y > 44 ? .below : .above
-    }
-
-    func dropUpdated(info: DropInfo) -> DropProposal? {
-        position = info.location.y > 44 ? .below : .above
-
-        onDragLocationChanged(info.location)
-
-        return DropProposal(operation: .move)
-    }
-
-    func performDrop(info: DropInfo) -> Bool {
-        false
-    }
-
-    func dropExited(info: DropInfo) {
-        if targetIDBinding == targetID {
-            targetIDBinding = nil
-            position = nil
-        }
-    }
-}
-
-private struct InstructionHoverDropDelegate: DropDelegate {
-    let targetID: UUID
-    let onDragLocationChanged: (CGPoint) -> Void
-    @Binding var draggedID: UUID?
-    @Binding var targetIDBinding: UUID?
-    @Binding var position: DropPosition?
-
-    func dropEntered(info: DropInfo) {
-        guard draggedID != nil, draggedID != targetID else { return }
-        targetIDBinding = targetID
-        position = info.location.y > 44 ? .below : .above
-    }
-
-    func dropUpdated(info: DropInfo) -> DropProposal? {
-        position = info.location.y > 44 ? .below : .above
-
-        onDragLocationChanged(info.location)
-
-        return DropProposal(operation: .move)
-    }
-
-    func performDrop(info: DropInfo) -> Bool {
-        false
-    }
-
-    func dropExited(info: DropInfo) {
-        if targetIDBinding == targetID {
-            targetIDBinding = nil
-            position = nil
-        }
-    }
-}
-
 #Preview {
     NavigationStack {
         AddRecipeView()
     }
-}
-
-
-private struct IngredientDragItem: Codable, Transferable {
-    let id: UUID
-
-    static var transferRepresentation: some TransferRepresentation {
-        CodableRepresentation(
-            contentType: .kinKitchenIngredient
-        )
-    }
-}
-
-private struct InstructionDragItem: Codable, Transferable {
-    let id: UUID
-
-    static var transferRepresentation: some TransferRepresentation {
-        CodableRepresentation(
-            contentType: .kinKitchenInstruction
-        )
-    }
-}
-
-private extension UTType {
-    static let kinKitchenIngredient =
-        UTType(
-            exportedAs: "com.kinkitchen.ingredient"
-        )
-
-    static let kinKitchenInstruction =
-        UTType(
-            exportedAs: "com.kinkitchen.instruction"
-        )
 }
