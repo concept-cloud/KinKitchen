@@ -1059,10 +1059,25 @@ struct AddRecipeView: View {
                     )
                 }
 
-            _ = try await RecipeService.createIngredients(
-                recipeId: recipe.id,
-                ingredients: ingredientInputs
-            )
+            let savedIngredients =
+                try await RecipeService.createIngredients(
+                    recipeId: recipe.id,
+                    ingredients: ingredientInputs
+                )
+
+            let allergenInputs =
+                savedIngredients.map { ingredient in
+                    IngredientAllergenInput(
+                        id: ingredient.id,
+                        name: ingredient.name,
+                        offProductId: ingredient.offProductId
+                    )
+                }
+
+            _ = try await IngredientAllergenService
+                .classifyAndStore(
+                    ingredients: allergenInputs
+                )
 
             // 3. Upload photo if one was selected
             var finalRecipe = recipe

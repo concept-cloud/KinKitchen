@@ -1477,13 +1477,26 @@ struct EditRecipeView: View {
                     )
                 )
 
-            _ =
+            let savedIngredients =
                 try await RecipeService
                     .replaceIngredients(
                         recipeId: recipeId,
-                        ingredients:
-                            ingredientInputs
+                        ingredients: ingredientInputs
                     )
+
+            let allergenInputs =
+                savedIngredients.map { ingredient in
+                    IngredientAllergenInput(
+                        id: ingredient.id,
+                        name: ingredient.name,
+                        offProductId: ingredient.offProductId
+                    )
+                }
+
+            _ = try await IngredientAllergenService
+                .classifyAndStore(
+                    ingredients: allergenInputs
+                )
 
             dismiss()
 
