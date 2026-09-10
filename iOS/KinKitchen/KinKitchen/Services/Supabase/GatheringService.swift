@@ -497,9 +497,547 @@ enum GatheringService {
             ? nil
             : cleaned
     }
+    
+    // MARK: - Fetch Upcoming Gathering List Items
+
+    static func fetchUpcomingGatheringItems()
+        async throws -> [GatheringListItem] {
+
+        let user =
+            try await SupabaseManager.client
+                .auth
+                .session
+                .user
+
+        let now =
+            Date()
+
+
+        // MARK: Gatherings Current User Hosts
+
+        let hostedGatherings:
+            [Gathering] =
+            try await SupabaseManager.client
+                .from("gatherings")
+                .select()
+                .eq(
+                    "host_id",
+                    value: user.id
+                )
+                .eq(
+                    "status",
+                    value:
+                        GatheringStatus
+                            .upcoming
+                            .rawValue
+                )
+                .gte(
+                    "starts_at",
+                    value: now
+                )
+                .order(
+                    "starts_at",
+                    ascending: true
+                )
+                .execute()
+                .value
+
+
+        var itemsById:
+            [UUID: GatheringListItem] = [:]
+
+
+        for gathering in hostedGatherings {
+
+            itemsById[
+                gathering.id
+            ] =
+                GatheringListItem(
+                    gathering:
+                        gathering,
+                    relationship:
+                        .hosting
+                )
+        }
+
+
+        // MARK: Gatherings Current User Is Invited To
+
+        let participantRows:
+            [GatheringParticipantListLookup] =
+            try await SupabaseManager.client
+                .from(
+                    "gathering_participants"
+                )
+                .select(
+                    """
+                    gathering_id,
+                    status
+                    """
+                )
+                .eq(
+                    "user_id",
+                    value:
+                        user.id
+                )
+                .in(
+                    "status",
+                    values: [
+                        InvitationStatus
+                            .pending
+                            .rawValue,
+
+                        InvitationStatus
+                            .accepted
+                            .rawValue
+                    ]
+                )
+                .execute()
+                .value
+
+
+        guard !participantRows.isEmpty else {
+
+            return itemsById
+                .values
+                .sorted {
+                    $0.gathering.startsAt <
+                        $1.gathering.startsAt
+                }
+        }
+
+
+        let gatheringIds =
+            Array(
+                Set(
+                    participantRows.map(
+                        \.gatheringId
+                    )
+                )
+            )
+
+
+        let participantGatherings:
+            [Gathering] =
+            try await SupabaseManager.client
+                .from("gatherings")
+                .select()
+                .in(
+                    "id",
+                    values:
+                        gatheringIds
+                )
+                .eq(
+                    "status",
+                    value:
+                        GatheringStatus
+                            .upcoming
+                            .rawValue
+                )
+                .gte(
+                    "starts_at",
+                    value:
+                        now
+                )
+                .order(
+                    "starts_at",
+                    ascending:
+                        true
+                )
+                .execute()
+                .value
+
+
+        let participantStatusByGatheringId =
+            Dictionary(
+                uniqueKeysWithValues:
+                    participantRows.map {
+                        (
+                            $0.gatheringId,
+                            $0.status
+                        )
+                    }
+            )
+
+
+        for gathering in participantGatherings {
+
+            // If somehow the host also has a participant
+            // record, Hosting always wins.
+
+            guard
+                itemsById[
+                    gathering.id
+                ] == nil
+            else {
+                continue
+            }
+
+
+            guard let invitationStatus =
+                participantStatusByGatheringId[
+                    gathering.id
+                ]
+            else {
+                continue
+            }
+
+
+            let relationship:
+                GatheringRelationship
+
+
+            switch invitationStatus {
+
+            case .pending:
+
+                relationship =
+                    .invited
+
+
+            case .accepted:
+
+                relationship =
+                    .going
+
+
+            case .declined:
+
+                continue
+            }
+
+
+            itemsById[
+                gathering.id
+            ] =
+                GatheringListItem(
+                    gathering:
+                        gathering,
+                    relationship:
+                        relationship
+                )
+        }
+
+
+        return itemsById
+            .values
+            .sorted {
+                $0.gathering.startsAt <
+                    $1.gathering.startsAt
+            }
+    }
+
+
+    // MARK: - Fetch Hosted Gathering List Items
+
+    static func fetchHostedGatheringItems()
+        async throws -> [GatheringListItem] {
+
+        let user =
+            try await SupabaseManager.client
+                .auth
+                .session
+                .user
+
+        let now =
+            Date()
+
+
+        let gatherings:
+            [Gathering] =
+            try await SupabaseManager.client
+                .from("gatherings")
+                .select()
+                .eq(
+                    "host_id",
+                    value:
+                        user.id
+                )
+                .eq(
+                    "status",
+                    value:
+                        GatheringStatus
+                            .upcoming
+                            .rawValue
+                )
+                .gte(
+                    "starts_at",
+                    value:
+                        now
+                )
+                .order(
+                    "starts_at",
+                    ascending:
+                        true
+                )
+                .execute()
+                .value
+
+
+        return gatherings.map {
+
+            GatheringListItem(
+                gathering:
+                    $0,
+                relationship:
+                    .hosting
+            )
+        }
+    }
+
+
+    // MARK: - Fetch Past Gathering List Items
+
+    static func fetchPastGatheringItems()
+        async throws -> [GatheringListItem] {
+
+        let user =
+            try await SupabaseManager.client
+                .auth
+                .session
+                .user
+
+        let now =
+            Date()
+
+
+        // MARK: Hosted History
+
+        let hostedGatherings:
+            [Gathering] =
+            try await SupabaseManager.client
+                .from("gatherings")
+                .select()
+                .eq(
+                    "host_id",
+                    value:
+                        user.id
+                )
+                .lt(
+                    "starts_at",
+                    value:
+                        now
+                )
+                .order(
+                    "starts_at",
+                    ascending:
+                        false
+                )
+                .execute()
+                .value
+
+
+        var itemsById:
+            [UUID: GatheringListItem] = [:]
+
+
+        for gathering in hostedGatherings {
+
+            itemsById[
+                gathering.id
+            ] =
+                GatheringListItem(
+                    gathering:
+                        gathering,
+                    relationship:
+                        .hosting
+                )
+        }
+
+
+        // MARK: Accepted Participant History
+
+        let participantRows:
+            [GatheringParticipantListLookup] =
+            try await SupabaseManager.client
+                .from(
+                    "gathering_participants"
+                )
+                .select(
+                    """
+                    gathering_id,
+                    status
+                    """
+                )
+                .eq(
+                    "user_id",
+                    value:
+                        user.id
+                )
+                .eq(
+                    "status",
+                    value:
+                        InvitationStatus
+                            .accepted
+                            .rawValue
+                )
+                .execute()
+                .value
+
+
+        guard !participantRows.isEmpty else {
+
+            return itemsById
+                .values
+                .sorted {
+                    $0.gathering.startsAt >
+                        $1.gathering.startsAt
+                }
+        }
+
+
+        let gatheringIds =
+            Array(
+                Set(
+                    participantRows.map(
+                        \.gatheringId
+                    )
+                )
+            )
+
+
+        let participantGatherings:
+            [Gathering] =
+            try await SupabaseManager.client
+                .from("gatherings")
+                .select()
+                .in(
+                    "id",
+                    values:
+                        gatheringIds
+                )
+                .lt(
+                    "starts_at",
+                    value:
+                        now
+                )
+                .order(
+                    "starts_at",
+                    ascending:
+                        false
+                )
+                .execute()
+                .value
+
+
+        for gathering in participantGatherings {
+
+            guard
+                itemsById[
+                    gathering.id
+                ] == nil
+            else {
+                continue
+            }
+
+
+            itemsById[
+                gathering.id
+            ] =
+                GatheringListItem(
+                    gathering:
+                        gathering,
+                    relationship:
+                        .going
+                )
+        }
+
+
+        return itemsById
+            .values
+            .sorted {
+                $0.gathering.startsAt >
+                    $1.gathering.startsAt
+            }
+    }
+}
+
+// MARK: - Gathering List Item
+
+struct GatheringListItem:
+    Identifiable,
+    Hashable {
+
+    let gathering:
+        Gathering
+
+    let relationship:
+        GatheringRelationship
+
+
+    var id: UUID {
+        gathering.id
+    }
 }
 
 
+// MARK: - Gathering Relationship
+
+enum GatheringRelationship:
+    String,
+    Hashable {
+
+    case hosting
+
+    case invited
+
+    case going
+
+
+    var displayName: String {
+
+        switch self {
+
+        case .hosting:
+            return "Hosting"
+
+        case .invited:
+            return "Invited"
+
+        case .going:
+            return "Going"
+        }
+    }
+}
+
+
+// MARK: - Invitation Status
+
+enum InvitationStatus:
+    String,
+    Codable,
+    Hashable {
+
+    case pending
+
+    case accepted
+
+    case declined
+}
+
+
+// MARK: - Gathering Participant List Lookup
+
+private struct GatheringParticipantListLookup:
+    Decodable {
+
+    let gatheringId:
+        UUID
+
+    let status:
+        InvitationStatus
+
+
+    enum CodingKeys:
+        String,
+        CodingKey {
+
+        case gatheringId =
+            "gathering_id"
+
+        case status
+    }
+}
 // MARK: - Participant Lookup
 
 private struct GatheringParticipantLookup:
