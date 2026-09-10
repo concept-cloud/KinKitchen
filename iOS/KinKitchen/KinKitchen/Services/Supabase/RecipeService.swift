@@ -838,6 +838,42 @@ enum RecipeService {
         return stories
     }
 
+    static func uploadRecipePhoto(
+        recipeId: UUID,
+        imageData: Data
+    ) async throws -> String {
+
+        let user =
+            try await SupabaseManager.client.auth.session.user
+
+        let path =
+            "\(user.id.uuidString.lowercased())/\(recipeId.uuidString.lowercased())/recipe.jpg"
+
+        try await SupabaseManager.client.storage
+            .from("recipe-photos")
+            .upload(
+                path,
+                data: imageData,
+                options: FileOptions(
+                    contentType: "image/jpeg",
+                    upsert: true
+                )
+            )
+
+        return path
+    }
+
+
+    static func fetchRecipePhoto(
+        path: String
+    ) async throws -> Data {
+
+        try await SupabaseManager.client.storage
+            .from("recipe-photos")
+            .download(
+                path: path
+            )
+    }
 
     // MARK: - Create Recipe Story
 

@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import PhotosUI
 import UniformTypeIdentifiers
 
 struct EditRecipeView: View {
@@ -41,7 +42,13 @@ struct EditRecipeView: View {
 
     @State private var ingredients: [EditableIngredient] = []
     @State private var instructions: [EditableInstruction] = []
-    
+
+    @State private var selectedPhotoItem: PhotosPickerItem?
+    @State private var selectedPhotoData: Data?
+    @State private var existingPhotoData: Data?
+    @State private var existingPhotoPath: String?
+    @State private var isLoadingPhoto = false
+
     // MARK: - Drag State
 
     @State private var draggedIngredientID: UUID?
@@ -125,6 +132,8 @@ struct EditRecipeView: View {
                     alignment: .leading,
                     spacing: KinSpacing.xLarge
                 ) {
+                    recipePhotoSection
+
                     recipeDetailsSection
 
                     ingredientsSection
@@ -198,6 +207,121 @@ struct EditRecipeView: View {
             alignment: .bottom
         ) {
             Divider()
+        }
+    }
+
+
+    // MARK: - Recipe Photo
+
+    private var recipePhotoSection: some View {
+        VStack(spacing: KinSpacing.medium) {
+            if let selectedPhotoData,
+               let image = UIImage(data: selectedPhotoData) {
+
+                Image(uiImage: image)
+                    .resizable()
+                    .scaledToFill()
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 210)
+                    .clipped()
+                    .clipShape(
+                        RoundedRectangle(
+                            cornerRadius: KinRadius.large
+                        )
+                    )
+
+                KinPhotoPicker(
+                    selectedItem: $selectedPhotoItem
+                )
+
+            } else if let existingPhotoData,
+                      let image = UIImage(data: existingPhotoData) {
+
+                Image(uiImage: image)
+                    .resizable()
+                    .scaledToFill()
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 210)
+                    .clipped()
+                    .clipShape(
+                        RoundedRectangle(
+                            cornerRadius: KinRadius.large
+                        )
+                    )
+
+                KinPhotoPicker(
+                    selectedItem: $selectedPhotoItem
+                )
+
+            } else if isLoadingPhoto {
+
+                RoundedRectangle(
+                    cornerRadius: KinRadius.large
+                )
+                .fill(KinColors.surface)
+                .frame(height: 210)
+                .overlay {
+                    ProgressView()
+                        .tint(KinColors.primary)
+                }
+
+            } else {
+
+                PhotosPicker(
+                    selection: $selectedPhotoItem,
+                    matching: .images
+                ) {
+                    RoundedRectangle(
+                        cornerRadius: KinRadius.large
+                    )
+                    .fill(KinColors.surface)
+                    .frame(height: 210)
+                    .overlay {
+                        VStack(spacing: KinSpacing.medium) {
+                            Image(
+                                systemName: "photo"
+                            )
+                            .font(.system(size: 38))
+                            .foregroundStyle(
+                                KinColors.primary
+                            )
+
+                            Text("Add Recipe Photo")
+                                .font(KinTypography.body)
+                                .foregroundStyle(
+                                    KinColors.primary
+                                )
+                        }
+                    }
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .onChange(of: selectedPhotoItem) {
+            _, newItem in
+
+            guard let newItem else {
+                return
+            }
+
+            Task {
+                do {
+                    if let data =
+                        try await newItem.loadTransferable(
+                            type: Data.self
+                        ) {
+
+                        await MainActor.run {
+                            selectedPhotoData = data
+                        }
+                    }
+                } catch {
+                    print(
+                        "EDIT RECIPE PHOTO PICK ERROR:",
+                        error.localizedDescription
+                    )
+                }
+            }
         }
     }
 
@@ -1177,6 +1301,31 @@ struct EditRecipeView: View {
                     String.init
                 ) ?? ""
 
+            existingPhotoPath =
+                recipe.photoPath
+
+            if let photoPath = recipe.photoPath,
+               !photoPath.isEmpty {
+                isLoadingPhoto = true
+                Task {
+                    defer {
+                        isLoadingPhoto = false
+                    }
+                    do {
+                        existingPhotoData =
+                            try await RecipeService
+                                .fetchRecipePhoto(
+                                    path: photoPath
+                                )
+                    } catch {
+                        print(
+                            "EDIT RECIPE PHOTO LOAD ERROR:",
+                            error.localizedDescription
+                        )
+                    }
+                }
+            }
+
             ingredients =
                 detail
                     .orderedIngredients
@@ -1298,6 +1447,17 @@ struct EditRecipeView: View {
                         )
                     }
 
+            var photoPath = existingPhotoPath
+
+            if let selectedPhotoData {
+                photoPath =
+                    try await RecipeService
+                        .uploadRecipePhoto(
+                            recipeId: recipeId,
+                            imageData: selectedPhotoData
+                        )
+            }
+
             _ =
                 try await RecipeService.updateRecipe(
                     id: recipeId,
@@ -1311,7 +1471,7 @@ struct EditRecipeView: View {
                     servings: Int(servings),
                     prepTimeMinutes: Int(prepTime),
                     cookTimeMinutes: Int(cookTime),
-                    photoPath: nil,
+                    photoPath: photoPath,
                     category: cleanedOptionalString(
                         category
                     )

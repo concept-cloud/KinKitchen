@@ -19,6 +19,7 @@ struct RecipeDetailView: View {
     @Environment(\.dismiss) private var dismiss
 
     let recipeId: UUID
+    let onBack: (() -> Void)?
 
     @State private var detail: RecipeWithIngredients?
     @State private var ratingSummary: RecipeRatingSummary?
@@ -48,6 +49,17 @@ struct RecipeDetailView: View {
     
     @State private var showingEditRecipe = false
     @State private var recipeWasDeleted = false
+    
+    @State private var recipePhotoData: Data?
+    @State private var isLoadingRecipePhoto = false
+    
+    init(
+        recipeId: UUID,
+        onBack: (() -> Void)? = nil
+    ) {
+        self.recipeId = recipeId
+        self.onBack = onBack
+    }
     
     var body: some View {
         ZStack {
@@ -143,10 +155,10 @@ struct RecipeDetailView: View {
     private func recipeContent(
         _ detail: RecipeWithIngredients
     ) -> some View {
-        ScrollView {
-            VStack(spacing: 0) {
-                header
+        VStack(spacing: 0) {
+            header
 
+            ScrollView {
                 VStack(
                     alignment: .leading,
                     spacing: KinSpacing.large
@@ -171,7 +183,11 @@ struct RecipeDetailView: View {
     private var header: some View {
         HStack {
             Button {
-                dismiss()
+                if let onBack {
+                    onBack()
+                } else {
+                    dismiss()
+                }
             } label: {
                 Image(systemName: "chevron.left")
                     .font(.title2)
@@ -184,9 +200,10 @@ struct RecipeDetailView: View {
 
             Spacer()
 
-            Text("Recipe")
-                .font(KinTypography.title3)
+            Text(detail?.recipe.name ?? "Recipe")
+                .font(KinTypography.title)
                 .foregroundStyle(KinColors.primaryText)
+                .lineLimit(1)
 
             Spacer()
 
@@ -204,24 +221,83 @@ struct RecipeDetailView: View {
 
     // MARK: - Hero
 
+    @ViewBuilder
     private func hero(
         _ recipe: Recipe
     ) -> some View {
-        RoundedRectangle(
-            cornerRadius: KinRadius.large
-        )
-        .fill(KinColors.surface)
-        .frame(height: 220)
-        .overlay {
-            if recipe.photoPath != nil {
-                Image(systemName: "photo")
-                    .font(.system(size: 46))
-                    .foregroundStyle(KinColors.primary)
+
+        ZStack {
+
+            RoundedRectangle(
+                cornerRadius: KinRadius.large
+            )
+            .fill(KinColors.surface)
+            .frame(height: 220)
+
+            if let recipePhotoData,
+               let image = UIImage(data: recipePhotoData) {
+
+                Image(uiImage: image)
+                    .resizable()
+                    .scaledToFill()
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 220)
+                    .clipped()
+                    .clipShape(
+                        RoundedRectangle(
+                            cornerRadius: KinRadius.large
+                        )
+                    )
+
+            } else if isLoadingRecipePhoto {
+
+                ProgressView()
+                    .tint(KinColors.primary)
+
             } else {
+
                 Image(systemName: "fork.knife")
                     .font(.system(size: 52))
                     .foregroundStyle(KinColors.primary)
             }
+        }
+    }
+    
+    
+    @MainActor
+    private func loadRecipePhoto(
+        path: String?
+    ) async {
+
+        recipePhotoData = nil
+
+        guard let path,
+              !path.isEmpty else {
+            isLoadingRecipePhoto = false
+            return
+        }
+
+        isLoadingRecipePhoto = true
+
+        defer {
+            isLoadingRecipePhoto = false
+        }
+
+        do {
+
+            recipePhotoData =
+                try await RecipeService.fetchRecipePhoto(
+                    path: path
+                )
+
+        } catch {
+
+            recipePhotoData = nil
+
+            print(
+                "RECIPE PHOTO LOAD ERROR:",
+                error.localizedDescription
+            )
         }
     }
 
@@ -234,10 +310,12 @@ struct RecipeDetailView: View {
             alignment: .leading,
             spacing: KinSpacing.medium
         ) {
-            HStack(alignment: .center, spacing: KinSpacing.medium) {
-                Text(recipe.name)
-                    .font(KinTypography.largeTitle)
-                    .foregroundStyle(KinColors.primaryText)
+            HStack(alignment: .top, spacing: KinSpacing.medium) {
+                if let description = cleaned(recipe.description) {
+                    Text(description)
+                        .font(KinTypography.body)
+                        .foregroundStyle(KinColors.secondaryText)
+                }
 
                 Spacer()
 
@@ -255,12 +333,6 @@ struct RecipeDetailView: View {
                     .buttonStyle(.plain)
                     .accessibilityLabel("Edit Recipe")
                 }
-            }
-
-            if let description = cleaned(recipe.description) {
-                Text(description)
-                    .font(KinTypography.body)
-                    .foregroundStyle(KinColors.secondaryText)
             }
 
             HStack(spacing: KinSpacing.medium) {
@@ -868,6 +940,10 @@ struct RecipeDetailView: View {
 
             let recipe =
                 loadedDetail.recipe
+            
+            await loadRecipePhoto(
+                path: recipe.photoPath
+            )
 
             async let ratingResult =
                 RecipeService

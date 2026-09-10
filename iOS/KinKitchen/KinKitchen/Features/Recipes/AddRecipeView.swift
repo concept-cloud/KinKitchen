@@ -6,13 +6,19 @@
 //
 
 import SwiftUI
+import PhotosUI
 
 struct AddRecipeView: View {
     @Environment(\.dismiss) private var dismiss
     private let onRecipeCreated: ((Recipe) -> Void)?
+    private let onCancel: (() -> Void)?
 
     @State private var recipeName = ""
     @State private var recipeDescription = ""
+    
+    @State private var selectedPhotoItem: PhotosPickerItem?
+    @State private var selectedPhotoData: Data?
+    
     @State private var servings = 4
     @State private var prepTime = ""
     @State private var cookTime = ""
@@ -48,8 +54,12 @@ struct AddRecipeView: View {
         "Other"
     ]
 
-    init(onRecipeCreated: ((Recipe) -> Void)? = nil) {
+    init(
+        onRecipeCreated: ((Recipe) -> Void)? = nil,
+        onCancel: (() -> Void)? = nil
+    ) {
         self.onRecipeCreated = onRecipeCreated
+        self.onCancel = onCancel
     }
 
     var body: some View {
@@ -142,7 +152,11 @@ struct AddRecipeView: View {
     private var header: some View {
         HStack(spacing: KinSpacing.medium) {
             Button {
-                dismiss()
+                if let onCancel {
+                    onCancel()
+                } else {
+                    dismiss()
+                }
             } label: {
                 Image(systemName: "chevron.left")
                     .font(.title2)
@@ -187,26 +201,88 @@ struct AddRecipeView: View {
     }
 
     private var recipePhotoPlaceholder: some View {
-        RoundedRectangle(cornerRadius: KinRadius.large)
-            .fill(KinColors.surface)
-            .frame(height: 210)
-            .overlay {
-                VStack(spacing: KinSpacing.medium) {
-                    Image(systemName: "photo.badge.plus")
-                        .font(.system(size: 38))
-                        .foregroundStyle(KinColors.primary)
 
-                    Text("Add Recipe Photo")
-                        .font(KinTypography.body)
-                        .foregroundStyle(KinColors.primary)
+        VStack(spacing: KinSpacing.medium) {
 
-                    Text("Photo upload will be connected when recipe media support is added.")
-                        .font(KinTypography.caption)
-                        .foregroundStyle(KinColors.secondaryText)
-                        .multilineTextAlignment(.center)
-                        .padding(.horizontal, KinSpacing.xLarge)
+            if let selectedPhotoData,
+               let image = UIImage(data: selectedPhotoData) {
+
+                Image(uiImage: image)
+                    .resizable()
+                    .scaledToFill()
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 210)
+                    .clipped()
+                    .clipShape(
+                        RoundedRectangle(
+                            cornerRadius: KinRadius.large
+                        )
+                    )
+
+                KinPhotoPicker(
+                    selectedItem: $selectedPhotoItem
+                )
+
+            } else {
+
+                PhotosPicker(
+                    selection: $selectedPhotoItem,
+                    matching: .images
+                ) {
+                    RoundedRectangle(
+                        cornerRadius: KinRadius.large
+                    )
+                    .fill(KinColors.surface)
+                    .frame(height: 210)
+                    .overlay {
+                        VStack(spacing: KinSpacing.medium) {
+
+                            Image(
+                                systemName: "photo"
+                            )
+                            .font(.system(size: 38))
+                            .foregroundStyle(
+                                KinColors.primary
+                            )
+
+                            Text("Add Recipe Photo")
+                                .font(KinTypography.body)
+                                .foregroundStyle(
+                                    KinColors.primary
+                                )
+                        }
+                    }
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .onChange(of: selectedPhotoItem) {
+            _, newItem in
+
+            guard let newItem else {
+                return
+            }
+
+            Task {
+                do {
+                    if let data =
+                        try await newItem.loadTransferable(
+                            type: Data.self
+                        ) {
+
+                        await MainActor.run {
+                            selectedPhotoData = data
+                        }
+                    }
+                } catch {
+                    await MainActor.run {
+                        errorMessage =
+                            "Kin Kitchen was unable to load that photo."
+                        showingError = true
+                    }
                 }
             }
+        }
     }
 
     private var servingsSection: some View {
@@ -927,7 +1003,10 @@ struct AddRecipeView: View {
 
     @MainActor
     private func saveRecipe() async {
-        guard !isSaving else { return }
+
+        guard !isSaving else {
+            return
+        }
 
         errorMessage = nil
 
@@ -938,14 +1017,21 @@ struct AddRecipeView: View {
         }
 
         isSaving = true
-        defer { isSaving = false }
+
+        defer {
+            isSaving = false
+        }
 
         var createdRecipe: Recipe?
 
         do {
+
+            // 1. Create the recipe first
             let recipe = try await RecipeService.createRecipe(
                 name: recipeName,
-                description: cleanedOptionalString(recipeDescription),
+                description: cleanedOptionalString(
+                    recipeDescription
+                ),
                 instructions: instructionText,
                 servings: servings,
                 prepTimeMinutes: Int(prepTime),
@@ -956,31 +1042,92 @@ struct AddRecipeView: View {
 
             createdRecipe = recipe
 
-            let ingredientInputs = cleanedIngredients.map { ingredient in
-                RecipeIngredientInput(
-                    name: ingredient.name,
-                    quantity: IngredientQuantityFormatter.parse(
-                        ingredient.quantity
-                    ),
-                    unit: cleanedOptionalString(ingredient.unit)
-                )
-            }
+            // 2. Save ingredients
+            let ingredientInputs =
+                cleanedIngredients.map { ingredient in
+
+                    RecipeIngredientInput(
+                        name: ingredient.name,
+                        quantity:
+                            IngredientQuantityFormatter.parse(
+                                ingredient.quantity
+                            ),
+                        unit:
+                            cleanedOptionalString(
+                                ingredient.unit
+                            )
+                    )
+                }
 
             _ = try await RecipeService.createIngredients(
                 recipeId: recipe.id,
                 ingredients: ingredientInputs
             )
 
-            onRecipeCreated?(recipe)
+            // 3. Upload photo if one was selected
+            var finalRecipe = recipe
+
+            if let selectedPhotoData {
+
+                do {
+
+                    let photoPath =
+                        try await RecipeService.uploadRecipePhoto(
+                            recipeId: recipe.id,
+                            imageData: selectedPhotoData
+                        )
+
+                    finalRecipe =
+                        try await RecipeService.updateRecipe(
+                            id: recipe.id,
+                            name: recipe.name,
+                            description: recipe.description,
+                            instructions: recipe.instructions,
+                            servings: recipe.servings,
+                            prepTimeMinutes:
+                                recipe.prepTimeMinutes,
+                            cookTimeMinutes:
+                                recipe.cookTimeMinutes,
+                            photoPath: photoPath,
+                            category: recipe.category
+                        )
+
+                } catch {
+
+                    print(
+                        "RECIPE PHOTO UPLOAD ERROR:",
+                        error.localizedDescription
+                    )
+
+                    errorMessage =
+                        "The recipe was saved, but the photo could not be uploaded. You can add the photo later by editing the recipe."
+
+                    showingError = true
+
+                    onRecipeCreated?(recipe)
+
+                    return
+                }
+            }
+
+            // 4. Notify parent with final saved recipe
+            onRecipeCreated?(finalRecipe)
+
             dismiss()
 
         } catch {
+
+            // Only delete the recipe if the actual recipe/ingredient
+            // creation failed.
             if let createdRecipe {
-                try? await RecipeService.deleteRecipe(id: createdRecipe.id)
+                try? await RecipeService.deleteRecipe(
+                    id: createdRecipe.id
+                )
             }
 
             errorMessage =
                 "Kin Kitchen was unable to save this recipe. Please try again."
+
             showingError = true
 
             print(
