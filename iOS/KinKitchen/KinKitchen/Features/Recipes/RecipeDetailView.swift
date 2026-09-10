@@ -54,6 +54,9 @@ struct RecipeDetailView: View {
     @State private var isLoadingRecipePhoto = false
     
     @State private var dietaryCheckResult: RecipeDietaryCheckResult?
+    @State private var showAllergenWarningDetail = false
+    
+    
     
     init(
         recipeId: UUID,
@@ -136,6 +139,15 @@ struct RecipeDetailView: View {
                     recipeWasDeleted = true
                 }
             )
+        }
+        .navigationDestination(
+            isPresented: $showAllergenWarningDetail
+        ) {
+            if let dietaryCheckResult {
+                AllergenWarningDetailView(
+                    result: dietaryCheckResult
+                )
+            }
         }
         .onChange(of: showingEditRecipe) { _, isShowing in
             guard !isShowing else {
@@ -445,6 +457,9 @@ struct RecipeDetailView: View {
             .accessibilityLabel(
                 "Potential allergen conflict. This recipe matches allergens in your Dietary Profile."
             )
+            .onTapGesture {
+                showAllergenWarningDetail = true
+            }
         }
     }
     // MARK: - Prep / Cook Time

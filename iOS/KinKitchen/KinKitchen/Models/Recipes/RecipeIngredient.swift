@@ -13,14 +13,18 @@ struct RecipeIngredient:
     Hashable {
 
     let id: UUID
+
     let recipeId: UUID
 
     var name: String
 
     var quantity: Double?
+
     var unit: String?
 
     var offProductId: String?
+
+    var allergenClassificationVersion: Int
 
     var sortOrder: Int
 
@@ -45,6 +49,9 @@ struct RecipeIngredient:
         case offProductId =
             "off_product_id"
 
+        case allergenClassificationVersion =
+            "allergen_classification_version"
+
         case sortOrder =
             "sort_order"
 
@@ -60,9 +67,11 @@ struct RecipeIngredientCreate:
     Encodable {
 
     let recipeId: UUID
+
     let name: String
 
     let quantity: Double?
+
     let unit: String?
 
     let offProductId: String?
@@ -100,6 +109,7 @@ struct RecipeIngredientUpdate:
     let name: String
 
     let quantity: Double?
+
     let unit: String?
 
     let offProductId: String?

@@ -8,20 +8,91 @@
 import Foundation
 import Supabase
 
+
 // MARK: - Ingredient Allergen Service
 
 enum IngredientAllergenService {
+
+    // MARK: - Catalog Version
+
+    static func fetchCurrentCatalogVersion()
+        async throws -> Int {
+
+        let records:
+            [AllergenCatalogMetadata] =
+            try await SupabaseManager.client
+                .from(
+                    "allergen_catalog_metadata"
+                )
+                .select(
+                    """
+                    current_version
+                    """
+                )
+                .eq(
+                    "id",
+                    value: 1
+                )
+                .limit(1)
+                .execute()
+                .value
+
+        return records.first?.currentVersion ?? 1
+    }
+
+
+    // MARK: - Refresh Recipe If Needed
+
+    static func refreshRecipeClassificationsIfNeeded(
+        ingredients: [RecipeIngredient]
+    ) async throws {
+
+        guard !ingredients.isEmpty else {
+            return
+        }
+
+        let currentVersion =
+            try await fetchCurrentCatalogVersion()
+
+        for ingredient in ingredients {
+
+            guard
+                ingredient
+                    .allergenClassificationVersion
+                    < currentVersion
+            else {
+                continue
+            }
+
+            _ = try await classifyAndStore(
+                ingredientId:
+                    ingredient.id,
+                name:
+                    ingredient.name,
+                offProductId:
+                    ingredient.offProductId,
+                catalogVersion:
+                    currentVersion
+            )
+        }
+    }
+
 
     // MARK: - Evaluate One Ingredient
 
     static func evaluateIngredient(
         name: String,
         offProductId: String? = nil
-    ) async throws -> IngredientAllergenAssociation {
+    ) async throws
+        -> IngredientAllergenAssociation {
 
-        let normalizedName = normalizeIngredientName(name)
+        let normalizedName =
+            normalizeIngredientName(
+                name
+            )
 
         guard !normalizedName.isEmpty else {
+
             return IngredientAllergenAssociation(
                 ingredientName: name,
                 canonicalIngredientName: nil,
@@ -31,62 +102,64 @@ enum IngredientAllergenService {
             )
         }
 
-        // -------------------------------------------------
-        // 1. Kin Kitchen catalog gets first priority.
-        // -------------------------------------------------
+
+        // MARK: Catalog
 
         if let catalogIngredient =
             try await findCatalogIngredient(
-                normalizedName: normalizedName
+                normalizedName:
+                    normalizedName
             ) {
 
             return try await buildSystemAssociation(
                 originalName: name,
-                catalogIngredient: catalogIngredient
+                catalogIngredient:
+                    catalogIngredient
             )
         }
 
-        // -------------------------------------------------
-        // 2. Try catalog aliases.
-        // -------------------------------------------------
+
+        // MARK: Alias
 
         if let catalogIngredient =
             try await findIngredientByAlias(
-                normalizedAlias: normalizedName
+                normalizedAlias:
+                    normalizedName
             ) {
 
             return try await buildSystemAssociation(
                 originalName: name,
-                catalogIngredient: catalogIngredient
+                catalogIngredient:
+                    catalogIngredient
             )
         }
 
-        // -------------------------------------------------
-        // 3. Packaged product fallback.
-        //
-        // We only automatically trust Open Food Facts when
-        // we have an actual product identifier/barcode.
-        // -------------------------------------------------
+
+        // MARK: Open Food Facts
 
         if let offProductId =
-            cleanedOptionalString(offProductId) {
+            cleanedOptionalString(
+                offProductId
+            ) {
 
             do {
 
                 let offResult =
-                    try await OpenFoodFactsService.lookupBarcode(
-                        offProductId
-                    )
+                    try await OpenFoodFactsService
+                        .lookupBarcode(
+                            offProductId
+                        )
 
-                return try await buildOpenFoodFactsAssociation(
-                    originalName: name,
-                    result: offResult
-                )
+                return try await
+                    buildOpenFoodFactsAssociation(
+                        originalName: name,
+                        result: offResult
+                    )
 
             } catch {
 
-                // OFF is supplemental.
-                // Failure must not break recipe creation.
+                // Open Food Facts is supplemental.
+                // Failure must not break recipe use.
 
                 return IngredientAllergenAssociation(
                     ingredientName: name,
@@ -98,9 +171,8 @@ enum IngredientAllergenService {
             }
         }
 
-        // -------------------------------------------------
-        // 4. Unknown
-        // -------------------------------------------------
+
+        // MARK: Unknown
 
         return IngredientAllergenAssociation(
             ingredientName: name,
@@ -112,14 +184,12 @@ enum IngredientAllergenService {
     }
 
 
-    // MARK: - Evaluate Recipe
+    // MARK: - Evaluate Whole Recipe
 
     static func evaluateRecipe(
         ingredients: [IngredientAllergenInput]
-    ) async throws -> RecipeAllergenAssociationResult {
-
-        let availableAllergens =
-            try await DietaryService.fetchAllergens()
+    ) async throws
+        -> RecipeAllergenAssociationResult {
 
         var results:
             [IngredientAllergenAssociation] = []
@@ -139,20 +209,45 @@ enum IngredientAllergenService {
         }
 
         return aggregateRecipeResults(
-            results,
-            availableAllergens:
-                availableAllergens
+            results
         )
     }
 
 
-    // MARK: - Classify and Store One Recipe Ingredient
+    // MARK: - Classify and Store One Ingredient
 
     static func classifyAndStore(
         ingredientId: UUID,
         name: String,
         offProductId: String? = nil
-    ) async throws -> IngredientAllergenAssociation {
+    ) async throws
+        -> IngredientAllergenAssociation {
+
+        let currentVersion =
+            try await fetchCurrentCatalogVersion()
+
+        return try await classifyAndStore(
+            ingredientId:
+                ingredientId,
+            name:
+                name,
+            offProductId:
+                offProductId,
+            catalogVersion:
+                currentVersion
+        )
+    }
+
+
+    // MARK: - Internal Classify and Store
+
+    private static func classifyAndStore(
+        ingredientId: UUID,
+        name: String,
+        offProductId: String?,
+        catalogVersion: Int
+    ) async throws
+        -> IngredientAllergenAssociation {
 
         let result =
             try await evaluateIngredient(
@@ -161,49 +256,76 @@ enum IngredientAllergenService {
                     offProductId
             )
 
-        // Remove only automatically generated results.
+        // Remove only automatic associations.
         //
-        // User-created mappings must NEVER be deleted here.
+        // Never delete source=user rows.
 
         try await deleteAutomaticAssociations(
-            ingredientId: ingredientId
+            ingredientId:
+                ingredientId
         )
 
-        guard let source = result.source else {
-            return result
+        if let source = result.source {
+
+            for allergen in result.allergens {
+
+                let insert =
+                    IngredientAllergenInsert(
+                        ingredientId:
+                            ingredientId,
+                        allergenId:
+                            allergen.id,
+                        source:
+                            source.rawValue
+                    )
+
+                try await SupabaseManager.client
+                    .from(
+                        "ingredient_allergens"
+                    )
+                    .upsert(
+                        insert,
+                        onConflict:
+                            "ingredient_id,allergen_id"
+                    )
+                    .execute()
+            }
         }
 
-        for allergen in result.allergens {
+        // Classification completed successfully,
+        // even when the result is unknown or contains
+        // no mapped allergens.
 
-            let insert =
-                IngredientAllergenInsert(
-                    ingredientId:
-                        ingredientId,
-                    allergenId:
-                        allergen.id,
-                    source:
-                        source.rawValue
-                )
-
-            try await SupabaseManager.client
-                .from("ingredient_allergens")
-                .upsert(
-                    insert,
-                    onConflict:
-                        "ingredient_id,allergen_id"
-                )
-                .execute()
-        }
+        try await updateClassificationVersion(
+            ingredientId:
+                ingredientId,
+            version:
+                catalogVersion
+        )
 
         return result
     }
 
 
-    // MARK: - Classify and Store Multiple Ingredients
+    // MARK: - Classify and Store Ingredient List
 
     static func classifyAndStore(
         ingredients: [IngredientAllergenInput]
-    ) async throws -> RecipeAllergenAssociationResult {
+    ) async throws
+        -> RecipeAllergenAssociationResult {
+
+        guard !ingredients.isEmpty else {
+
+            return RecipeAllergenAssociationResult(
+                ingredientResults: [],
+                allergenAssociations: [],
+                unknownIngredients: [],
+                knownIngredientsWithoutMappedAllergens: []
+            )
+        }
+
+        let currentVersion =
+            try await fetchCurrentCatalogVersion()
 
         var results:
             [IngredientAllergenAssociation] = []
@@ -215,7 +337,8 @@ enum IngredientAllergenService {
 
                 let result =
                     try await evaluateIngredient(
-                        name: ingredient.name,
+                        name:
+                            ingredient.name,
                         offProductId:
                             ingredient.offProductId
                     )
@@ -234,7 +357,9 @@ enum IngredientAllergenService {
                     name:
                         ingredient.name,
                     offProductId:
-                        ingredient.offProductId
+                        ingredient.offProductId,
+                    catalogVersion:
+                        currentVersion
                 )
 
             results.append(
@@ -242,13 +367,8 @@ enum IngredientAllergenService {
             )
         }
 
-        let availableAllergens =
-            try await DietaryService.fetchAllergens()
-
         return aggregateRecipeResults(
-            results,
-            availableAllergens:
-                availableAllergens
+            results
         )
     }
 
@@ -257,12 +377,15 @@ enum IngredientAllergenService {
 
     private static func findCatalogIngredient(
         normalizedName: String
-    ) async throws -> IngredientCatalogRecord? {
+    ) async throws
+        -> IngredientCatalogRecord? {
 
         let records:
             [IngredientCatalogRecord] =
             try await SupabaseManager.client
-                .from("ingredient_catalog")
+                .from(
+                    "ingredient_catalog"
+                )
                 .select(
                     """
                     id,
@@ -272,7 +395,8 @@ enum IngredientAllergenService {
                 )
                 .eq(
                     "normalized_name",
-                    value: normalizedName
+                    value:
+                        normalizedName
                 )
                 .limit(1)
                 .execute()
@@ -286,12 +410,15 @@ enum IngredientAllergenService {
 
     private static func findIngredientByAlias(
         normalizedAlias: String
-    ) async throws -> IngredientCatalogRecord? {
+    ) async throws
+        -> IngredientCatalogRecord? {
 
         let aliases:
             [IngredientAliasLookup] =
             try await SupabaseManager.client
-                .from("ingredient_aliases")
+                .from(
+                    "ingredient_aliases"
+                )
                 .select(
                     """
                     ingredient_id
@@ -299,7 +426,8 @@ enum IngredientAllergenService {
                 )
                 .eq(
                     "normalized_alias",
-                    value: normalizedAlias
+                    value:
+                        normalizedAlias
                 )
                 .limit(1)
                 .execute()
@@ -307,13 +435,16 @@ enum IngredientAllergenService {
 
         guard let alias =
             aliases.first else {
+
             return nil
         }
 
         let ingredients:
             [IngredientCatalogRecord] =
             try await SupabaseManager.client
-                .from("ingredient_catalog")
+                .from(
+                    "ingredient_catalog"
+                )
                 .select(
                     """
                     id,
@@ -340,7 +471,8 @@ enum IngredientAllergenService {
         originalName: String,
         catalogIngredient:
             IngredientCatalogRecord
-    ) async throws -> IngredientAllergenAssociation {
+    ) async throws
+        -> IngredientAllergenAssociation {
 
         let mappings:
             [IngredientCatalogAllergenLookup] =
@@ -361,8 +493,10 @@ enum IngredientAllergenService {
                 .execute()
                 .value
 
-        // Ingredient exists in our catalog but has
-        // no intrinsic mapping to one of our allergens.
+
+        // The ingredient is known, but we do not
+        // currently associate it with one of the
+        // supported allergens.
 
         guard !mappings.isEmpty else {
 
@@ -379,6 +513,7 @@ enum IngredientAllergenService {
             )
         }
 
+
         let allergenIds =
             Set(
                 mappings.map(
@@ -387,7 +522,8 @@ enum IngredientAllergenService {
             )
 
         let availableAllergens =
-            try await DietaryService.fetchAllergens()
+            try await DietaryService
+                .fetchAllergens()
 
         let matchedAllergens =
             availableAllergens
@@ -404,6 +540,7 @@ enum IngredientAllergenService {
                         == .orderedAscending
                 }
 
+
         guard !matchedAllergens.isEmpty else {
 
             return IngredientAllergenAssociation(
@@ -417,6 +554,7 @@ enum IngredientAllergenService {
                 source: nil
             )
         }
+
 
         return IngredientAllergenAssociation(
             ingredientName:
@@ -438,22 +576,12 @@ enum IngredientAllergenService {
     private static func buildOpenFoodFactsAssociation(
         originalName: String,
         result: OpenFoodFactsResult
-    ) async throws -> IngredientAllergenAssociation {
+    ) async throws
+        -> IngredientAllergenAssociation {
 
         let availableAllergens =
-            try await DietaryService.fetchAllergens()
-
-        // OFF may return terminology such as:
-        //
-        // milk
-        // eggs
-        // peanuts
-        // nuts
-        // soybeans
-        // gluten
-        //
-        // Convert those into Kin Kitchen's canonical
-        // allergen records.
+            try await DietaryService
+                .fetchAllergens()
 
         let normalizedOFFAllergens =
             Set(
@@ -463,7 +591,8 @@ enum IngredientAllergenService {
                 )
                 .compactMap {
                     canonicalAllergenName(
-                        fromExternalName: $0
+                        fromExternalName:
+                            $0
                     )
                 }
             )
@@ -472,9 +601,10 @@ enum IngredientAllergenService {
             availableAllergens
                 .filter { allergen in
 
-                    normalizedOFFAllergens.contains(
-                        allergen.name
-                    )
+                    normalizedOFFAllergens
+                        .contains(
+                            allergen.name
+                        )
                 }
                 .sorted {
                     $0.name
@@ -483,6 +613,7 @@ enum IngredientAllergenService {
                         )
                         == .orderedAscending
                 }
+
 
         if !matchedAllergens.isEmpty {
 
@@ -500,10 +631,9 @@ enum IngredientAllergenService {
             )
         }
 
-        // IMPORTANT:
-        //
-        // An empty OFF allergen list is NOT automatically
-        // interpreted as safe.
+
+        // Missing OFF allergen data must never
+        // automatically mean "safe".
 
         switch result.dataState {
 
@@ -545,11 +675,14 @@ enum IngredientAllergenService {
     ) async throws {
 
         try await SupabaseManager.client
-            .from("ingredient_allergens")
+            .from(
+                "ingredient_allergens"
+            )
             .delete()
             .eq(
                 "ingredient_id",
-                value: ingredientId
+                value:
+                    ingredientId
             )
             .in(
                 "source",
@@ -567,13 +700,40 @@ enum IngredientAllergenService {
     }
 
 
-    // MARK: - Aggregate Recipe
+    // MARK: - Update Classification Version
+
+    private static func updateClassificationVersion(
+        ingredientId: UUID,
+        version: Int
+    ) async throws {
+
+        let payload =
+            IngredientClassificationVersionUpdate(
+                allergenClassificationVersion:
+                    version
+            )
+
+        try await SupabaseManager.client
+            .from(
+                "recipe_ingredients"
+            )
+            .update(
+                payload
+            )
+            .eq(
+                "id",
+                value:
+                    ingredientId
+            )
+            .execute()
+    }
+
+
+    // MARK: - Aggregate Recipe Results
 
     private static func aggregateRecipeResults(
         _ results:
-            [IngredientAllergenAssociation],
-        availableAllergens:
-            [Allergen]
+            [IngredientAllergenAssociation]
     ) -> RecipeAllergenAssociationResult {
 
         var allergensById:
@@ -587,6 +747,7 @@ enum IngredientAllergenService {
 
         var knownWithoutMappings:
             [String] = []
+
 
         for result in results {
 
@@ -610,11 +771,13 @@ enum IngredientAllergenService {
                     )
                 }
 
+
             case .knownNoMappedAllergens:
 
                 knownWithoutMappings.append(
                     result.ingredientName
                 )
+
 
             case .unknown:
 
@@ -623,6 +786,7 @@ enum IngredientAllergenService {
                 )
             }
         }
+
 
         let associations =
             allergensById.values
@@ -646,6 +810,7 @@ enum IngredientAllergenService {
                             )
                     )
                 }
+
 
         return RecipeAllergenAssociationResult(
             ingredientResults:
@@ -683,12 +848,14 @@ enum IngredientAllergenService {
 
             return "Milk"
 
+
         case "egg",
              "eggs",
              "oeuf",
              "oeufs":
 
             return "Egg"
+
 
         case "peanut",
              "peanuts",
@@ -699,6 +866,7 @@ enum IngredientAllergenService {
 
             return "Peanut"
 
+
         case "soy",
              "soya",
              "soybean",
@@ -707,20 +875,24 @@ enum IngredientAllergenService {
 
             return "Soy"
 
+
         case "sesame",
              "sesame seeds":
 
             return "Sesame"
 
+
         case "fish":
 
             return "Fish"
+
 
         case "shellfish",
              "crustaceans",
              "crustacean":
 
             return "Shellfish"
+
 
         case "tree nut",
              "tree nuts",
@@ -745,17 +917,17 @@ enum IngredientAllergenService {
 
             return "Tree Nut"
 
+
         case "wheat",
              "ble":
 
             return "Wheat"
 
+
         default:
 
-            // Do NOT map "gluten" directly to Wheat.
-            //
-            // Gluten can come from grains other than wheat,
-            // so that would create an unsafe assumption.
+            // Gluten is deliberately not converted
+            // directly into Wheat.
 
             return nil
         }
@@ -774,10 +946,11 @@ enum IngredientAllergenService {
                     .diacriticInsensitive,
                     .caseInsensitive
                 ],
-                locale: Locale(
-                    identifier:
-                        "en_US_POSIX"
-                )
+                locale:
+                    Locale(
+                        identifier:
+                            "en_US_POSIX"
+                    )
             )
             .lowercased()
             .replacingOccurrences(
@@ -799,6 +972,8 @@ enum IngredientAllergenService {
     }
 
 
+    // MARK: - Optional String
+
     private static func cleanedOptionalString(
         _ value: String?
     ) -> String? {
@@ -819,6 +994,8 @@ enum IngredientAllergenService {
     }
 
 
+    // MARK: - Unique Strings
+
     private static func uniqueStrings(
         _ values: [String]
     ) -> [String] {
@@ -837,9 +1014,11 @@ enum IngredientAllergenService {
                 return false
             }
 
-            return seen.insert(
-                key
-            ).inserted
+            return seen
+                .insert(
+                    key
+                )
+                .inserted
         }
     }
 }
@@ -851,8 +1030,11 @@ struct IngredientAllergenInput:
     Hashable {
 
     let id: UUID?
+
     let name: String
+
     let offProductId: String?
+
 
     init(
         id: UUID? = nil,
@@ -861,7 +1043,9 @@ struct IngredientAllergenInput:
     ) {
 
         self.id = id
+
         self.name = name
+
         self.offProductId =
             offProductId
     }
@@ -891,6 +1075,7 @@ struct IngredientAllergenAssociation:
     let source:
         IngredientAllergenSource?
 
+
     var isKnown: Bool {
 
         switch state {
@@ -906,13 +1091,16 @@ struct IngredientAllergenAssociation:
         }
     }
 
+
     var hasMappedAllergens: Bool {
-        state == .knownWithAllergens
+
+        state ==
+            .knownWithAllergens
     }
 }
 
 
-// MARK: - Recipe Allergen Source
+// MARK: - Allergen Source Association
 
 struct AllergenSourceAssociation:
     Identifiable,
@@ -947,6 +1135,7 @@ struct RecipeAllergenAssociationResult:
     let knownIngredientsWithoutMappedAllergens:
         [String]
 
+
     var allergens:
         [Allergen] {
 
@@ -955,11 +1144,15 @@ struct RecipeAllergenAssociationResult:
         )
     }
 
+
     var hasKnownAllergens: Bool {
+
         !allergenAssociations.isEmpty
     }
 
+
     var hasUnknownIngredients: Bool {
+
         !unknownIngredients.isEmpty
     }
 }
@@ -1002,14 +1195,18 @@ private struct IngredientCatalogRecord:
     Decodable {
 
     let id: UUID
+
     let name: String
+
     let normalizedName: String
+
 
     enum CodingKeys:
         String,
         CodingKey {
 
         case id
+
         case name
 
         case normalizedName =
@@ -1022,6 +1219,7 @@ private struct IngredientAliasLookup:
     Decodable {
 
     let ingredientId: UUID
+
 
     enum CodingKeys:
         String,
@@ -1038,6 +1236,7 @@ private struct IngredientCatalogAllergenLookup:
 
     let allergenId: UUID
 
+
     enum CodingKeys:
         String,
         CodingKey {
@@ -1052,8 +1251,11 @@ private struct IngredientAllergenInsert:
     Encodable {
 
     let ingredientId: UUID
+
     let allergenId: UUID
+
     let source: String
+
 
     enum CodingKeys:
         String,
@@ -1066,5 +1268,39 @@ private struct IngredientAllergenInsert:
             "allergen_id"
 
         case source
+    }
+}
+
+
+private struct AllergenCatalogMetadata:
+    Decodable {
+
+    let currentVersion:
+        Int
+
+
+    enum CodingKeys:
+        String,
+        CodingKey {
+
+        case currentVersion =
+            "current_version"
+    }
+}
+
+
+private struct IngredientClassificationVersionUpdate:
+    Encodable {
+
+    let allergenClassificationVersion:
+        Int
+
+
+    enum CodingKeys:
+        String,
+        CodingKey {
+
+        case allergenClassificationVersion =
+            "allergen_classification_version"
     }
 }
