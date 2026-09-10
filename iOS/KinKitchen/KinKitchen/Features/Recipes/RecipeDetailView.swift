@@ -53,6 +53,8 @@ struct RecipeDetailView: View {
     @State private var recipePhotoData: Data?
     @State private var isLoadingRecipePhoto = false
     
+    @State private var dietaryCheckResult: RecipeDietaryCheckResult?
+    
     init(
         recipeId: UUID,
         onBack: (() -> Void)? = nil
@@ -359,11 +361,90 @@ struct RecipeDetailView: View {
             }
 
             timeDetails(recipe)
+            
+            allergenWarningIndicator
 
             ratingSection
 
             lineageActions(recipe)
 
+        }
+    }
+    
+    // MARK: - Allergen Warning
+
+    @ViewBuilder
+    private var allergenWarningIndicator: some View {
+
+        if let dietaryCheckResult,
+           dietaryCheckResult.state == .conflict {
+
+            KinCard {
+
+                HStack(
+                    spacing: KinSpacing.medium
+                ) {
+
+                    Image(
+                        systemName:
+                            "exclamationmark.triangle.fill"
+                    )
+                    .font(.title2)
+                    .foregroundStyle(
+                        KinColors.error
+                    )
+                    .frame(
+                        width: 44,
+                        height: 44
+                    )
+                    .background(
+                        KinColors.error.opacity(0.12)
+                    )
+                    .clipShape(Circle())
+
+                    VStack(
+                        alignment: .leading,
+                        spacing: KinSpacing.small
+                    ) {
+
+                        Text(
+                            "Potential Allergen Conflict"
+                        )
+                        .font(
+                            KinTypography.title3
+                        )
+                        .foregroundStyle(
+                            KinColors.primaryText
+                        )
+
+                        Text(
+                            "This recipe matches allergens in your Dietary Profile."
+                        )
+                        .font(
+                            KinTypography.caption
+                        )
+                        .foregroundStyle(
+                            KinColors.secondaryText
+                        )
+                    }
+
+                    Spacer()
+
+                    Image(
+                        systemName: "chevron.right"
+                    )
+                    .font(.caption)
+                    .foregroundStyle(
+                        KinColors.primary
+                    )
+                }
+            }
+            .accessibilityElement(
+                children: .combine
+            )
+            .accessibilityLabel(
+                "Potential allergen conflict. This recipe matches allergens in your Dietary Profile."
+            )
         }
     }
     // MARK: - Prep / Cook Time
@@ -918,6 +999,31 @@ struct RecipeDetailView: View {
         .padding(KinSpacing.large)
     }
 
+    // MARK: - Load Dietary Check
+
+    @MainActor
+    private func loadDietaryCheck() async {
+
+        do {
+
+            dietaryCheckResult =
+                try await RecipeDietaryCheckService
+                    .checkRecipe(
+                        recipeId: recipeId
+                    )
+
+        } catch {
+
+            dietaryCheckResult = nil
+
+            print(
+                "RECIPE DIETARY CHECK ERROR:",
+                error.localizedDescription
+            )
+        }
+    }
+    
+    
     // MARK: - Load Recipe
 
     @MainActor
@@ -940,10 +1046,12 @@ struct RecipeDetailView: View {
 
             let recipe =
                 loadedDetail.recipe
-            
+
             await loadRecipePhoto(
                 path: recipe.photoPath
             )
+
+            await loadDietaryCheck()
 
             async let ratingResult =
                 RecipeService
