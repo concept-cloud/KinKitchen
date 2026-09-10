@@ -388,80 +388,166 @@ struct RecipeDetailView: View {
     @ViewBuilder
     private var allergenWarningIndicator: some View {
 
-        if let dietaryCheckResult,
-           dietaryCheckResult.state == .conflict {
+        if let dietaryCheckResult {
 
-            KinCard {
+            switch dietaryCheckResult.state {
 
-                HStack(
-                    spacing: KinSpacing.medium
-                ) {
+            case .conflict:
 
-                    Image(
-                        systemName:
-                            "exclamationmark.triangle.fill"
-                    )
-                    .font(.title2)
-                    .foregroundStyle(
-                        KinColors.error
-                    )
-                    .frame(
-                        width: 44,
-                        height: 44
-                    )
-                    .background(
-                        KinColors.error.opacity(0.12)
-                    )
-                    .clipShape(Circle())
+                KinCard {
 
-                    VStack(
-                        alignment: .leading,
-                        spacing: KinSpacing.small
+                    HStack(
+                        spacing: KinSpacing.medium
                     ) {
 
-                        Text(
-                            "Potential Allergen Conflict"
+                        Image(
+                            systemName:
+                                "exclamationmark.triangle.fill"
                         )
-                        .font(
-                            KinTypography.title3
-                        )
+                        .font(.title2)
                         .foregroundStyle(
-                            KinColors.primaryText
+                            KinColors.error
                         )
+                        .frame(
+                            width: 44,
+                            height: 44
+                        )
+                        .background(
+                            KinColors.error.opacity(0.12)
+                        )
+                        .clipShape(Circle())
 
-                        Text(
-                            "This recipe matches allergens in your Dietary Profile."
+                        VStack(
+                            alignment: .leading,
+                            spacing: KinSpacing.small
+                        ) {
+
+                            Text(
+                                "Potential Allergen Conflict"
+                            )
+                            .font(
+                                KinTypography.title3
+                            )
+                            .foregroundStyle(
+                                KinColors.primaryText
+                            )
+
+                            Text(
+                                "This recipe matches allergens in your Dietary Profile."
+                            )
+                            .font(
+                                KinTypography.caption
+                            )
+                            .foregroundStyle(
+                                KinColors.secondaryText
+                            )
+                        }
+
+                        Spacer()
+
+                        Image(
+                            systemName:
+                                "chevron.right"
                         )
-                        .font(
-                            KinTypography.caption
-                        )
+                        .font(.caption)
                         .foregroundStyle(
-                            KinColors.secondaryText
+                            KinColors.primary
                         )
                     }
-
-                    Spacer()
-
-                    Image(
-                        systemName: "chevron.right"
-                    )
-                    .font(.caption)
-                    .foregroundStyle(
-                        KinColors.primary
-                    )
                 }
-            }
-            .accessibilityElement(
-                children: .combine
-            )
-            .accessibilityLabel(
-                "Potential allergen conflict. This recipe matches allergens in your Dietary Profile."
-            )
-            .onTapGesture {
-                showAllergenWarningDetail = true
+                .accessibilityElement(
+                    children: .combine
+                )
+                .accessibilityLabel(
+                    "Potential allergen conflict. This recipe matches allergens in your Dietary Profile."
+                )
+                .onTapGesture {
+                    showAllergenWarningDetail = true
+                }
+
+
+            case .incomplete:
+
+                KinCard {
+
+                    HStack(
+                        spacing: KinSpacing.medium
+                    ) {
+
+                        Image(
+                            systemName:
+                                "questionmark.circle.fill"
+                        )
+                        .font(.title2)
+                        .foregroundStyle(
+                            KinColors.warning
+                        )
+                        .frame(
+                            width: 44,
+                            height: 44
+                        )
+                        .background(
+                            KinColors.warning.opacity(0.12)
+                        )
+                        .clipShape(Circle())
+
+                        VStack(
+                            alignment: .leading,
+                            spacing: KinSpacing.small
+                        ) {
+
+                            Text(
+                                "Allergen Information Incomplete"
+                            )
+                            .font(
+                                KinTypography.title3
+                            )
+                            .foregroundStyle(
+                                KinColors.primaryText
+                            )
+
+                            Text(
+                                "Some ingredients could not be fully evaluated."
+                            )
+                            .font(
+                                KinTypography.caption
+                            )
+                            .foregroundStyle(
+                                KinColors.secondaryText
+                            )
+                        }
+
+                        Spacer()
+
+                        Image(
+                            systemName:
+                                "chevron.right"
+                        )
+                        .font(.caption)
+                        .foregroundStyle(
+                            KinColors.primary
+                        )
+                    }
+                }
+                .accessibilityElement(
+                    children: .combine
+                )
+                .accessibilityLabel(
+                    "Allergen information incomplete. Some ingredients could not be fully evaluated."
+                )
+                .onTapGesture {
+                    showAllergenWarningDetail = true
+                }
+
+
+            case .noKnownConflict:
+
+                EmptyView()
             }
         }
     }
+    
+    
     // MARK: - Prep / Cook Time
 
     private func timeDetails(

@@ -131,69 +131,143 @@ private extension AllergenWarningDetailView {
 
 private extension AllergenWarningDetailView {
 
+    @ViewBuilder
     var warningSummary: some View {
 
-        HStack(
-            alignment: .top,
-            spacing: KinSpacing.medium
-        ) {
+        switch result.state {
 
-            Image(
-                systemName:
-                    "exclamationmark.triangle.fill"
-            )
-            .font(.title2)
-            .foregroundStyle(
-                KinColors.error
-            )
-            .frame(
-                width: 48,
-                height: 48
-            )
-            .background(
-                KinColors.error.opacity(0.12)
-            )
-            .clipShape(Circle())
+        case .conflict:
 
-            VStack(
-                alignment: .leading,
-                spacing: KinSpacing.small
+            HStack(
+                alignment: .top,
+                spacing: KinSpacing.medium
             ) {
 
-                Text(
-                    "Potential Allergen Conflict"
+                Image(
+                    systemName:
+                        "exclamationmark.triangle.fill"
                 )
-                .font(
-                    KinTypography.title3
-                )
+                .font(.title2)
                 .foregroundStyle(
-                    KinColors.primaryText
+                    KinColors.error
                 )
+                .frame(
+                    width: 48,
+                    height: 48
+                )
+                .background(
+                    KinColors.error.opacity(0.12)
+                )
+                .clipShape(Circle())
 
-                Text(
-                    "This recipe contains ingredients that match allergens listed in your Dietary Profile."
-                )
-                .font(
-                    KinTypography.body
-                )
-                .foregroundStyle(
-                    KinColors.secondaryText
-                )
+                VStack(
+                    alignment: .leading,
+                    spacing: KinSpacing.small
+                ) {
+
+                    Text(
+                        "Potential Allergen Conflict"
+                    )
+                    .font(
+                        KinTypography.title3
+                    )
+                    .foregroundStyle(
+                        KinColors.primaryText
+                    )
+
+                    Text(
+                        "This recipe contains ingredients that match allergens listed in your Dietary Profile."
+                    )
+                    .font(
+                        KinTypography.body
+                    )
+                    .foregroundStyle(
+                        KinColors.secondaryText
+                    )
+                }
+
+                Spacer()
             }
-
-            Spacer()
-        }
-        .padding(
-            KinSpacing.large
-        )
-        .background(
-            KinColors.surface
-        )
-        .clipShape(
-            RoundedRectangle(
-                cornerRadius: 20
+            .padding(
+                KinSpacing.large
             )
-        )
+            .background(
+                KinColors.surface
+            )
+            .clipShape(
+                RoundedRectangle(
+                    cornerRadius: 20
+                )
+            )
+
+        case .incomplete:
+
+            HStack(
+                alignment: .top,
+                spacing: KinSpacing.medium
+            ) {
+
+                Image(
+                    systemName:
+                        "questionmark.circle.fill"
+                )
+                .font(.title2)
+                .foregroundStyle(
+                    KinColors.warning
+                )
+                .frame(
+                    width: 48,
+                    height: 48
+                )
+                .background(
+                    KinColors.warning.opacity(0.12)
+                )
+                .clipShape(Circle())
+
+                VStack(
+                    alignment: .leading,
+                    spacing: KinSpacing.small
+                ) {
+
+                    Text(
+                        "Allergen Information Incomplete"
+                    )
+                    .font(
+                        KinTypography.title3
+                    )
+                    .foregroundStyle(
+                        KinColors.primaryText
+                    )
+
+                    Text(
+                        "Some ingredients could not be fully evaluated. This does not mean the recipe is safe."
+                    )
+                    .font(
+                        KinTypography.body
+                    )
+                    .foregroundStyle(
+                        KinColors.secondaryText
+                    )
+                }
+
+                Spacer()
+            }
+            .padding(
+                KinSpacing.large
+            )
+            .background(
+                KinColors.surface
+            )
+            .clipShape(
+                RoundedRectangle(
+                    cornerRadius: 20
+                )
+            )
+
+        case .noKnownConflict:
+
+            EmptyView()
+        }
     }
 }
 
