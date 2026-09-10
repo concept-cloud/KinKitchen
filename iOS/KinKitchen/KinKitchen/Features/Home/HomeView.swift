@@ -106,6 +106,7 @@ struct HomeView: View {
                             print("Gatherings tapped")
                         }
                         
+                        
                     }
 
 
