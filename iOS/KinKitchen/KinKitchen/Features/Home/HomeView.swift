@@ -106,6 +106,61 @@ struct HomeView: View {
                             print("Gatherings tapped")
                         }
                         
+                        // test buttons
+                        
+                        Button("Test Gathering Service") {
+                            Task {
+                                do {
+                                    let created =
+                                        try await GatheringService.createGathering(
+                                            name: "Test Gathering",
+                                            description: "KINKIT-108 service test",
+                                            location: "Oxford, PA",
+                                            startsAt: Date().addingTimeInterval(86_400),
+                                            guestLimit: 12
+                                        )
+
+                                    print("CREATED:", created.id)
+                                    print("STATUS:", created.status.rawValue)
+
+                                    let fetched =
+                                        try await GatheringService.fetchGathering(
+                                            id: created.id
+                                        )
+
+                                    print("FETCHED:", fetched.name)
+
+                                    let updated =
+                                        try await GatheringService.updateGathering(
+                                            id: created.id,
+                                            name: "Updated Test Gathering",
+                                            description: "Updated description",
+                                            location: "Oxford, PA",
+                                            startsAt: created.startsAt,
+                                            guestLimit: 20
+                                        )
+
+                                    print("UPDATED:", updated.name)
+                                    print("GUEST LIMIT:", updated.guestLimit ?? 0)
+
+                                    let cancelled =
+                                        try await GatheringService.cancelGathering(
+                                            id: created.id
+                                        )
+
+                                    print(
+                                        "CANCELLED:",
+                                        cancelled.status.rawValue
+                                    )
+
+                                } catch {
+                                    print(
+                                        "GATHERING SERVICE ERROR:",
+                                        error.localizedDescription
+                                    )
+                                }
+                            }
+                        }
                         
                     }
 
