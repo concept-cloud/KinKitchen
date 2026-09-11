@@ -10,102 +10,90 @@ import SwiftUI
 
 
 struct GatheringsView: View {
-
+    
     enum GatheringTab:
         String,
         CaseIterable {
-
+        
         case upcoming = "Upcoming"
         case hosting = "Hosting"
         case past = "Past"
     }
-
-
+    
+    
     @State private var selectedTab: GatheringTab = .upcoming
-
+    
     @State private var isLoading = true
-
+    
     @State private var errorMessage: String?
-
+    
     @State private var selectedGatheringId: UUID?
-
+    
     @State private var showingGatheringDetail = false
-
+    
     @State private var showingAddGathering = false
     
     @State private var gatherings: [GatheringListItem] = []
-
-
+    
+    
     var body: some View {
-
-        ZStack {
-
-            KinColors.background
-                .ignoresSafeArea()
-
-            VStack(
-                spacing: 0
-            ) {
-
-                header
-
-                tabs
-
-                content
-            }
-        }
-        .navigationBarHidden(true)
-        .task {
-            await loadGatherings()
-        }
-        .navigationDestination(
-            isPresented:
-                $showingGatheringDetail
-        ) {
-
-            if let selectedGatheringId {
-
-                // KINKIT-73
-                Text(
-                    "Gathering Detail\n\(selectedGatheringId)"
-                )
-                .multilineTextAlignment(
-                    .center
-                )
-                .foregroundStyle(
-                    KinColors.primaryText
-                )
-                .frame(
-                    maxWidth: .infinity,
-                    maxHeight: .infinity
-                )
-                .background(
-                    KinColors.background
-                )
-            }
-        }
-        .navigationDestination(
-            isPresented:
-                $showingAddGathering
-        ) {
-
-            // KINKIT-72
-            Text(
-                "Add Gathering"
-            )
-            .font(
-                KinTypography.title
-            )
-            .foregroundStyle(
-                KinColors.primaryText
-            )
-            .frame(
-                maxWidth: .infinity,
-                maxHeight: .infinity
-            )
-            .background(
+        
+        NavigationStack {
+            
+            ZStack {
+                
                 KinColors.background
-            )
+                    .ignoresSafeArea()
+                
+                VStack(
+                    spacing: 0
+                ) {
+                    
+                    header
+                    
+                    tabs
+                    
+                    content
+                }
+            }
+            .navigationBarHidden(true)
+            .task {
+                
+                await loadGatherings()
+            }
+            .navigationDestination(
+                isPresented:
+                    $showingGatheringDetail
+            ) {
+                
+                if let selectedGatheringId {
+                    
+                    // KINKIT-73
+                    Text(
+                        "Gathering Detail\n\(selectedGatheringId)"
+                    )
+                    .multilineTextAlignment(
+                        .center
+                    )
+                    .foregroundStyle(
+                        KinColors.primaryText
+                    )
+                    .frame(
+                        maxWidth: .infinity,
+                        maxHeight: .infinity
+                    )
+                    .background(
+                        KinColors.background
+                    )
+                }
+            }
+            .navigationDestination(
+                isPresented:
+                    $showingAddGathering
+            ) {
+                
+                AddGatheringView()
+            }
         }
     }
 }

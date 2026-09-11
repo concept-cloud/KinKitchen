@@ -15,6 +15,7 @@ enum GatheringService {
 
     static func createGathering(
         name: String,
+        theme: String?,
         description: String?,
         location: String?,
         startsAt: Date,
@@ -33,6 +34,10 @@ enum GatheringService {
                 name: name.trimmingCharacters(
                     in: .whitespacesAndNewlines
                 ),
+                theme:
+                    cleanedOptionalString(
+                        theme
+                    ),
                 description:
                     cleanedOptionalString(
                         description
@@ -58,7 +63,6 @@ enum GatheringService {
 
         return gathering
     }
-
 
     // MARK: - Fetch Gathering
 
@@ -313,6 +317,7 @@ enum GatheringService {
     static func updateGathering(
         id gatheringId: UUID,
         name: String,
+        theme: String?,
         description: String?,
         location: String?,
         startsAt: Date,
@@ -330,6 +335,10 @@ enum GatheringService {
                 name: name.trimmingCharacters(
                     in: .whitespacesAndNewlines
                 ),
+                theme:
+                    cleanedOptionalString(
+                        theme
+                    ),
                 description:
                     cleanedOptionalString(
                         description
@@ -363,8 +372,6 @@ enum GatheringService {
 
         return gathering
     }
-
-
     // MARK: - Cancel Gathering
 
     static func cancelGathering(

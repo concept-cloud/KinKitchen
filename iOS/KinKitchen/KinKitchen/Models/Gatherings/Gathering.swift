@@ -16,23 +16,17 @@ struct Gathering:
     Hashable {
 
     let id: UUID
-
     let hostId: UUID
 
     var name: String
-
+    var theme: String?
     var description: String?
-
     var location: String?
-
     var startsAt: Date
-
     var guestLimit: Int?
-
     var status: GatheringStatus
 
     let createdAt: Date
-
     var updatedAt: Date
 
 
@@ -46,6 +40,8 @@ struct Gathering:
             "host_id"
 
         case name
+
+        case theme
 
         case description
 
@@ -76,9 +72,7 @@ enum GatheringStatus:
     Hashable {
 
     case upcoming
-
     case completed
-
     case cancelled
 }
 
@@ -91,13 +85,10 @@ struct GatheringCreate:
     let hostId: UUID
 
     let name: String
-
+    let theme: String?
     let description: String?
-
     let location: String?
-
     let startsAt: Date
-
     let guestLimit: Int?
 
 
@@ -109,6 +100,8 @@ struct GatheringCreate:
             "host_id"
 
         case name
+
+        case theme
 
         case description
 
@@ -129,13 +122,10 @@ struct GatheringUpdate:
     Encodable {
 
     let name: String
-
+    let theme: String?
     let description: String?
-
     let location: String?
-
     let startsAt: Date
-
     let guestLimit: Int?
 
 
@@ -144,6 +134,8 @@ struct GatheringUpdate:
         CodingKey {
 
         case name
+
+        case theme
 
         case description
 
