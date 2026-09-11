@@ -60,6 +60,11 @@ struct GatheringDetailView: View {
 
             await loadGathering()
         }
+        .onAppear {
+            Task {
+                await loadGathering()
+            }
+        }
     }
 }
 
@@ -84,22 +89,30 @@ private extension GatheringDetailView {
         _ gathering: Gathering
     ) -> some View {
 
-        ScrollView(
-            showsIndicators: false
+        VStack(
+            spacing: 0
         ) {
 
-            VStack(
-                alignment: .leading,
-                spacing: KinSpacing.xLarge
+            navigationHeader
+                .padding(
+                    .horizontal,
+                    KinSpacing.large
+                )
+
+            ScrollView(
+                showsIndicators: false
             ) {
 
-                navigationHeader
+                VStack(
+                    alignment: .leading,
+                    spacing: KinSpacing.xLarge
+                ) {
 
-                GatheringHeroImage(
-                    path:
-                        gathering
-                            .coverImagePath
-                )
+                    GatheringHeroImage(
+                        path:
+                            gathering
+                                .coverImagePath
+                    )
 
                 titleSection(
                     gathering
@@ -124,9 +137,10 @@ private extension GatheringDetailView {
                 KinSpacing.xxxLarge
             )
         }
-        .refreshable {
+            .refreshable {
 
-            await loadGathering()
+                await loadGathering()
+            }
         }
     }
 }
@@ -238,8 +252,8 @@ private extension GatheringDetailView {
 
                     NavigationLink {
 
-                        editGatheringPlaceholder(
-                            gathering
+                        EditGatheringView(
+                            gathering: gathering
                         )
 
                     } label: {
@@ -1088,58 +1102,6 @@ private extension GatheringDetailView {
                 "GATHERING DETAIL ERROR:",
                 error.localizedDescription
             )
-        }
-    }
-}
-
-
-// MARK: - KINKIT-74 Placeholder
-
-private extension GatheringDetailView {
-
-    func editGatheringPlaceholder(
-        _ gathering: Gathering
-    ) -> some View {
-
-        ZStack {
-
-            KinColors.background
-                .ignoresSafeArea()
-
-            VStack(
-                spacing: KinSpacing.medium
-            ) {
-
-                Text(
-                    "Edit Gathering"
-                )
-                .font(
-                    KinTypography.title
-                )
-                .foregroundStyle(
-                    KinColors.primaryText
-                )
-
-                Text(
-                    gathering.name
-                )
-                .font(
-                    KinTypography.body
-                )
-                .foregroundStyle(
-                    KinColors.secondaryText
-                )
-
-                Text(
-                    "KINKIT-74"
-                )
-                .font(
-                    KinTypography.caption
-                )
-                .foregroundStyle(
-                    KinColors.secondaryText
-                )
-            }
         }
     }
 }

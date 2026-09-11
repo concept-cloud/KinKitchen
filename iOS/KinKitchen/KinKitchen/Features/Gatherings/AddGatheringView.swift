@@ -21,6 +21,7 @@ struct AddGatheringView: View {
     @State private var time = Date()
     @State private var location = ""
     @State private var description = ""
+    @State private var guestLimit: Int?
 
     @State private var selectedPhotoItem: PhotosPickerItem?
     @State private var selectedImageData: Data?
@@ -602,6 +603,10 @@ private extension AddGatheringView {
             KinTextEditor(
                 text: $description
             )
+            
+            // MARK: Guest Limit
+
+            guestLimitSection
         }
     }
 
@@ -619,6 +624,146 @@ private extension AddGatheringView {
         .foregroundStyle(
             KinColors.primaryText
         )
+    }
+}
+
+// MARK: - Guest Limit
+
+private extension AddGatheringView {
+
+    var guestLimitSection: some View {
+
+        VStack(
+            alignment: .leading,
+            spacing: KinSpacing.small
+        ) {
+
+            HStack {
+
+                VStack(
+                    alignment: .leading,
+                    spacing: 2
+                ) {
+
+                    Text("Guest Limit")
+                        .font(
+                            KinTypography.headline
+                        )
+                        .foregroundStyle(
+                            KinColors.primaryText
+                        )
+
+                    Text("Optional")
+                        .font(
+                            KinTypography.caption
+                        )
+                        .foregroundStyle(
+                            KinColors.secondaryText
+                        )
+                }
+
+                Spacer()
+
+                HStack(
+                    spacing: KinSpacing.large
+                ) {
+
+                    Button {
+
+                        decreaseGuestLimit()
+
+                    } label: {
+
+                        Image(
+                            systemName: "minus"
+                        )
+                        .frame(
+                            width: 30,
+                            height: 30
+                        )
+                    }
+                    .buttonStyle(.plain)
+
+                    Text(
+                        guestLimit.map {
+                            String($0)
+                        } ?? "—"
+                    )
+                    .font(
+                        KinTypography.body
+                    )
+                    .foregroundStyle(
+                        KinColors.primaryText
+                    )
+                    .frame(
+                        minWidth: 28
+                    )
+
+                    Button {
+
+                        increaseGuestLimit()
+
+                    } label: {
+
+                        Image(
+                            systemName: "plus"
+                        )
+                        .frame(
+                            width: 30,
+                            height: 30
+                        )
+                    }
+                    .buttonStyle(.plain)
+                }
+                .foregroundStyle(
+                    KinColors.primaryText
+                )
+                .padding(
+                    KinSpacing.small
+                )
+                .background(
+                    KinColors.surface
+                )
+                .clipShape(
+                    RoundedRectangle(
+                        cornerRadius:
+                            KinRadius.medium
+                    )
+                )
+            }
+        }
+    }
+
+
+    func increaseGuestLimit() {
+
+        if let guestLimit {
+
+            self.guestLimit =
+                guestLimit + 1
+
+        } else {
+
+            guestLimit = 1
+        }
+    }
+
+
+    func decreaseGuestLimit() {
+
+        guard let guestLimit else {
+            return
+        }
+
+        if guestLimit <= 1 {
+
+            self.guestLimit = nil
+
+        } else {
+
+            self.guestLimit =
+                guestLimit - 1
+        }
     }
 }
 
@@ -727,7 +872,7 @@ private extension AddGatheringView {
                         startsAt:
                             startsAt,
                         guestLimit:
-                            nil
+                            guestLimit
                     )
 
             dismiss()

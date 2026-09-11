@@ -29,18 +29,16 @@ struct GatheringsView: View {
     
     @State private var errorMessage: String?
     
-    @State private var selectedGatheringId: UUID?
-    
-    @State private var showingGatheringDetail = false
-    
     @State private var showingAddGathering = false
     
     @State private var gatherings: [GatheringListItem] = []
     
+    @State private var navigationPath = NavigationPath()
+    
     
     var body: some View {
         
-        NavigationStack {
+        NavigationStack(path: $navigationPath) {
             
             ZStack {
                 
@@ -65,35 +63,18 @@ struct GatheringsView: View {
             }
             .navigationDestination(
                 isPresented:
-                    $showingGatheringDetail
-            ) {
-                
-                if let selectedGatheringId {
-                    
-                    GatheringDetailView(
-                        gatheringId: selectedGatheringId
-                    )
-                    .multilineTextAlignment(
-                        .center
-                    )
-                    .foregroundStyle(
-                        KinColors.primaryText
-                    )
-                    .frame(
-                        maxWidth: .infinity,
-                        maxHeight: .infinity
-                    )
-                    .background(
-                        KinColors.background
-                    )
-                }
-            }
-            .navigationDestination(
-                isPresented:
                     $showingAddGathering
             ) {
                 
                 AddGatheringView()
+            }
+            .navigationDestination(
+                for: UUID.self
+            ) { gatheringId in
+
+                GatheringDetailView(
+                    gatheringId: gatheringId
+                )
             }
         }
     }
@@ -291,23 +272,15 @@ private extension GatheringsView {
                     gatherings
                 ) { item in
 
-                    Button {
-
-                        selectedGatheringId =
-                            item.gathering.id
-
-                        showingGatheringDetail =
-                            true
-
-                    } label: {
+                    NavigationLink(
+                        value: item.gathering.id
+                    ) {
 
                         gatheringCard(
                             item
                         )
                     }
-                    .buttonStyle(
-                        .plain
-                    )
+                    .buttonStyle(.plain)
                 }
             }
             .padding(
