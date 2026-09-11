@@ -17,6 +17,9 @@ struct AddDishView: View {
     @State private var notes = ""
     @State private var selectedNeeds: Set<DishNeed> = []
     @State private var selectedSupplies: Set<DishSupply> = []
+
+    @State private var selectedRecipe: Recipe?
+    @State private var isShowingRecipePicker = false
     @State private var isSuppliesExpanded = false
     @State private var isSaving = false
     @State private var errorMessage: String?
@@ -46,6 +49,13 @@ struct AddDishView: View {
             }
         }
         .navigationBarHidden(true)
+        .sheet(
+            isPresented: $isShowingRecipePicker
+        ) {
+            RecipeSelectionView(
+                selectedRecipe: $selectedRecipe
+            )
+        }
     }
 }
 
@@ -140,33 +150,80 @@ private extension AddDishView {
 
 private extension AddDishView {
     var recipeSection: some View {
-        Button {
-        } label: {
-            HStack(
-                spacing: KinSpacing.medium
-            ) {
-                Image(systemName: "book.closed.fill")
-                    .foregroundStyle(KinColors.primary)
+        VStack(
+            alignment: .leading,
+            spacing: KinSpacing.small
+        ) {
+            fieldLabel("Recipe")
 
-                Text("Select Recipe")
-                    .font(KinTypography.body)
-                    .foregroundStyle(KinColors.primaryText)
+            Button {
+                isShowingRecipePicker = true
+            } label: {
+                HStack(
+                    spacing: KinSpacing.medium
+                ) {
+                    Image(
+                        systemName:
+                            "book.closed.fill"
+                    )
+                    .foregroundStyle(
+                        KinColors.primary
+                    )
 
-                Spacer()
+                    VStack(
+                        alignment: .leading,
+                        spacing: KinSpacing.xSmall
+                    ) {
+                        Text(
+                            selectedRecipe?.name
+                            ?? "Select Recipe"
+                        )
+                        .font(
+                            KinTypography.body
+                        )
+                        .foregroundStyle(
+                            KinColors.primaryText
+                        )
 
-                Image(systemName: "chevron.right")
-                    .font(KinTypography.footnote)
-                    .foregroundStyle(KinColors.primary)
-            }
-            .padding(KinSpacing.large)
-            .background(KinColors.surface)
-            .clipShape(
-                RoundedRectangle(
-                    cornerRadius: KinRadius.medium
+                        if selectedRecipe != nil {
+                            Text(
+                                "Recipe selected"
+                            )
+                            .font(
+                                KinTypography.footnote
+                            )
+                            .foregroundStyle(
+                                KinColors.secondaryText
+                            )
+                        }
+                    }
+
+                    Spacer()
+
+                    Image(
+                        systemName:
+                            "chevron.right"
+                    )
+                    .font(
+                        KinTypography.footnote
+                    )
+                    .foregroundStyle(
+                        KinColors.primary
+                    )
+                }
+                .padding(KinSpacing.large)
+                .background(
+                    KinColors.surface
                 )
-            )
+                .clipShape(
+                    RoundedRectangle(
+                        cornerRadius:
+                            KinRadius.medium
+                    )
+                )
+            }
+            .buttonStyle(.plain)
         }
-        .buttonStyle(.plain)
     }
 }
 
@@ -186,40 +243,52 @@ private extension AddDishView {
                     id: \.self
                 ) { category in
                     Button {
-                        selectedCategory = category
+                        selectedCategory =
+                            category
                     } label: {
-                        if selectedCategory == category {
+                        if selectedCategory ==
+                            category {
                             Label(
                                 category.displayName,
-                                systemImage: "checkmark"
+                                systemImage:
+                                    "checkmark"
                             )
                         } else {
-                            Text(category.displayName)
+                            Text(
+                                category.displayName
+                            )
                         }
                     }
                 }
             } label: {
                 HStack {
-                    Text(selectedCategory.displayName)
-                        .font(KinTypography.body)
-                        .foregroundStyle(
-                            KinColors.primaryText
-                        )
+                    Text(
+                        selectedCategory
+                            .displayName
+                    )
+                    .font(KinTypography.body)
+                    .foregroundStyle(
+                        KinColors.primaryText
+                    )
 
                     Spacer()
 
                     Image(
-                        systemName: "chevron.down"
+                        systemName:
+                            "chevron.down"
                     )
                     .foregroundStyle(
                         KinColors.primary
                     )
                 }
                 .padding(KinSpacing.large)
-                .background(KinColors.surface)
+                .background(
+                    KinColors.surface
+                )
                 .clipShape(
                     RoundedRectangle(
-                        cornerRadius: KinRadius.medium
+                        cornerRadius:
+                            KinRadius.medium
                     )
                 )
             }
@@ -240,7 +309,11 @@ private extension AddDishView {
 
             LazyVGrid(
                 columns: [
-                    GridItem(.adaptive(minimum: 105))
+                    GridItem(
+                        .adaptive(
+                            minimum: 105
+                        )
+                    )
                 ],
                 spacing: KinSpacing.small
             ) {
@@ -268,7 +341,9 @@ private extension AddDishView {
             }
         } label: {
             Text(need.displayName)
-                .font(KinTypography.footnote)
+                .font(
+                    KinTypography.footnote
+                )
                 .foregroundStyle(
                     isSelected
                     ? Color.white
@@ -304,7 +379,8 @@ private extension AddDishView {
 
             Button {
                 withAnimation {
-                    isSuppliesExpanded.toggle()
+                    isSuppliesExpanded
+                        .toggle()
                 }
             } label: {
                 HStack(
@@ -314,11 +390,17 @@ private extension AddDishView {
                         systemName:
                             "takeoutbag.and.cup.and.straw.fill"
                     )
-                    .foregroundStyle(KinColors.primary)
+                    .foregroundStyle(
+                        KinColors.primary
+                    )
 
                     Text(suppliesSummary)
-                        .font(KinTypography.body)
-                        .foregroundStyle(KinColors.primaryText)
+                        .font(
+                            KinTypography.body
+                        )
+                        .foregroundStyle(
+                            KinColors.primaryText
+                        )
 
                     Spacer()
 
@@ -328,13 +410,18 @@ private extension AddDishView {
                             ? "chevron.up"
                             : "chevron.right"
                     )
-                    .foregroundStyle(KinColors.primary)
+                    .foregroundStyle(
+                        KinColors.primary
+                    )
                 }
                 .padding(KinSpacing.large)
-                .background(KinColors.surface)
+                .background(
+                    KinColors.surface
+                )
                 .clipShape(
                     RoundedRectangle(
-                        cornerRadius: KinRadius.medium
+                        cornerRadius:
+                            KinRadius.medium
                     )
                 )
             }
@@ -351,10 +438,13 @@ private extension AddDishView {
                         supplyRow(supply)
                     }
                 }
-                .background(KinColors.surface)
+                .background(
+                    KinColors.surface
+                )
                 .clipShape(
                     RoundedRectangle(
-                        cornerRadius: KinRadius.medium
+                        cornerRadius:
+                            KinRadius.medium
                     )
                 )
             }
@@ -365,27 +455,36 @@ private extension AddDishView {
         _ supply: DishSupply
     ) -> some View {
         Button {
-            if selectedSupplies.contains(supply) {
-                selectedSupplies.remove(supply)
+            if selectedSupplies
+                .contains(supply) {
+                selectedSupplies
+                    .remove(supply)
             } else {
-                selectedSupplies.insert(supply)
+                selectedSupplies
+                    .insert(supply)
             }
         } label: {
             HStack {
                 Text(supply.displayName)
-                    .font(KinTypography.body)
-                    .foregroundStyle(KinColors.primaryText)
+                    .font(
+                        KinTypography.body
+                    )
+                    .foregroundStyle(
+                        KinColors.primaryText
+                    )
 
                 Spacer()
 
                 Image(
                     systemName:
-                        selectedSupplies.contains(supply)
+                        selectedSupplies
+                            .contains(supply)
                         ? "checkmark.circle.fill"
                         : "circle"
                 )
                 .foregroundStyle(
-                    selectedSupplies.contains(supply)
+                    selectedSupplies
+                        .contains(supply)
                     ? KinColors.primary
                     : KinColors.secondaryText
                 )
@@ -401,7 +500,8 @@ private extension AddDishView {
         }
 
         if selectedSupplies.count == 1,
-           let supply = selectedSupplies.first {
+           let supply =
+            selectedSupplies.first {
             return supply.displayName
         }
 
@@ -443,36 +543,49 @@ private extension AddDishView {
                         servings -= 1
                     }
                 } label: {
-                    Image(systemName: "minus")
-                        .frame(
-                            width: 30,
-                            height: 30
-                        )
+                    Image(
+                        systemName: "minus"
+                    )
+                    .frame(
+                        width: 30,
+                        height: 30
+                    )
                 }
                 .buttonStyle(.plain)
 
                 Text("\(servings)")
-                    .font(KinTypography.body)
-                    .foregroundStyle(KinColors.primaryText)
+                    .font(
+                        KinTypography.body
+                    )
+                    .foregroundStyle(
+                        KinColors.primaryText
+                    )
                     .frame(minWidth: 28)
 
                 Button {
                     servings += 1
                 } label: {
-                    Image(systemName: "plus")
-                        .frame(
-                            width: 30,
-                            height: 30
-                        )
+                    Image(
+                        systemName: "plus"
+                    )
+                    .frame(
+                        width: 30,
+                        height: 30
+                    )
                 }
                 .buttonStyle(.plain)
             }
-            .foregroundStyle(KinColors.primaryText)
+            .foregroundStyle(
+                KinColors.primaryText
+            )
             .padding(KinSpacing.small)
-            .background(KinColors.surface)
+            .background(
+                KinColors.surface
+            )
             .clipShape(
                 RoundedRectangle(
-                    cornerRadius: KinRadius.medium
+                    cornerRadius:
+                        KinRadius.medium
                 )
             )
         }
@@ -487,7 +600,9 @@ private extension AddDishView {
     ) -> some View {
         Text(title)
             .font(KinTypography.headline)
-            .foregroundStyle(KinColors.primaryText)
+            .foregroundStyle(
+                KinColors.primaryText
+            )
     }
 }
 
@@ -523,12 +638,19 @@ private extension AddDishView {
 
         let cleanName =
             dishName.trimmingCharacters(
-                in: .whitespacesAndNewlines
+                in:
+                    .whitespacesAndNewlines
             )
 
         guard !cleanName.isEmpty else {
             errorMessage =
                 "Please enter a dish name."
+            return
+        }
+
+        guard servings > 0 else {
+            errorMessage =
+                "Servings must be at least 1."
             return
         }
 
@@ -542,26 +664,358 @@ private extension AddDishView {
             _ =
                 try await GatheringDishService
                     .createNeed(
-                        gatheringId: gatheringId,
-                        name: cleanName,
-                        category: selectedCategory,
-                        quantityNeeded: servings,
-                        recipeId: nil,
-                        notes: notes,
-                        needs: selectedNeeds,
-                        supplies: selectedSupplies
+                        gatheringId:
+                            gatheringId,
+                        name:
+                            cleanName,
+                        category:
+                            selectedCategory,
+                        quantityNeeded:
+                            servings,
+                        recipeId:
+                            selectedRecipe?.id,
+                        notes:
+                            notes,
+                        needs:
+                            selectedNeeds,
+                        supplies:
+                            selectedSupplies
                     )
 
             dismiss()
         } catch {
             errorMessage =
                 error.localizedDescription
+        }
+    }
+}
 
-            print(
-                "ADD DISH ERROR:",
-                error.localizedDescription
+// MARK: - Recipe Selection View
+
+private struct RecipeSelectionView:
+    View {
+
+    @Environment(\.dismiss)
+    private var dismiss
+
+    @Binding
+    var selectedRecipe: Recipe?
+
+    @State
+    private var recipes: [Recipe] = []
+
+    @State
+    private var isLoading = true
+
+    @State
+    private var errorMessage: String?
+
+    var body: some View {
+        NavigationStack {
+            ZStack {
+                KinColors.background
+                    .ignoresSafeArea()
+
+                content
+            }
+            .navigationTitle(
+                "Select Recipe"
+            )
+            .navigationBarTitleDisplayMode(
+                .inline
+            )
+            .toolbar {
+                ToolbarItem(
+                    placement:
+                        .topBarLeading
+                ) {
+                    Button("Cancel") {
+                        dismiss()
+                    }
+                }
+            }
+            .task {
+                await loadRecipes()
+            }
+        }
+    }
+}
+
+// MARK: - Recipe Selection Content
+
+private extension RecipeSelectionView {
+    @ViewBuilder
+    var content: some View {
+        if isLoading {
+            ProgressView()
+                .tint(
+                    KinColors.primary
+                )
+        } else if let errorMessage {
+            VStack(
+                spacing: KinSpacing.large
+            ) {
+                Image(
+                    systemName:
+                        "exclamationmark.triangle.fill"
+                )
+                .font(.largeTitle)
+                .foregroundStyle(
+                    KinColors.error
+                )
+
+                Text(
+                    "Unable to Load Recipes"
+                )
+                .font(
+                    KinTypography.headline
+                )
+                .foregroundStyle(
+                    KinColors.primaryText
+                )
+
+                Text(errorMessage)
+                    .font(
+                        KinTypography.body
+                    )
+                    .foregroundStyle(
+                        KinColors.secondaryText
+                    )
+                    .multilineTextAlignment(
+                        .center
+                    )
+
+                Button("Try Again") {
+                    Task {
+                        await loadRecipes()
+                    }
+                }
+                .font(
+                    KinTypography.body
+                )
+                .foregroundStyle(
+                    KinColors.primary
+                )
+            }
+            .padding(KinSpacing.xLarge)
+        } else if recipes.isEmpty {
+            VStack(
+                spacing: KinSpacing.large
+            ) {
+                Image(
+                    systemName:
+                        "book.closed"
+                )
+                .font(.largeTitle)
+                .foregroundStyle(
+                    KinColors.primary
+                )
+
+                Text("No Recipes Yet")
+                    .font(
+                        KinTypography.headline
+                    )
+                    .foregroundStyle(
+                        KinColors.primaryText
+                    )
+
+                Text(
+                    "Create a recipe first, or continue without selecting one."
+                )
+                .font(
+                    KinTypography.body
+                )
+                .foregroundStyle(
+                    KinColors.secondaryText
+                )
+                .multilineTextAlignment(
+                    .center
+                )
+            }
+            .padding(KinSpacing.xLarge)
+        } else {
+            recipeList
+        }
+    }
+}
+
+// MARK: - Recipe List
+
+private extension RecipeSelectionView {
+    var recipeList: some View {
+        ScrollView {
+            LazyVStack(
+                spacing: KinSpacing.medium
+            ) {
+                if selectedRecipe != nil {
+                    noRecipeButton
+                }
+
+                ForEach(recipes) { recipe in
+                    recipeButton(recipe)
+                }
+            }
+            .padding(KinSpacing.large)
+        }
+    }
+
+    var noRecipeButton: some View {
+        Button {
+            selectedRecipe = nil
+            dismiss()
+        } label: {
+            HStack(
+                spacing: KinSpacing.medium
+            ) {
+                Image(
+                    systemName:
+                        "xmark.circle"
+                )
+                .foregroundStyle(
+                    KinColors.secondaryText
+                )
+
+                Text("No Recipe")
+                    .font(
+                        KinTypography.body
+                    )
+                    .foregroundStyle(
+                        KinColors.primaryText
+                    )
+
+                Spacer()
+            }
+            .padding(KinSpacing.large)
+            .background(
+                KinColors.surface
+            )
+            .clipShape(
+                RoundedRectangle(
+                    cornerRadius:
+                        KinRadius.medium
+                )
             )
         }
+        .buttonStyle(.plain)
+    }
+
+    func recipeButton(
+        _ recipe: Recipe
+    ) -> some View {
+        Button {
+            selectedRecipe = recipe
+            dismiss()
+        } label: {
+            HStack(
+                spacing: KinSpacing.medium
+            ) {
+                Image(
+                    systemName:
+                        "book.closed.fill"
+                )
+                .font(.title3)
+                .foregroundStyle(
+                    KinColors.primary
+                )
+
+                VStack(
+                    alignment: .leading,
+                    spacing: KinSpacing.xSmall
+                ) {
+                    Text(recipe.name)
+                        .font(
+                            KinTypography.body
+                        )
+                        .foregroundStyle(
+                            KinColors.primaryText
+                        )
+                        .multilineTextAlignment(
+                            .leading
+                        )
+
+                    if let category =
+                        recipe.category,
+                       !category.isEmpty {
+                        Text(category)
+                            .font(
+                                KinTypography.footnote
+                            )
+                            .foregroundStyle(
+                                KinColors.secondaryText
+                            )
+                    }
+
+                    if let servings =
+                        recipe.servings {
+                        Text(
+                            "\(servings) servings"
+                        )
+                        .font(
+                            KinTypography.footnote
+                        )
+                        .foregroundStyle(
+                            KinColors.secondaryText
+                        )
+                    }
+                }
+
+                Spacer()
+
+                if selectedRecipe?.id ==
+                    recipe.id {
+                    Image(
+                        systemName:
+                            "checkmark.circle.fill"
+                    )
+                    .foregroundStyle(
+                        KinColors.primary
+                    )
+                } else {
+                    Image(
+                        systemName:
+                            "chevron.right"
+                    )
+                    .font(
+                        KinTypography.footnote
+                    )
+                    .foregroundStyle(
+                        KinColors.secondaryText
+                    )
+                }
+            }
+            .padding(KinSpacing.large)
+            .background(
+                KinColors.surface
+            )
+            .clipShape(
+                RoundedRectangle(
+                    cornerRadius:
+                        KinRadius.medium
+                )
+            )
+        }
+        .buttonStyle(.plain)
+    }
+}
+
+// MARK: - Load Recipes
+
+private extension RecipeSelectionView {
+    @MainActor
+    func loadRecipes() async {
+        isLoading = true
+        errorMessage = nil
+
+        do {
+            recipes =
+                try await RecipeService
+                    .fetchCurrentUserRecipes()
+        } catch {
+            errorMessage =
+                error.localizedDescription
+        }
+
+        isLoading = false
     }
 }
 

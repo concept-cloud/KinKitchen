@@ -17,6 +17,7 @@ struct GatheringNeedDetailView: View {
     @State private var claims: [GatheringNeedClaim] = []
     @State private var isLoading = true
     @State private var errorMessage: String?
+    @State private var recipe: Recipe?
 
     var body: some View {
         ZStack {
@@ -36,6 +37,11 @@ struct GatheringNeedDetailView: View {
                     ) {
                         header
                         dishHeader
+
+                        if let recipe {
+                            recipeSection(recipe)
+                        }
+
                         servingsSection
 
                         if !requirements.isEmpty {
@@ -185,6 +191,172 @@ private extension GatheringNeedDetailView {
             return "shippingbox"
         case .other:
             return "fork.knife"
+        }
+    }
+}
+
+// MARK: - Recipe
+
+private extension GatheringNeedDetailView {
+    func recipeSection(
+        _ recipe: Recipe
+    ) -> some View {
+        VStack(
+            alignment: .leading,
+            spacing: KinSpacing.medium
+        ) {
+            Text("Recipe")
+                .font(KinTypography.headline)
+                .foregroundStyle(
+                    KinColors.primaryText
+                )
+
+            VStack(
+                alignment: .leading,
+                spacing: KinSpacing.medium
+            ) {
+                HStack(
+                    spacing: KinSpacing.medium
+                ) {
+                    ZStack {
+                        RoundedRectangle(
+                            cornerRadius:
+                                KinRadius.medium
+                        )
+                        .fill(
+                            KinColors.primary
+                                .opacity(0.10)
+                        )
+                        .frame(
+                            width: 56,
+                            height: 56
+                        )
+
+                        Image(
+                            systemName:
+                                "book.closed.fill"
+                        )
+                        .font(.title2)
+                        .foregroundStyle(
+                            KinColors.primary
+                        )
+                    }
+
+                    VStack(
+                        alignment: .leading,
+                        spacing: KinSpacing.xSmall
+                    ) {
+                        Text(recipe.name)
+                            .font(
+                                KinTypography.headline
+                            )
+                            .foregroundStyle(
+                                KinColors.primaryText
+                            )
+
+                        if let category =
+                            recipe.category,
+                           !category.isEmpty {
+                            Text(category)
+                                .font(
+                                    KinTypography.footnote
+                                )
+                                .foregroundStyle(
+                                    KinColors.secondaryText
+                                )
+                        }
+                    }
+
+                    Spacer()
+                }
+
+                if let description =
+                    recipe.description,
+                   !description.isEmpty {
+                    Text(description)
+                        .font(
+                            KinTypography.body
+                        )
+                        .foregroundStyle(
+                            KinColors.secondaryText
+                        )
+                }
+
+                HStack(
+                    spacing: KinSpacing.xLarge
+                ) {
+                    if let servings =
+                        recipe.servings {
+                        recipeStat(
+                            icon: "person.2.fill",
+                            value:
+                                "\(servings)",
+                            label: "Servings"
+                        )
+                    }
+
+                    if recipe.prepTimeMinutes != nil {
+                        recipeStat(
+                            icon: "clock",
+                            value:
+                                recipe.formattedPrepTime,
+                            label: "Prep"
+                        )
+                    }
+
+                    if recipe.cookTimeMinutes != nil {
+                        recipeStat(
+                            icon: "flame.fill",
+                            value:
+                                recipe.formattedCookTime,
+                            label: "Cook"
+                        )
+                    }
+                }
+            }
+            .padding(KinSpacing.large)
+            .frame(
+                maxWidth: .infinity,
+                alignment: .leading
+            )
+            .background(KinColors.surface)
+            .clipShape(
+                RoundedRectangle(
+                    cornerRadius:
+                        KinRadius.large
+                )
+            )
+        }
+    }
+
+    func recipeStat(
+        icon: String,
+        value: String,
+        label: String
+    ) -> some View {
+        VStack(
+            alignment: .leading,
+            spacing: KinSpacing.xSmall
+        ) {
+            HStack(
+                spacing: KinSpacing.xSmall
+            ) {
+                Image(
+                    systemName: icon
+                )
+
+                Text(value)
+            }
+            .font(KinTypography.footnote)
+            .foregroundStyle(
+                KinColors.primary
+            )
+
+            Text(label)
+                .font(KinTypography.footnote)
+                .foregroundStyle(
+                    KinColors.secondaryText
+                )
         }
     }
 }
@@ -391,6 +563,18 @@ private extension GatheringNeedDetailView {
                         needId: need.id
                     )
 
+            let loadedRecipe: Recipe?
+
+            if let recipeId = need.recipeId {
+                loadedRecipe =
+                    try await RecipeService
+                        .fetchRecipe(
+                            id: recipeId
+                        )
+            } else {
+                loadedRecipe = nil
+            }
+
             let (
                 loadedRequirements,
                 loadedSupplies,
@@ -401,9 +585,17 @@ private extension GatheringNeedDetailView {
                 claimsRequest
             )
 
-            requirements = loadedRequirements
-            supplies = loadedSupplies
-            claims = loadedClaims
+            requirements =
+                loadedRequirements
+
+            supplies =
+                loadedSupplies
+
+            claims =
+                loadedClaims
+
+            recipe =
+                loadedRecipe
         } catch {
             errorMessage =
                 error.localizedDescription
