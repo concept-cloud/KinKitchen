@@ -370,7 +370,6 @@ enum GatheringDishService {
         id needId: UUID,
         quantity: Int = 1
     ) async throws -> GatheringNeedClaim {
-
         guard quantity > 0 else {
             throw GatheringDishServiceError.invalidQuantity
         }
@@ -380,7 +379,7 @@ enum GatheringDishService {
             quantity: quantity
         )
 
-        let claim: GatheringNeedClaim =
+        let claims: [GatheringNeedClaim] =
             try await SupabaseManager.client
                 .rpc(
                     "claim_gathering_need",
@@ -388,6 +387,10 @@ enum GatheringDishService {
                 )
                 .execute()
                 .value
+
+        guard let claim = claims.first else {
+            throw GatheringDishServiceError.claimNotReturned
+        }
 
         return claim
     }
@@ -714,6 +717,7 @@ enum GatheringDishServiceError: LocalizedError {
     case invalidName
     case invalidQuantity
     case quantityBelowClaims
+    case claimNotReturned
 
     var errorDescription: String? {
         switch self {
@@ -725,6 +729,9 @@ enum GatheringDishServiceError: LocalizedError {
 
         case .quantityBelowClaims:
             return "Quantity cannot be lower than the amount already claimed."
+
+        case .claimNotReturned:
+            return "The dish claim could not be completed."
         }
     }
 }

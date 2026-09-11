@@ -24,6 +24,7 @@ struct GatheringDetailView: View {
         GatheringDetailTab = .details
     
     @State private var gatheringNeeds: [GatheringNeed] = []
+    @State private var gatheringClaims: [GatheringNeedClaim] = []
 
 
     var body: some View {
@@ -718,7 +719,8 @@ private extension GatheringDetailView {
                     ForEach(gatheringNeeds) { need in
                         NavigationLink {
                             GatheringNeedDetailView(
-                                need: need
+                                need: need,
+                                isHost: isHost
                             )
                         } label: {
                             gatheringNeedCard(need)
@@ -804,6 +806,15 @@ private extension GatheringDetailView {
                     .font(KinTypography.caption)
                     .foregroundStyle(KinColors.secondaryText)
                 }
+                Text(
+                    claimStatus(for: need)
+                )
+                .font(KinTypography.caption)
+                .foregroundStyle(
+                    remainingQuantity(for: need) == 0
+                        ? KinColors.success
+                        : KinColors.primary
+                )
             }
 
             Spacer()
@@ -820,7 +831,54 @@ private extension GatheringDetailView {
             )
         )
     }
+    
+    func claims(
+        for need: GatheringNeed
+    ) -> [GatheringNeedClaim] {
+        gatheringClaims.filter {
+            $0.gatheringNeedId == need.id
+        }
+    }
 
+    func claimedQuantity(
+        for need: GatheringNeed
+    ) -> Int {
+        claims(for: need).reduce(0) {
+            $0 + $1.quantity
+        }
+    }
+
+    func remainingQuantity(
+        for need: GatheringNeed
+    ) -> Int {
+        max(
+            need.quantityNeeded -
+            claimedQuantity(for: need),
+            0
+        )
+    }
+
+    func claimStatus(
+        for need: GatheringNeed
+    ) -> String {
+        let claimed =
+            claimedQuantity(for: need)
+
+        let remaining =
+            remainingQuantity(for: need)
+
+        if remaining == 0 {
+            return "Claimed"
+        }
+
+        if claimed == 0 {
+            return "Available"
+        }
+
+        return "\(remaining) remaining"
+    }
+    
+    
     func dishIcon(
         for category: DishCategory
     ) -> String {
@@ -1146,21 +1204,34 @@ private extension GatheringDetailView {
                         gatheringId: gatheringId
                     )
             
+            let loadedNeeds =
+                try await needsRequest
+
+            async let claimsRequest =
+                GatheringDishService
+                    .fetchClaims(
+                        gatheringNeedIds:
+                            loadedNeeds.map(\.id)
+                    )
+            
             let (
                 loadedGathering,
                 currentUser,
-                loadedNeeds
+                loadedClaims
             ) = try await (
                 gatheringRequest,
                 userRequest,
-                needsRequest
+                claimsRequest
             )
 
             gathering =
                 loadedGathering
-            
+
             gatheringNeeds =
                 loadedNeeds
+
+            gatheringClaims =
+                loadedClaims
 
             isHost =
                 loadedGathering.hostId ==
@@ -1174,6 +1245,7 @@ private extension GatheringDetailView {
             gatheringNeeds = []
             isHost = false
             isLoading = false
+            gatheringClaims = []
 
             errorMessage =
                 "Unable to load gathering. Please try again."

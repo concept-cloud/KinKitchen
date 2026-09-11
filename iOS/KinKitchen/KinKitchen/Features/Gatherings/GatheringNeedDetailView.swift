@@ -6,18 +6,24 @@
 //
 
 import SwiftUI
+import Supabase
 
 struct GatheringNeedDetailView: View {
     @Environment(\.dismiss) private var dismiss
 
     let need: GatheringNeed
-
+    let isHost: Bool
+    
     @State private var requirements: [GatheringNeedRequirement] = []
     @State private var supplies: [GatheringNeedSupply] = []
     @State private var claims: [GatheringNeedClaim] = []
     @State private var isLoading = true
     @State private var errorMessage: String?
     @State private var recipe: Recipe?
+    @State private var currentUserId: UUID?
+    @State private var claimQuantity = 1
+    @State private var isClaiming = false
+    @State private var claimErrorMessage: String?
 
     var body: some View {
         ZStack {
@@ -43,6 +49,8 @@ struct GatheringNeedDetailView: View {
                         }
 
                         servingsSection
+                        
+                        claimSection
 
                         if !requirements.isEmpty {
                             requirementsSection
@@ -418,6 +426,254 @@ private extension GatheringNeedDetailView {
     }
 }
 
+// MARK: - Claim Dish
+
+private extension GatheringNeedDetailView {
+    var totalClaimed: Int {
+        claims.reduce(0) {
+            $0 + $1.quantity
+        }
+    }
+
+    var remainingQuantity: Int {
+        max(
+            need.quantityNeeded - totalClaimed,
+            0
+        )
+    }
+
+    var currentUserClaim: GatheringNeedClaim? {
+        guard let currentUserId else {
+            return nil
+        }
+
+        return claims.first {
+            $0.userId == currentUserId
+        }
+    }
+
+
+    var claimSection: some View {
+        VStack(
+            alignment: .leading,
+            spacing: KinSpacing.medium
+        ) {
+            Text("Sign Up")
+                .font(KinTypography.headline)
+                .foregroundStyle(
+                    KinColors.primaryText
+                )
+
+            if let currentUserClaim {
+                HStack(
+                    spacing: KinSpacing.medium
+                ) {
+                    Image(
+                        systemName:
+                            "checkmark.circle.fill"
+                    )
+                    .font(.title2)
+                    .foregroundStyle(
+                        KinColors.success
+                    )
+
+                    VStack(
+                        alignment: .leading,
+                        spacing: KinSpacing.xSmall
+                    ) {
+                        Text("You're bringing this")
+                            .font(
+                                KinTypography.headline
+                            )
+                            .foregroundStyle(
+                                KinColors.primaryText
+                            )
+
+                        Text(
+                            "\(currentUserClaim.quantity) serving\(currentUserClaim.quantity == 1 ? "" : "s") claimed"
+                        )
+                        .font(
+                            KinTypography.footnote
+                        )
+                        .foregroundStyle(
+                            KinColors.secondaryText
+                        )
+                    }
+
+                    Spacer()
+                }
+                .padding(KinSpacing.large)
+                .background(KinColors.surface)
+                .clipShape(
+                    RoundedRectangle(
+                        cornerRadius:
+                            KinRadius.large
+                    )
+                )
+            } else if remainingQuantity == 0 {
+                HStack(
+                    spacing: KinSpacing.medium
+                ) {
+                    Image(
+                        systemName:
+                            "checkmark.circle.fill"
+                    )
+                    .foregroundStyle(
+                        KinColors.success
+                    )
+
+                    Text("This dish is fully claimed")
+                        .font(
+                            KinTypography.body
+                        )
+                        .foregroundStyle(
+                            KinColors.primaryText
+                        )
+                }
+                .padding(KinSpacing.large)
+                .frame(
+                    maxWidth: .infinity,
+                    alignment: .leading
+                )
+                .background(KinColors.surface)
+                .clipShape(
+                    RoundedRectangle(
+                        cornerRadius:
+                            KinRadius.large
+                    )
+                )
+            } else {
+                VStack(
+                    spacing: KinSpacing.large
+                ) {
+                    if remainingQuantity > 1 {
+                        Stepper(
+                            value: $claimQuantity,
+                            in: 1...remainingQuantity
+                        ) {
+                            VStack(
+                                alignment: .leading,
+                                spacing: KinSpacing.xSmall
+                            ) {
+                                Text("Servings")
+                                    .font(
+                                        KinTypography.body
+                                    )
+                                    .foregroundStyle(
+                                        KinColors.primaryText
+                                    )
+
+                                Text(
+                                    "\(claimQuantity) of \(remainingQuantity) available"
+                                )
+                                .font(
+                                    KinTypography.footnote
+                                )
+                                .foregroundStyle(
+                                    KinColors.secondaryText
+                                )
+                            }
+                        }
+                    }
+
+                    Button {
+                        Task {
+                            await claimDish()
+                        }
+                    } label: {
+                        HStack {
+                            if isClaiming {
+                                ProgressView()
+                                    .tint(.white)
+                            }
+
+                            Text(
+                                isClaiming
+                                    ? "Claiming..."
+                                    : "I'll Bring This"
+                            )
+                        }
+                        .font(KinTypography.headline)
+                        .foregroundStyle(Color.white)
+                        .frame(
+                            maxWidth: .infinity
+                        )
+                        .padding(
+                            .vertical,
+                            KinSpacing.large
+                        )
+                        .background(
+                            KinColors.primary
+                        )
+                        .clipShape(
+                            RoundedRectangle(
+                                cornerRadius:
+                                    KinRadius.large
+                            )
+                        )
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(isClaiming)
+                }
+                .padding(KinSpacing.large)
+                .background(KinColors.surface)
+                .clipShape(
+                    RoundedRectangle(
+                        cornerRadius:
+                            KinRadius.large
+                    )
+                )
+            }
+
+            if let claimErrorMessage {
+                Text(claimErrorMessage)
+                    .font(
+                        KinTypography.footnote
+                    )
+                    .foregroundStyle(
+                        KinColors.error
+                    )
+            }
+        }
+    }
+
+    @MainActor
+    func claimDish() async {
+        guard currentUserClaim == nil else {
+            return
+        }
+
+        guard remainingQuantity > 0 else {
+            return
+        }
+
+        isClaiming = true
+        claimErrorMessage = nil
+
+        do {
+            _ =
+                try await GatheringDishService
+                    .claimNeed(
+                        id: need.id,
+                        quantity: claimQuantity
+                    )
+
+            claims =
+                try await GatheringDishService
+                    .fetchClaims(
+                        needId: need.id
+                    )
+
+            claimQuantity = 1
+        } catch {
+            claimErrorMessage =
+                error.localizedDescription
+        }
+
+        isClaiming = false
+    }
+}
+
 // MARK: - Requirements
 
 private extension GatheringNeedDetailView {
@@ -562,12 +818,18 @@ private extension GatheringNeedDetailView {
                     .fetchClaims(
                         needId: need.id
                     )
+            
+            async let userRequest =
+                SupabaseManager.client
+                    .auth
+                    .session
+                    .user
 
             let loadedRecipe: Recipe?
 
             if let recipeId = need.recipeId {
                 loadedRecipe =
-                    try await RecipeService
+                    try? await RecipeService
                         .fetchRecipe(
                             id: recipeId
                         )
@@ -578,11 +840,13 @@ private extension GatheringNeedDetailView {
             let (
                 loadedRequirements,
                 loadedSupplies,
-                loadedClaims
+                loadedClaims,
+                currentUser
             ) = try await (
                 requirementsRequest,
                 suppliesRequest,
-                claimsRequest
+                claimsRequest,
+                userRequest
             )
 
             requirements =
@@ -593,6 +857,8 @@ private extension GatheringNeedDetailView {
 
             claims =
                 loadedClaims
+            
+            currentUserId = currentUser.id
 
             recipe =
                 loadedRecipe
@@ -707,7 +973,8 @@ private struct FlowLayout: Layout {
                 notes: "Keep warm until serving.",
                 createdAt: Date(),
                 updatedAt: Date()
-            )
+            ),
+            isHost: false
         )
     }
 }
