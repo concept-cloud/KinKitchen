@@ -6,6 +6,8 @@
 //
 
 import SwiftUI
+import UIKit
+import Supabase
 
 
 
@@ -68,9 +70,8 @@ struct GatheringsView: View {
                 
                 if let selectedGatheringId {
                     
-                    // KINKIT-73
-                    Text(
-                        "Gathering Detail\n\(selectedGatheringId)"
+                    GatheringDetailView(
+                        gatheringId: selectedGatheringId
                     )
                     .multilineTextAlignment(
                         .center
@@ -340,38 +341,9 @@ private extension GatheringsView {
             spacing: KinSpacing.medium
         ) {
 
-            ZStack {
-
-                RoundedRectangle(
-                    cornerRadius:
-                        KinRadius.medium
-                )
-                .fill(
-                    KinColors.background
-                )
-                .frame(
-                    width: 82,
-                    height: 82
-                )
-
-                Image(
-                    systemName:
-                        cardIcon(
-                            for: item
-                        )
-                )
-                .font(
-                    .system(
-                        size: 28,
-                        weight: .semibold
-                    )
-                )
-                .foregroundStyle(
-                    relationshipColor(
-                        for: item
-                    )
-                )
-            }
+            GatheringCardImage(
+                path: gathering.coverImagePath
+            )
 
             VStack(
                 alignment: .leading,
@@ -432,9 +404,27 @@ private extension GatheringsView {
             )
 
             VStack(
-                alignment: .trailing,
-                spacing: KinSpacing.medium
+                alignment: .center,
+                spacing: KinSpacing.xSmall
             ) {
+
+                Image(
+                    systemName:
+                        cardIcon(
+                            for: item
+                        )
+                )
+                .font(
+                    .system(
+                        size: 20,
+                        weight: .semibold
+                    )
+                )
+                .foregroundStyle(
+                    relationshipColor(
+                        for: item
+                    )
+                )
 
                 Text(
                     item.relationship.displayName
@@ -528,6 +518,122 @@ private extension GatheringsView {
 
         case .going:
             return "person.3.fill"
+        }
+    }
+}
+
+// MARK: - Gathering Card Image
+
+private struct GatheringCardImage: View {
+
+    let path: String?
+
+    @State private var imageData: Data?
+    @State private var isLoading = false
+
+
+    var body: some View {
+
+        ZStack {
+
+            RoundedRectangle(
+                cornerRadius:
+                    KinRadius.medium
+            )
+            .fill(
+                KinColors.background
+            )
+
+            if
+                let imageData,
+                let image =
+                    UIImage(
+                        data: imageData
+                    )
+            {
+
+                Image(
+                    uiImage: image
+                )
+                .resizable()
+                .scaledToFill()
+                .frame(
+                    width: 82,
+                    height: 82
+                )
+                .clipped()
+
+            } else {
+
+                Image(
+                    systemName:
+                        "fork.knife"
+                )
+                .font(
+                    .system(
+                        size: 26,
+                        weight: .semibold
+                    )
+                )
+                .foregroundStyle(
+                    KinColors.secondaryText
+                )
+            }
+        }
+        .frame(
+            width: 82,
+            height: 82
+        )
+        .clipShape(
+            RoundedRectangle(
+                cornerRadius:
+                    KinRadius.medium
+            )
+        )
+        .task(
+            id: path
+        ) {
+
+            await loadImage()
+        }
+    }
+
+
+    @MainActor
+    private func loadImage() async {
+
+        guard
+            !isLoading,
+            let path,
+            !path.isEmpty
+        else {
+            return
+        }
+
+        isLoading = true
+
+        defer {
+            isLoading = false
+        }
+
+        do {
+
+            imageData =
+                try await SupabaseManager.client
+                    .storage
+                    .from(
+                        "gathering-photos"
+                    )
+                    .download(
+                        path: path
+                    )
+
+        } catch {
+
+            print(
+                "GATHERING CARD IMAGE ERROR:",
+                error.localizedDescription
+            )
         }
     }
 }

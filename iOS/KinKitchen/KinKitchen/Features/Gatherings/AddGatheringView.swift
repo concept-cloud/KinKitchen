@@ -6,6 +6,9 @@
 //
 
 import SwiftUI
+import PhotosUI
+import UIKit
+import Supabase
 
 
 struct AddGatheringView: View {
@@ -19,9 +22,12 @@ struct AddGatheringView: View {
     @State private var location = ""
     @State private var description = ""
 
+    @State private var selectedPhotoItem: PhotosPickerItem?
+    @State private var selectedImageData: Data?
+
     @State private var isSaving = false
     @State private var errorMessage: String?
-    
+
     @State private var isDatePickerExpanded = false
     @State private var isTimePickerExpanded = false
 
@@ -41,6 +47,8 @@ struct AddGatheringView: View {
                 ) {
 
                     header
+
+                    gatheringPhoto
 
                     gatheringForm
 
@@ -65,6 +73,20 @@ struct AddGatheringView: View {
             }
         }
         .navigationBarHidden(true)
+        .onChange(
+            of: selectedPhotoItem
+        ) { _, newItem in
+
+            guard let newItem else {
+                return
+            }
+
+            Task {
+                await loadSelectedPhoto(
+                    newItem
+                )
+            }
+        }
     }
 }
 
@@ -90,9 +112,7 @@ private extension AddGatheringView {
                 KinColors.secondaryText
             )
 
-
             Spacer()
-
 
             Text(
                 "Add Gathering"
@@ -104,9 +124,7 @@ private extension AddGatheringView {
                 KinColors.primaryText
             )
 
-
             Spacer()
-
 
             Text(
                 "Cancel"
@@ -118,6 +136,150 @@ private extension AddGatheringView {
                 .clear
             )
         }
+    }
+}
+
+
+// MARK: - Gathering Photo
+
+private extension AddGatheringView {
+
+    var gatheringPhoto: some View {
+
+        PhotosPicker(
+            selection: $selectedPhotoItem,
+            matching: .images
+        ) {
+
+            ZStack {
+
+                RoundedRectangle(
+                    cornerRadius: KinRadius.medium
+                )
+                .fill(
+                    KinColors.surface
+                )
+
+                if
+                    let selectedImageData,
+                    let image =
+                        UIImage(
+                            data: selectedImageData
+                        )
+                {
+
+                    Image(
+                        uiImage: image
+                    )
+                    .resizable()
+                    .scaledToFill()
+                    .frame(
+                        maxWidth: .infinity
+                    )
+                    .frame(
+                        height: 210
+                    )
+                    .clipped()
+                    .clipShape(
+                        RoundedRectangle(
+                            cornerRadius:
+                                KinRadius.medium
+                        )
+                    )
+
+                    VStack {
+
+                        Spacer()
+
+                        HStack {
+
+                            Spacer()
+
+                            Image(
+                                systemName:
+                                    "camera.fill"
+                            )
+                            .font(
+                                .system(
+                                    size: 16,
+                                    weight: .semibold
+                                )
+                            )
+                            .foregroundStyle(
+                                .white
+                            )
+                            .padding(
+                                KinSpacing.medium
+                            )
+                            .background(
+                                .black.opacity(0.55)
+                            )
+                            .clipShape(
+                                Circle()
+                            )
+                            .padding(
+                                KinSpacing.medium
+                            )
+                        }
+                    }
+
+                } else {
+
+                    VStack(
+                        spacing: KinSpacing.medium
+                    ) {
+
+                        Image(
+                            systemName:
+                                "photo.badge.plus"
+                        )
+                        .font(
+                            .system(
+                                size: 38
+                            )
+                        )
+                        .foregroundStyle(
+                            KinColors.primary
+                        )
+
+                        Text(
+                            "Add Gathering Photo"
+                        )
+                        .font(
+                            KinTypography.headline
+                        )
+                        .foregroundStyle(
+                            KinColors.primaryText
+                        )
+
+                        Text(
+                            "Choose a photo for your gathering"
+                        )
+                        .font(
+                            KinTypography.caption
+                        )
+                        .foregroundStyle(
+                            KinColors.secondaryText
+                        )
+                    }
+                }
+            }
+            .frame(
+                maxWidth: .infinity
+            )
+            .frame(
+                height: 210
+            )
+            .clipShape(
+                RoundedRectangle(
+                    cornerRadius:
+                        KinRadius.medium
+                )
+            )
+        }
+        .buttonStyle(
+            .plain
+        )
     }
 }
 
@@ -166,6 +328,7 @@ private extension AddGatheringView {
                 Button {
 
                     withAnimation {
+
                         isDatePickerExpanded.toggle()
                         isTimePickerExpanded = false
                     }
@@ -192,8 +355,8 @@ private extension AddGatheringView {
                         Image(
                             systemName:
                                 isDatePickerExpanded
-                                    ? "chevron.up"
-                                    : "calendar"
+                                ? "chevron.up"
+                                : "calendar"
                         )
                         .foregroundStyle(
                             KinColors.primary
@@ -216,7 +379,6 @@ private extension AddGatheringView {
                     .plain
                 )
 
-
                 if isDatePickerExpanded {
 
                     VStack(
@@ -226,7 +388,8 @@ private extension AddGatheringView {
                         DatePicker(
                             "",
                             selection: $date,
-                            displayedComponents: .date
+                            displayedComponents:
+                                .date
                         )
                         .datePickerStyle(
                             .graphical
@@ -236,7 +399,6 @@ private extension AddGatheringView {
                             KinColors.primary
                         )
 
-
                         HStack {
 
                             Spacer()
@@ -244,7 +406,9 @@ private extension AddGatheringView {
                             Button {
 
                                 withAnimation {
-                                    isDatePickerExpanded = false
+
+                                    isDatePickerExpanded =
+                                        false
                                 }
 
                             } label: {
@@ -299,6 +463,7 @@ private extension AddGatheringView {
                 Button {
 
                     withAnimation {
+
                         isTimePickerExpanded.toggle()
                         isDatePickerExpanded = false
                     }
@@ -325,8 +490,8 @@ private extension AddGatheringView {
                         Image(
                             systemName:
                                 isTimePickerExpanded
-                                    ? "chevron.up"
-                                    : "clock"
+                                ? "chevron.up"
+                                : "clock"
                         )
                         .foregroundStyle(
                             KinColors.primary
@@ -349,7 +514,6 @@ private extension AddGatheringView {
                     .plain
                 )
 
-
                 if isTimePickerExpanded {
 
                     VStack(
@@ -370,7 +534,6 @@ private extension AddGatheringView {
                             KinColors.primary
                         )
 
-
                         HStack {
 
                             Spacer()
@@ -378,7 +541,9 @@ private extension AddGatheringView {
                             Button {
 
                                 withAnimation {
-                                    isTimePickerExpanded = false
+
+                                    isTimePickerExpanded =
+                                        false
                                 }
 
                             } label: {
@@ -418,6 +583,7 @@ private extension AddGatheringView {
                     )
                 }
             }
+
 
             fieldLabel(
                 "Location"
@@ -466,8 +632,8 @@ private extension AddGatheringView {
         KinPrimaryButton(
             title:
                 isSaving
-                    ? "Creating..."
-                    : "Create Gathering"
+                ? "Creating..."
+                : "Create Gathering"
         ) {
 
             Task {
@@ -480,8 +646,8 @@ private extension AddGatheringView {
         )
         .opacity(
             isSaving
-                ? 0.6
-                : 1
+            ? 0.6
+            : 1
         )
     }
 }
@@ -495,7 +661,6 @@ private extension AddGatheringView {
     func createGathering() async {
 
         errorMessage = nil
-
 
         let cleanName =
             name.trimmingCharacters(
@@ -511,10 +676,8 @@ private extension AddGatheringView {
             return
         }
 
-
         let startsAt =
             combinedDateAndTime()
-
 
         guard startsAt > Date() else {
 
@@ -524,7 +687,6 @@ private extension AddGatheringView {
             return
         }
 
-
         isSaving = true
 
         defer {
@@ -532,8 +694,17 @@ private extension AddGatheringView {
             isSaving = false
         }
 
-
         do {
+
+            var coverImagePath: String?
+
+            if let selectedImageData {
+
+                coverImagePath =
+                    try await uploadGatheringPhoto(
+                        selectedImageData
+                    )
+            }
 
             _ =
                 try await GatheringService
@@ -543,6 +714,8 @@ private extension AddGatheringView {
                             cleaned(
                                 theme
                             ),
+                        coverImagePath:
+                            coverImagePath,
                         description:
                             cleaned(
                                 description
@@ -569,6 +742,104 @@ private extension AddGatheringView {
                 error.localizedDescription
             )
         }
+    }
+}
+
+
+// MARK: - Photo Selection
+
+private extension AddGatheringView {
+
+    @MainActor
+    func loadSelectedPhoto(
+        _ item: PhotosPickerItem
+    ) async {
+
+        do {
+
+            guard
+                let imageData =
+                    try await item.loadTransferable(
+                        type: Data.self
+                    )
+            else {
+
+                errorMessage =
+                    "Unable to load the selected photo."
+
+                return
+            }
+
+            selectedImageData =
+                imageData
+
+        } catch {
+
+            errorMessage =
+                "Unable to load the selected photo."
+
+            print(
+                "GATHERING PHOTO LOAD ERROR:",
+                error.localizedDescription
+            )
+        }
+    }
+}
+
+
+// MARK: - Upload Gathering Photo
+
+private extension AddGatheringView {
+
+    func uploadGatheringPhoto(
+        _ imageData: Data
+    ) async throws -> String {
+
+        let user =
+            try await SupabaseManager.client
+                .auth
+                .session
+                .user
+
+        guard
+            let image =
+                UIImage(
+                    data: imageData
+                ),
+            let jpegData =
+                image.jpegData(
+                    compressionQuality: 0.85
+                )
+        else {
+
+            throw GatheringPhotoError
+                .invalidImage
+        }
+
+        let fileName =
+            "\(UUID().uuidString.lowercased()).jpg"
+
+        let path =
+            "\(user.id.uuidString.lowercased())/\(fileName)"
+
+        try await SupabaseManager.client
+            .storage
+            .from(
+                "gathering-photos"
+            )
+            .upload(
+                path,
+                data: jpegData,
+                options:
+                    FileOptions(
+                        contentType:
+                            "image/jpeg",
+                        upsert:
+                            false
+                    )
+            )
+
+        return path
     }
 }
 
@@ -601,7 +872,6 @@ private extension AddGatheringView {
                 from: time
             )
 
-
         var components =
             DateComponents()
 
@@ -619,7 +889,6 @@ private extension AddGatheringView {
 
         components.minute =
             timeComponents.minute
-
 
         return calendar.date(
             from: components
@@ -639,11 +908,34 @@ private extension AddGatheringView {
             )
 
         return cleanedValue.isEmpty
-            ? nil
-            : cleanedValue
+        ? nil
+        : cleanedValue
     }
 }
 
+
+// MARK: - Photo Error
+
+private enum GatheringPhotoError:
+    LocalizedError {
+
+    case invalidImage
+
+
+    var errorDescription: String? {
+
+        switch self {
+
+        case .invalidImage:
+
+            return
+                "The selected gathering photo could not be processed."
+        }
+    }
+}
+
+
+// MARK: - Preview
 
 #Preview {
 

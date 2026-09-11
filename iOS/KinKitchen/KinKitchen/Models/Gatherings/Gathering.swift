@@ -20,6 +20,7 @@ struct Gathering:
 
     var name: String
     var theme: String?
+    var coverImagePath: String?
     var description: String?
     var location: String?
     var startsAt: Date
@@ -42,6 +43,9 @@ struct Gathering:
         case name
 
         case theme
+
+        case coverImagePath =
+            "cover_image_path"
 
         case description
 
@@ -86,6 +90,7 @@ struct GatheringCreate:
 
     let name: String
     let theme: String?
+    let coverImagePath: String?
     let description: String?
     let location: String?
     let startsAt: Date
@@ -102,6 +107,9 @@ struct GatheringCreate:
         case name
 
         case theme
+
+        case coverImagePath =
+            "cover_image_path"
 
         case description
 
@@ -123,6 +131,7 @@ struct GatheringUpdate:
 
     let name: String
     let theme: String?
+    let coverImagePath: String?
     let description: String?
     let location: String?
     let startsAt: Date
@@ -136,6 +145,9 @@ struct GatheringUpdate:
         case name
 
         case theme
+
+        case coverImagePath =
+            "cover_image_path"
 
         case description
 

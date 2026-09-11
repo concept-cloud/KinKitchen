@@ -16,6 +16,7 @@ enum GatheringService {
     static func createGathering(
         name: String,
         theme: String?,
+        coverImagePath: String?,
         description: String?,
         location: String?,
         startsAt: Date,
@@ -37,6 +38,10 @@ enum GatheringService {
                 theme:
                     cleanedOptionalString(
                         theme
+                    ),
+                coverImagePath:
+                    cleanedOptionalString(
+                        coverImagePath
                     ),
                 description:
                     cleanedOptionalString(
@@ -63,7 +68,6 @@ enum GatheringService {
 
         return gathering
     }
-
     // MARK: - Fetch Gathering
 
     static func fetchGathering(
@@ -318,6 +322,7 @@ enum GatheringService {
         id gatheringId: UUID,
         name: String,
         theme: String?,
+        coverImagePath: String?,
         description: String?,
         location: String?,
         startsAt: Date,
@@ -338,6 +343,10 @@ enum GatheringService {
                 theme:
                     cleanedOptionalString(
                         theme
+                    ),
+                coverImagePath:
+                    cleanedOptionalString(
+                        coverImagePath
                     ),
                 description:
                     cleanedOptionalString(
@@ -372,6 +381,8 @@ enum GatheringService {
 
         return gathering
     }
+    
+    
     // MARK: - Cancel Gathering
 
     static func cancelGathering(
