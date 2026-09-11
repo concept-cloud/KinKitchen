@@ -25,9 +25,7 @@ enum ProfileRequirement: CaseIterable {
 }
 
 enum ProfileService {
-
     static func fetchCurrentProfile() async throws -> Profile {
-
         let user =
             try await SupabaseManager.client.auth.session.user
 
@@ -41,6 +39,38 @@ enum ProfileService {
                 .value
 
         return profile
+    }
+
+    // MARK: - Fetch Profiles
+
+    static func fetchProfiles(
+        userIds: [UUID]
+    ) async throws -> [Profile] {
+        guard !userIds.isEmpty else {
+            return []
+        }
+
+        var profiles: [Profile] = []
+
+        for userId in Set(userIds) {
+            let results: [Profile] =
+                try await SupabaseManager.client
+                    .from("profiles")
+                    .select()
+                    .eq(
+                        "id",
+                        value: userId
+                    )
+                    .limit(1)
+                    .execute()
+                    .value
+
+            if let profile = results.first {
+                profiles.append(profile)
+            }
+        }
+
+        return profiles
     }
 
     static func isUsernameAvailable(

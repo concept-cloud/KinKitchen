@@ -48,7 +48,7 @@ struct GatheringNeedDetailView: View {
                             recipeSection(recipe)
                         }
 
-                        servingsSection
+                        dishesNeededSection
                         
                         claimSection
 
@@ -369,16 +369,17 @@ private extension GatheringNeedDetailView {
     }
 }
 
-// MARK: - Servings
+
+// MARK: - Dishes Needed
 
 private extension GatheringNeedDetailView {
-    var servingsSection: some View {
+    var dishesNeededSection: some View {
         HStack {
             VStack(
                 alignment: .leading,
                 spacing: KinSpacing.xSmall
             ) {
-                Text("Servings Needed")
+                Text("Dishes Needed")
                     .font(KinTypography.headline)
                     .foregroundStyle(KinColors.primaryText)
 
@@ -490,7 +491,9 @@ private extension GatheringNeedDetailView {
                             )
 
                         Text(
-                            "\(currentUserClaim.quantity) serving\(currentUserClaim.quantity == 1 ? "" : "s") claimed"
+                            currentUserClaim.quantity == 1
+                                ? "1 dish claimed"
+                                : "\(currentUserClaim.quantity) dishes claimed"
                         )
                         .font(
                             KinTypography.footnote
@@ -555,7 +558,7 @@ private extension GatheringNeedDetailView {
                                 alignment: .leading,
                                 spacing: KinSpacing.xSmall
                             ) {
-                                Text("Servings")
+                                Text("Dishes")
                                     .font(
                                         KinTypography.body
                                     )
@@ -564,7 +567,9 @@ private extension GatheringNeedDetailView {
                                     )
 
                                 Text(
-                                    "\(claimQuantity) of \(remainingQuantity) available"
+                                    claimQuantity == 1
+                                        ? "Bringing 1 of \(remainingQuantity) needed"
+                                        : "Bringing \(claimQuantity) of \(remainingQuantity) needed"
                                 )
                                 .font(
                                     KinTypography.footnote

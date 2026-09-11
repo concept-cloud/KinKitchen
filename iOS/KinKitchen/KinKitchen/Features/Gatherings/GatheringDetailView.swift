@@ -25,6 +25,9 @@ struct GatheringDetailView: View {
     
     @State private var gatheringNeeds: [GatheringNeed] = []
     @State private var gatheringClaims: [GatheringNeedClaim] = []
+    
+    @State private var contributorProfiles: [Profile] = []
+    @State private var currentUserId: UUID?
 
 
     var body: some View {
@@ -801,7 +804,7 @@ private extension GatheringDetailView {
 
                 if need.quantityNeeded > 1 {
                     Text(
-                        "\(need.quantityNeeded) servings needed"
+                        "\(need.quantityNeeded) Dishes needed"
                     )
                     .font(KinTypography.caption)
                     .foregroundStyle(KinColors.secondaryText)
@@ -815,6 +818,16 @@ private extension GatheringDetailView {
                         ? KinColors.success
                         : KinColors.primary
                 )
+                if let contributor =
+                    contributorText(
+                        for: need
+                    ) {
+                    Text(contributor)
+                        .font(KinTypography.caption)
+                        .foregroundStyle(
+                            KinColors.secondaryText
+                        )
+                }
             }
 
             Spacer()
@@ -878,6 +891,87 @@ private extension GatheringDetailView {
         return "\(remaining) remaining"
     }
     
+    func contributorProfiles(
+        for need: GatheringNeed
+    ) -> [Profile] {
+        let userIds =
+            Set(
+                claims(for: need)
+                    .map(\.userId)
+            )
+
+        return contributorProfiles.filter {
+            userIds.contains($0.id)
+        }
+    }
+
+    func contributorText(
+        for need: GatheringNeed
+    ) -> String? {
+        let profiles =
+            contributorProfiles(
+                for: need
+            )
+
+        guard !profiles.isEmpty else {
+            return nil
+        }
+
+        let names =
+            profiles.map { profile in
+                if profile.id == currentUserId {
+                    return "You"
+                }
+
+                if let displayName =
+                    profile.displayName?
+                        .trimmingCharacters(
+                            in: .whitespacesAndNewlines
+                        ),
+                   !displayName.isEmpty {
+                    return displayName
+                }
+
+                let firstName =
+                    profile.firstName?
+                        .trimmingCharacters(
+                            in: .whitespacesAndNewlines
+                        ) ?? ""
+
+                let lastName =
+                    profile.lastName?
+                        .trimmingCharacters(
+                            in: .whitespacesAndNewlines
+                        ) ?? ""
+
+                let fullName =
+                    "\(firstName) \(lastName)"
+                        .trimmingCharacters(
+                            in: .whitespacesAndNewlines
+                        )
+
+                if !fullName.isEmpty {
+                    return fullName
+                }
+
+                if let username =
+                    profile.username?
+                        .trimmingCharacters(
+                            in: .whitespacesAndNewlines
+                        ),
+                   !username.isEmpty {
+                    return username
+                }
+
+                return "Contributor"
+            }
+
+        if names.count == 1 {
+            return "Bringing: \(names[0])"
+        }
+
+        return "Bringing: \(names.joined(separator: ", "))"
+    }
     
     func dishIcon(
         for category: DishCategory
@@ -1213,15 +1307,22 @@ private extension GatheringDetailView {
                         gatheringNeedIds:
                             loadedNeeds.map(\.id)
                     )
-            
+            let loadedClaims =
+                try await claimsRequest
+
+            async let profilesRequest =
+                ProfileService.fetchProfiles(
+                    userIds: loadedClaims.map(\.userId)
+                )
+
             let (
                 loadedGathering,
                 currentUser,
-                loadedClaims
+                loadedProfiles
             ) = try await (
                 gatheringRequest,
                 userRequest,
-                claimsRequest
+                profilesRequest
             )
 
             gathering =
@@ -1233,12 +1334,19 @@ private extension GatheringDetailView {
             gatheringClaims =
                 loadedClaims
 
+            contributorProfiles =
+                loadedProfiles
+
+            currentUserId =
+                currentUser.id
+
             isHost =
                 loadedGathering.hostId ==
                 currentUser.id
 
             isLoading = false
-
+            
+            
         } catch {
 
             gathering = nil
@@ -1246,6 +1354,8 @@ private extension GatheringDetailView {
             isHost = false
             isLoading = false
             gatheringClaims = []
+            contributorProfiles = []
+            currentUserId = nil
 
             errorMessage =
                 "Unable to load gathering. Please try again."
