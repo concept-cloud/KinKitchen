@@ -398,7 +398,6 @@ enum GatheringDishService {
     static func unclaimNeed(
         id needId: UUID
     ) async throws -> GatheringNeedClaim {
-
         let params = UnclaimNeedParameters(
             needId: needId
         )
@@ -420,7 +419,6 @@ enum GatheringDishService {
         to newNeedId: UUID,
         quantity: Int = 1
     ) async throws -> GatheringNeedClaim {
-
         guard quantity > 0 else {
             throw GatheringDishServiceError.invalidQuantity
         }

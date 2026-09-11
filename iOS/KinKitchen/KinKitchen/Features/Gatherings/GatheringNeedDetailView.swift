@@ -22,6 +22,7 @@ struct GatheringNeedDetailView: View {
     @State private var recipe: Recipe?
     @State private var currentUserId: UUID?
     @State private var claimQuantity = 1
+    @State private var isEditingClaim = false
     @State private var isClaiming = false
     @State private var claimErrorMessage: String?
 
@@ -453,7 +454,14 @@ private extension GatheringNeedDetailView {
         }
     }
 
+    var maximumClaimQuantity: Int {
+        if let currentUserClaim {
+            return currentUserClaim.quantity + remainingQuantity
+        }
 
+        return remainingQuantity
+    }
+    
     var claimSection: some View {
         VStack(
             alignment: .leading,
@@ -466,51 +474,155 @@ private extension GatheringNeedDetailView {
                 )
 
             if let currentUserClaim {
-                HStack(
-                    spacing: KinSpacing.medium
+                VStack(
+                    spacing: KinSpacing.large
                 ) {
-                    Image(
-                        systemName:
-                            "checkmark.circle.fill"
-                    )
-                    .font(.title2)
-                    .foregroundStyle(
-                        KinColors.success
-                    )
-
-                    VStack(
-                        alignment: .leading,
-                        spacing: KinSpacing.xSmall
+                    HStack(
+                        spacing: KinSpacing.medium
                     ) {
-                        Text("You're bringing this")
+                        Image(
+                            systemName: "checkmark.circle.fill"
+                        )
+                        .font(.title2)
+                        .foregroundStyle(
+                            KinColors.success
+                        )
+
+                        VStack(
+                            alignment: .leading,
+                            spacing: KinSpacing.xSmall
+                        ) {
+                            Text("You're bringing this")
+                                .font(
+                                    KinTypography.headline
+                                )
+                                .foregroundStyle(
+                                    KinColors.primaryText
+                                )
+
+                            Text(
+                                currentUserClaim.quantity == 1
+                                    ? "1 dish claimed"
+                                    : "\(currentUserClaim.quantity) dishes claimed"
+                            )
                             .font(
-                                KinTypography.headline
+                                KinTypography.footnote
                             )
                             .foregroundStyle(
-                                KinColors.primaryText
+                                KinColors.secondaryText
                             )
+                        }
 
-                        Text(
-                            currentUserClaim.quantity == 1
-                                ? "1 dish claimed"
-                                : "\(currentUserClaim.quantity) dishes claimed"
-                        )
-                        .font(
-                            KinTypography.footnote
-                        )
-                        .foregroundStyle(
-                            KinColors.secondaryText
-                        )
+                        Spacer()
                     }
 
-                    Spacer()
+                    if isEditingClaim {
+                        claimQuantityControl(
+                            maximum: maximumClaimQuantity
+                        )
+
+                        Button {
+                            Task {
+                                await updateClaim()
+                            }
+                        } label: {
+                            Text(
+                                isClaiming
+                                    ? "Saving..."
+                                    : "Save Changes"
+                            )
+                            .font(KinTypography.headline)
+                            .foregroundStyle(Color.white)
+                            .frame(maxWidth: .infinity)
+                            .padding(
+                                .vertical,
+                                KinSpacing.large
+                            )
+                            .background(
+                                KinColors.primary
+                            )
+                            .clipShape(
+                                RoundedRectangle(
+                                    cornerRadius:
+                                        KinRadius.large
+                                )
+                            )
+                        }
+                        .buttonStyle(.plain)
+                        .disabled(
+                            isClaiming ||
+                            claimQuantity ==
+                                currentUserClaim.quantity
+                        )
+
+                        Button {
+                            Task {
+                                await removeClaim()
+                            }
+                        } label: {
+                            Text("Remove Claim")
+                                .font(
+                                    KinTypography.headline
+                                )
+                                .foregroundStyle(
+                                    KinColors.error
+                                )
+                                .frame(
+                                    maxWidth: .infinity
+                                )
+                                .padding(
+                                    .vertical,
+                                    KinSpacing.medium
+                                )
+                        }
+                        .buttonStyle(.plain)
+                        .disabled(isClaiming)
+
+                        Button {
+                            claimQuantity =
+                                currentUserClaim.quantity
+
+                            isEditingClaim = false
+                        } label: {
+                            Text("Cancel")
+                                .font(
+                                    KinTypography.body
+                                )
+                                .foregroundStyle(
+                                    KinColors.secondaryText
+                                )
+                        }
+                        .buttonStyle(.plain)
+                    } else {
+                        Button {
+                            claimQuantity =
+                                currentUserClaim.quantity
+
+                            isEditingClaim = true
+                        } label: {
+                            Text("Edit Claim")
+                                .font(
+                                    KinTypography.headline
+                                )
+                                .foregroundStyle(
+                                    KinColors.primary
+                                )
+                                .frame(
+                                    maxWidth: .infinity
+                                )
+                                .padding(
+                                    .vertical,
+                                    KinSpacing.medium
+                                )
+                        }
+                        .buttonStyle(.plain)
+                    }
                 }
                 .padding(KinSpacing.large)
                 .background(KinColors.surface)
                 .clipShape(
                     RoundedRectangle(
-                        cornerRadius:
-                            KinRadius.large
+                        cornerRadius: KinRadius.large
                     )
                 )
             } else if remainingQuantity == 0 {
@@ -550,34 +662,25 @@ private extension GatheringNeedDetailView {
                     spacing: KinSpacing.large
                 ) {
                     if remainingQuantity > 1 {
-                        Stepper(
-                            value: $claimQuantity,
-                            in: 1...remainingQuantity
+                        VStack(
+                            alignment: .leading,
+                            spacing: KinSpacing.small
                         ) {
-                            VStack(
-                                alignment: .leading,
-                                spacing: KinSpacing.xSmall
-                            ) {
-                                Text("Dishes")
-                                    .font(
-                                        KinTypography.body
-                                    )
-                                    .foregroundStyle(
-                                        KinColors.primaryText
-                                    )
+                            claimQuantityControl(
+                                maximum: remainingQuantity
+                            )
 
-                                Text(
-                                    claimQuantity == 1
-                                        ? "Bringing 1 of \(remainingQuantity) needed"
-                                        : "Bringing \(claimQuantity) of \(remainingQuantity) needed"
-                                )
-                                .font(
-                                    KinTypography.footnote
-                                )
-                                .foregroundStyle(
-                                    KinColors.secondaryText
-                                )
-                            }
+                            Text(
+                                claimQuantity == 1
+                                    ? "Bringing 1 of \(remainingQuantity) needed"
+                                    : "Bringing \(claimQuantity) of \(remainingQuantity) needed"
+                            )
+                            .font(
+                                KinTypography.footnote
+                            )
+                            .foregroundStyle(
+                                KinColors.secondaryText
+                            )
                         }
                     }
 
@@ -641,6 +744,65 @@ private extension GatheringNeedDetailView {
             }
         }
     }
+    
+    func claimQuantityControl(
+        maximum: Int
+    ) -> some View {
+        HStack {
+            Text("Dishes")
+                .font(KinTypography.body)
+                .foregroundStyle(
+                    KinColors.primaryText
+                )
+
+            Spacer()
+
+            HStack(
+                spacing: KinSpacing.medium
+            ) {
+                Button {
+                    if claimQuantity > 1 {
+                        claimQuantity -= 1
+                    }
+                } label: {
+                    Image(systemName: "minus")
+                        .frame(
+                            width: 44,
+                            height: 44
+                        )
+                }
+                .buttonStyle(.plain)
+                .disabled(
+                    claimQuantity <= 1
+                )
+
+                Text("\(claimQuantity)")
+                    .font(KinTypography.headline)
+                    .foregroundStyle(
+                        KinColors.primaryText
+                    )
+                    .frame(
+                        minWidth: 30
+                    )
+
+                Button {
+                    if claimQuantity < maximum {
+                        claimQuantity += 1
+                    }
+                } label: {
+                    Image(systemName: "plus")
+                        .frame(
+                            width: 44,
+                            height: 44
+                        )
+                }
+                .buttonStyle(.plain)
+                .disabled(
+                    claimQuantity >= maximum
+                )
+            }
+        }
+    }
 
     @MainActor
     func claimDish() async {
@@ -670,6 +832,67 @@ private extension GatheringNeedDetailView {
                     )
 
             claimQuantity = 1
+        } catch {
+            claimErrorMessage =
+                error.localizedDescription
+        }
+
+        isClaiming = false
+    }
+    
+    @MainActor
+    func updateClaim() async {
+        guard currentUserClaim != nil else {
+            return
+        }
+
+        isClaiming = true
+        claimErrorMessage = nil
+
+        do {
+            _ =
+                try await GatheringDishService
+                    .claimNeed(
+                        id: need.id,
+                        quantity: claimQuantity
+                    )
+
+            claims =
+                try await GatheringDishService
+                    .fetchClaims(
+                        needId: need.id
+                    )
+
+            isEditingClaim = false
+        } catch {
+            claimErrorMessage =
+                error.localizedDescription
+        }
+
+        isClaiming = false
+    }
+    
+    @MainActor
+    func removeClaim() async {
+        guard currentUserClaim != nil else {
+            return
+        }
+
+        isClaiming = true
+        claimErrorMessage = nil
+
+        do {
+            _ =
+                try await GatheringDishService
+                    .unclaimNeed(
+                        id: need.id
+                    )
+
+            claims =
+                try await GatheringDishService
+                    .fetchClaims(
+                        needId: need.id
+                    )
         } catch {
             claimErrorMessage =
                 error.localizedDescription
