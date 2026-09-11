@@ -22,6 +22,8 @@ struct GatheringDetailView: View {
 
     @State private var selectedTab:
         GatheringDetailTab = .details
+    
+    @State private var gatheringNeeds: [GatheringNeed] = []
 
 
     var body: some View {
@@ -681,97 +683,163 @@ private extension GatheringDetailView {
 // MARK: - Dishes
 
 private extension GatheringDetailView {
-
     var dishesSection: some View {
-
         VStack(
             alignment: .leading,
             spacing: KinSpacing.medium
         ) {
-
             HStack {
-
-                Text(
-                    "Dishes Needed"
-                )
-                .font(
-                    KinTypography.sectionTitle
-                )
-                .foregroundStyle(
-                    KinColors.primaryText
-                )
+                Text("Dishes Needed")
+                    .font(KinTypography.sectionTitle)
+                    .foregroundStyle(KinColors.primaryText)
 
                 Spacer()
 
-                Text(
-                    "Add Dish"
-                )
-                .font(
-                    KinTypography.footnote
-                )
-                .foregroundStyle(
-                    KinColors.primary
-                )
+                if isHost {
+                    NavigationLink {
+                        AddDishView(
+                            gatheringId: gatheringId
+                        )
+                    } label: {
+                        Text("Add Dish")
+                            .font(KinTypography.footnote)
+                            .foregroundStyle(KinColors.primary)
+                    }
+                    .buttonStyle(.plain)
+                }
             }
 
-            VStack(
-                spacing: KinSpacing.medium
-            ) {
+            if gatheringNeeds.isEmpty {
+                emptyDishesView
+            } else {
+                VStack(
+                    spacing: KinSpacing.medium
+                ) {
+                    ForEach(gatheringNeeds) { need in
+                        NavigationLink {
+                            GatheringNeedDetailView(
+                                need: need
+                            )
+                        } label: {
+                            gatheringNeedCard(need)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+            }
+        }
+    }
 
-                Image(
-                    systemName:
-                        "fork.knife"
-                )
+    var emptyDishesView: some View {
+        VStack(
+            spacing: KinSpacing.medium
+        ) {
+            Image(systemName: "fork.knife")
                 .font(
                     .system(
                         size: 30,
                         weight: .medium
                     )
                 )
-                .foregroundStyle(
-                    KinColors.primary
-                )
+                .foregroundStyle(KinColors.primary)
 
-                Text(
-                    "No dishes yet"
-                )
-                .font(
-                    KinTypography.headline
-                )
-                .foregroundStyle(
-                    KinColors.primaryText
-                )
+            Text("No dishes yet")
+                .font(KinTypography.headline)
+                .foregroundStyle(KinColors.primaryText)
 
-                Text(
-                    "Dish sign-ups will appear here."
+            Text("Dish sign-ups will appear here.")
+                .font(KinTypography.footnote)
+                .foregroundStyle(KinColors.secondaryText)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, KinSpacing.xLarge)
+        .background(KinColors.surface)
+        .clipShape(
+            RoundedRectangle(
+                cornerRadius: KinRadius.large
+            )
+        )
+    }
+
+    func gatheringNeedCard(
+        _ need: GatheringNeed
+    ) -> some View {
+        HStack(
+            spacing: KinSpacing.medium
+        ) {
+            ZStack {
+                Circle()
+                    .fill(
+                        KinColors.primary.opacity(0.10)
+                    )
+                    .frame(
+                        width: 46,
+                        height: 46
+                    )
+
+                Image(
+                    systemName: dishIcon(
+                        for: need.category
+                    )
                 )
-                .font(
-                    KinTypography.footnote
-                )
-                .foregroundStyle(
-                    KinColors.secondaryText
-                )
+                .foregroundStyle(KinColors.primary)
             }
-            .frame(
-                maxWidth: .infinity
+
+            VStack(
+                alignment: .leading,
+                spacing: KinSpacing.xSmall
+            ) {
+                Text(need.name)
+                    .font(KinTypography.headline)
+                    .foregroundStyle(KinColors.primaryText)
+
+                Text(need.category.displayName)
+                    .font(KinTypography.footnote)
+                    .foregroundStyle(KinColors.secondaryText)
+
+                if need.quantityNeeded > 1 {
+                    Text(
+                        "\(need.quantityNeeded) servings needed"
+                    )
+                    .font(KinTypography.caption)
+                    .foregroundStyle(KinColors.secondaryText)
+                }
+            }
+
+            Spacer()
+
+            Image(systemName: "chevron.right")
+                .font(KinTypography.footnote)
+                .foregroundStyle(KinColors.secondaryText)
+        }
+        .padding(KinSpacing.large)
+        .background(KinColors.surface)
+        .clipShape(
+            RoundedRectangle(
+                cornerRadius: KinRadius.large
             )
-            .padding(
-                .vertical,
-                KinSpacing.xLarge
-            )
-            .background(
-                KinColors.surface
-            )
-            .clipShape(
-                RoundedRectangle(
-                    cornerRadius:
-                        KinRadius.large
-                )
-            )
+        )
+    }
+
+    func dishIcon(
+        for category: DishCategory
+    ) -> String {
+        switch category {
+        case .entree:
+            return "fork.knife"
+        case .side:
+            return "takeoutbag.and.cup.and.straw"
+        case .dessert:
+            return "birthday.cake"
+        case .drink:
+            return "cup.and.saucer"
+        case .supplies:
+            return "shippingbox"
+        case .other:
+            return "fork.knife"
         }
     }
 }
-
 
 // MARK: - Future Tabs
 
@@ -1072,16 +1140,27 @@ private extension GatheringDetailView {
                     .session
                     .user
 
+            async let needsRequest =
+                GatheringDishService
+                    .fetchNeeds(
+                        gatheringId: gatheringId
+                    )
+            
             let (
                 loadedGathering,
-                currentUser
+                currentUser,
+                loadedNeeds
             ) = try await (
                 gatheringRequest,
-                userRequest
+                userRequest,
+                needsRequest
             )
 
             gathering =
                 loadedGathering
+            
+            gatheringNeeds =
+                loadedNeeds
 
             isHost =
                 loadedGathering.hostId ==
@@ -1092,6 +1171,7 @@ private extension GatheringDetailView {
         } catch {
 
             gathering = nil
+            gatheringNeeds = []
             isHost = false
             isLoading = false
 
