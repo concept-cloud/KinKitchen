@@ -30,6 +30,8 @@ struct GatheringDetailView: View {
     @State private var currentUserId: UUID?
     
     @State private var currentParticipant: GatheringParticipant?
+    @State private var gatheringParticipants: [GatheringParticipant] = []
+    @State private var gatheringParticipantProfiles: [Profile] = []
     @State private var isRespondingToInvitation = false
     @State private var invitationResponseError: String?
 
@@ -778,24 +780,62 @@ private extension GatheringDetailView {
             }
 
             if isHost {
-                Text(
-                    "Invite Kin Kitchen users to join this gathering."
+                if gatheringParticipants.isEmpty {
+                    Text(
+                        "No guests have been invited yet."
+                    )
+                    .font(
+                        KinTypography.body
+                    )
+                    .foregroundStyle(
+                        KinColors.secondaryText
+                    )
+                } else {
+                    VStack(
+                        spacing: KinSpacing.medium
+                    ) {
+                        ForEach(
+                            gatheringParticipants,
+                            id: \.userId
+                        ) { participant in
+                            participantStatusRow(
+                                participant
+                            )
+                        }
+                    }
+                }
+            } else if let currentParticipant {
+                VStack(
+                    alignment: .leading,
+                    spacing: KinSpacing.small
+                ) {
+                    Text("Your Invitation")
+                        .font(
+                            KinTypography.headline
+                        )
+                        .foregroundStyle(
+                            KinColors.primaryText
+                        )
+
+                    invitationStatusBadge(
+                        currentParticipant.status
+                    )
+                }
+                .frame(
+                    maxWidth: .infinity,
+                    alignment: .leading
                 )
-                .font(
-                    KinTypography.body
+                .padding(
+                    KinSpacing.large
                 )
-                .foregroundStyle(
-                    KinColors.secondaryText
+                .background(
+                    KinColors.surface
                 )
-            } else {
-                Text(
-                    "Guest information will appear here."
-                )
-                .font(
-                    KinTypography.body
-                )
-                .foregroundStyle(
-                    KinColors.secondaryText
+                .clipShape(
+                    RoundedRectangle(
+                        cornerRadius:
+                            KinRadius.large
+                    )
                 )
             }
         }
@@ -803,6 +843,218 @@ private extension GatheringDetailView {
             maxWidth: .infinity,
             alignment: .leading
         )
+    }
+
+    func participantStatusRow(
+        _ participant: GatheringParticipant
+    ) -> some View {
+        HStack(
+            spacing: KinSpacing.medium
+        ) {
+            VStack(
+                alignment: .leading,
+                spacing: KinSpacing.xSmall
+            ) {
+                Text(
+                    participantDisplayName(
+                        participant
+                    )
+                )
+                .font(
+                    KinTypography.headline
+                )
+                .foregroundStyle(
+                    KinColors.primaryText
+                )
+
+                if let username =
+                    participantUsername(
+                        participant
+                    ) {
+                    Text("@\(username)")
+                        .font(
+                            KinTypography.footnote
+                        )
+                        .foregroundStyle(
+                            KinColors.secondaryText
+                        )
+                }
+            }
+
+            Spacer()
+
+            invitationStatusBadge(
+                participant.status
+            )
+        }
+        .padding(
+            KinSpacing.large
+        )
+        .background(
+            KinColors.surface
+        )
+        .clipShape(
+            RoundedRectangle(
+                cornerRadius:
+                    KinRadius.large
+            )
+        )
+    }
+
+    func invitationStatusBadge(
+        _ status: InvitationStatus
+    ) -> some View {
+        Text(
+            invitationStatusDisplayName(
+                status
+            )
+        )
+        .font(
+            KinTypography.caption
+        )
+        .foregroundStyle(
+            invitationStatusColor(
+                status
+            )
+        )
+        .padding(
+            .horizontal,
+            KinSpacing.medium
+        )
+        .padding(
+            .vertical,
+            KinSpacing.xSmall
+        )
+        .background(
+            invitationStatusColor(
+                status
+            )
+            .opacity(0.10)
+        )
+        .clipShape(
+            Capsule()
+        )
+    }
+
+    func invitationStatusDisplayName(
+        _ status: InvitationStatus
+    ) -> String {
+        switch status {
+        case .pending:
+            return "Pending"
+
+        case .accepted:
+            return "Accepted"
+
+        case .declined:
+            return "Declined"
+        }
+    }
+
+    func invitationStatusColor(
+        _ status: InvitationStatus
+    ) -> Color {
+        switch status {
+        case .pending:
+            return KinColors.warning
+
+        case .accepted:
+            return KinColors.success
+
+        case .declined:
+            return KinColors.error
+        }
+    }
+
+    func participantProfile(
+        _ participant: GatheringParticipant
+    ) -> Profile? {
+        gatheringParticipantProfiles.first {
+            $0.id ==
+                participant.userId
+        }
+    }
+
+    func participantDisplayName(
+        _ participant: GatheringParticipant
+    ) -> String {
+        guard let profile =
+            participantProfile(
+                participant
+            )
+        else {
+            return "Guest"
+        }
+
+        if let displayName =
+            profile.displayName?
+                .trimmingCharacters(
+                    in:
+                        .whitespacesAndNewlines
+                ),
+           !displayName.isEmpty {
+            return displayName
+        }
+
+        let firstName =
+            profile.firstName?
+                .trimmingCharacters(
+                    in:
+                        .whitespacesAndNewlines
+                )
+            ?? ""
+
+        let lastName =
+            profile.lastName?
+                .trimmingCharacters(
+                    in:
+                        .whitespacesAndNewlines
+                )
+            ?? ""
+
+        let fullName =
+            "\(firstName) \(lastName)"
+                .trimmingCharacters(
+                    in:
+                        .whitespacesAndNewlines
+                )
+
+        if !fullName.isEmpty {
+            return fullName
+        }
+
+        if let username =
+            profile.username?
+                .trimmingCharacters(
+                    in:
+                        .whitespacesAndNewlines
+                ),
+           !username.isEmpty {
+            return username
+        }
+
+        return "Guest"
+    }
+
+    func participantUsername(
+        _ participant: GatheringParticipant
+    ) -> String? {
+        guard
+            let username =
+                participantProfile(
+                    participant
+                )?
+                .username?
+                .trimmingCharacters(
+                    in:
+                        .whitespacesAndNewlines
+                ),
+            !username.isEmpty
+        else {
+            return nil
+        }
+
+        return username
     }
 }
 
@@ -1612,6 +1864,15 @@ private extension GatheringDetailView {
                             gatheringId
                     )
 
+            gatheringParticipants =
+                participants
+
+            gatheringParticipantProfiles =
+                try await ProfileService.fetchProfiles(
+                    userIds:
+                        participants.map(\.userId)
+                )
+
             currentParticipant =
                 participants.first {
                     $0.userId ==
@@ -1635,6 +1896,8 @@ private extension GatheringDetailView {
             contributorProfiles = []
             currentUserId = nil
             currentParticipant = nil
+            gatheringParticipants = []
+            gatheringParticipantProfiles = []
 
             errorMessage =
                 "Unable to load gathering. Please try again."
