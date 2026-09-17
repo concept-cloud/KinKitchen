@@ -534,6 +534,73 @@ private extension GatheringDetailView {
     }
 }
 
+// MARK: - Guests
+
+private extension GatheringDetailView {
+
+    var guestsTab: some View {
+        VStack(
+            alignment: .leading,
+            spacing: KinSpacing.large
+        ) {
+            HStack {
+                Text("Guests")
+                    .font(
+                        KinTypography.sectionTitle
+                    )
+                    .foregroundStyle(
+                        KinColors.primaryText
+                    )
+
+                Spacer()
+
+                if isHost {
+                    NavigationLink {
+                        GatheringInviteUserView(
+                            gatheringId:
+                                gatheringId
+                        )
+                    } label: {
+                        Text("Invite Guests")
+                            .font(
+                                KinTypography.footnote
+                            )
+                            .foregroundStyle(
+                                KinColors.primary
+                            )
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+
+            if isHost {
+                Text(
+                    "Invite Kin Kitchen users to join this gathering."
+                )
+                .font(
+                    KinTypography.body
+                )
+                .foregroundStyle(
+                    KinColors.secondaryText
+                )
+            } else {
+                Text(
+                    "Guest information will appear here."
+                )
+                .font(
+                    KinTypography.body
+                )
+                .foregroundStyle(
+                    KinColors.secondaryText
+                )
+            }
+        }
+        .frame(
+            maxWidth: .infinity,
+            alignment: .leading
+        )
+    }
+}
 
 // MARK: - Tab Content
 
@@ -553,13 +620,7 @@ private extension GatheringDetailView {
             )
 
         case .guests:
-
-            futureTab(
-                icon: "person.2",
-                title: "Guests",
-                message:
-                    "Guest management will be available here."
-            )
+            guestsTab
 
         case .chat:
 
