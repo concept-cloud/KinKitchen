@@ -21,6 +21,10 @@ struct GatheringInviteUserView: View {
     @State private var isSearching = false
     @State private var searchCompleted = false
     @State private var errorMessage: String?
+    @State private var isSendingInvitation = false
+    @State private var invitationErrorMessage: String?
+    @State private var invitationSent = false
+    @State private var invitationErrorTitle = "Unable to Send Invitation"
 
     var body: some View {
         ZStack {
@@ -40,6 +44,10 @@ struct GatheringInviteUserView: View {
                         searchField
 
                         searchContent
+
+                        if selectedUser != nil {
+                            sendInvitationButton
+                        }
                     }
                     .padding(
                         .horizontal,
@@ -57,6 +65,41 @@ struct GatheringInviteUserView: View {
             id: searchText
         ) {
             await searchUsers()
+        }
+        .alert(
+            "Invitation Sent",
+            isPresented:
+                $invitationSent
+        ) {
+            Button("Done") {
+                dismiss()
+            }
+        } message: {
+            Text(
+                "The gathering invitation was sent successfully."
+            )
+        }
+        .alert(
+            invitationErrorTitle,
+            isPresented:
+                Binding(
+                    get: {
+                        invitationErrorMessage != nil
+                    },
+                    set: { newValue in
+                        if !newValue {
+                            invitationErrorMessage = nil
+                        }
+                    }
+                )
+        ) {
+            Button("OK") {
+                invitationErrorMessage = nil
+            }
+        } message: {
+            Text(
+                invitationErrorMessage ?? ""
+            )
         }
     }
 }
@@ -524,6 +567,116 @@ private extension GatheringInviteUserView {
         }
 
         isSearching = false
+    }
+}
+
+// MARK: - Send Invitation
+
+private extension GatheringInviteUserView {
+
+    var sendInvitationButton: some View {
+        Button {
+            Task {
+                await sendInvitation()
+            }
+        } label: {
+            HStack(
+                spacing: KinSpacing.small
+            ) {
+                if isSendingInvitation {
+                    ProgressView()
+                        .tint(.white)
+                }
+
+                Text(
+                    isSendingInvitation
+                        ? "Sending..."
+                        : "Invite Selected User"
+                )
+                .font(
+                    KinTypography.headline
+                )
+                .foregroundStyle(
+                    Color.white
+                )
+            }
+            .frame(
+                maxWidth: .infinity
+            )
+            .padding(
+                .vertical,
+                KinSpacing.large
+            )
+            .background(
+                KinColors.primary
+            )
+            .clipShape(
+                RoundedRectangle(
+                    cornerRadius:
+                        KinRadius.medium
+                )
+            )
+        }
+        .buttonStyle(.plain)
+        .disabled(
+            isSendingInvitation
+        )
+    }
+
+    @MainActor
+    func sendInvitation() async {
+        guard let selectedUser else {
+            return
+        }
+
+        isSendingInvitation = true
+        invitationErrorMessage = nil
+
+        do {
+            _ =
+                try await GatheringInvitationService
+                    .createInvitation(
+                        gatheringId:
+                            gatheringId,
+                        userId:
+                            selectedUser.id
+                    )
+
+            invitationSent = true
+
+        } catch {
+            let errorText =
+                error.localizedDescription
+                    .lowercased()
+
+            if errorText.contains(
+                "duplicate key"
+            ) ||
+                errorText.contains(
+                    "gathering_participants_pkey"
+                ) {
+
+                invitationErrorTitle =
+                    "Already Invited"
+
+                invitationErrorMessage =
+                    "\(displayName(for: selectedUser)) already has an invitation to this gathering."
+
+            } else {
+                invitationErrorTitle =
+                    "Unable to Send Invitation"
+
+                invitationErrorMessage =
+                    "Unable to send invitation. Please try again."
+            }
+
+            print(
+                "GATHERING INVITATION ERROR:",
+                error.localizedDescription
+            )
+        }
+
+        isSendingInvitation = false
     }
 }
 
