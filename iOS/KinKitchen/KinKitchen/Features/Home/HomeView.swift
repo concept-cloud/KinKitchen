@@ -419,55 +419,50 @@ private extension HomeView {
 // MARK: - Home Data
 
 private extension HomeView {
-
+    
     @MainActor
     func loadHome() async {
-
         isLoadingGatherings = true
-
-        async let profileTask =
-            ProfileService
-                .fetchCurrentProfile()
-
-        async let gatheringsTask =
-            GatheringService
-                .fetchUpcomingGatheringItems()
-
+        
         do {
-
-            let (
-                profile,
-                gatherings
-            ) = try await (
-                profileTask,
-                gatheringsTask
-            )
-
+            let profile =
+            try await ProfileService
+                .fetchCurrentProfile()
+            
             firstName =
-                profile.firstName?
-                    .trimmingCharacters(
-                        in:
-                            .whitespacesAndNewlines
-                    )
-                ?? ""
-
-            upcomingGatherings =
-                Array(
-                    gatherings.prefix(3)
+            profile.firstName?
+                .trimmingCharacters(
+                    in: .whitespacesAndNewlines
                 )
-
+            ?? ""
         } catch {
-
             print(
-                "HOME LOAD ERROR:",
+                "HOME PROFILE LOAD ERROR:",
                 error.localizedDescription
             )
         }
-
+        
+        do {
+            let gatherings =
+            try await GatheringService
+                .fetchUpcomingGatheringItems()
+            
+            upcomingGatherings =
+            Array(
+                gatherings.prefix(3)
+            )
+        } catch {
+            upcomingGatherings = []
+            
+            print(
+                "HOME GATHERINGS LOAD ERROR:",
+                error.localizedDescription
+            )
+        }
+        
         isLoadingGatherings = false
     }
 }
-
 
 // MARK: - Gathering Helpers
 

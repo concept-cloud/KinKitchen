@@ -28,6 +28,10 @@ struct GatheringDetailView: View {
     
     @State private var contributorProfiles: [Profile] = []
     @State private var currentUserId: UUID?
+    
+    @State private var currentParticipant: GatheringParticipant?
+    @State private var isRespondingToInvitation = false
+    @State private var invitationResponseError: String?
 
 
     var body: some View {
@@ -120,15 +124,21 @@ private extension GatheringDetailView {
                                 .coverImagePath
                     )
 
-                titleSection(
-                    gathering
-                )
+                    titleSection(
+                        gathering
+                    )
 
-                gatheringMetadata(
-                    gathering
-                )
+                    gatheringMetadata(
+                        gathering
+                    )
 
-                tabPicker
+                    if currentParticipant?.status == .pending {
+                        invitationResponseSection(
+                            gathering
+                        )
+                    }
+
+                    tabPicker
 
                 tabContent(
                     gathering
@@ -467,6 +477,200 @@ private extension GatheringDetailView {
     }
 }
 
+
+// MARK: - Invitation Response
+
+private extension GatheringDetailView {
+
+    func invitationResponseSection(
+        _ gathering: Gathering
+    ) -> some View {
+        VStack(
+            alignment: .leading,
+            spacing: KinSpacing.medium
+        ) {
+            Text("You're Invited")
+                .font(
+                    KinTypography.sectionTitle
+                )
+                .foregroundStyle(
+                    KinColors.primaryText
+                )
+
+            Text(
+                "You've been invited to \(gathering.name)."
+            )
+            .font(
+                KinTypography.body
+            )
+            .foregroundStyle(
+                KinColors.secondaryText
+            )
+
+            HStack(
+                spacing: KinSpacing.medium
+            ) {
+                Button {
+                    Task {
+                        await respondToInvitation(
+                            status: .declined
+                        )
+                    }
+                } label: {
+                    Text("Decline")
+                        .font(
+                            KinTypography.headline
+                        )
+                        .foregroundStyle(
+                            KinColors.primary
+                        )
+                        .frame(
+                            maxWidth: .infinity
+                        )
+                        .padding(
+                            .vertical,
+                            KinSpacing.medium
+                        )
+                        .background(
+                            KinColors.surface
+                        )
+                        .clipShape(
+                            RoundedRectangle(
+                                cornerRadius:
+                                    KinRadius.medium
+                            )
+                        )
+                }
+                .buttonStyle(.plain)
+                .disabled(
+                    isRespondingToInvitation
+                )
+
+                Button {
+                    Task {
+                        await respondToInvitation(
+                            status: .accepted
+                        )
+                    }
+                } label: {
+                    HStack(
+                        spacing: KinSpacing.small
+                    ) {
+                        if isRespondingToInvitation {
+                            ProgressView()
+                                .tint(.white)
+                        }
+
+                        Text("Accept")
+                            .font(
+                                KinTypography.headline
+                            )
+                            .foregroundStyle(
+                                Color.white
+                            )
+                    }
+                    .frame(
+                        maxWidth: .infinity
+                    )
+                    .padding(
+                        .vertical,
+                        KinSpacing.medium
+                    )
+                    .background(
+                        KinColors.primary
+                    )
+                    .clipShape(
+                        RoundedRectangle(
+                            cornerRadius:
+                                KinRadius.medium
+                        )
+                    )
+                }
+                .buttonStyle(.plain)
+                .disabled(
+                    isRespondingToInvitation
+                )
+            }
+
+            if let invitationResponseError {
+                Text(
+                    invitationResponseError
+                )
+                .font(
+                    KinTypography.footnote
+                )
+                .foregroundStyle(
+                    KinColors.error
+                )
+            }
+        }
+        .padding(
+            KinSpacing.large
+        )
+        .background(
+            KinColors.surface
+        )
+        .clipShape(
+            RoundedRectangle(
+                cornerRadius:
+                    KinRadius.large
+            )
+        )
+    }
+
+    @MainActor
+    func respondToInvitation(
+        status: InvitationStatus
+    ) async {
+        guard
+            currentParticipant?.status ==
+                .pending
+        else {
+            invitationResponseError =
+                "This invitation has already been answered."
+            return
+        }
+
+        isRespondingToInvitation = true
+        invitationResponseError = nil
+
+        do {
+            switch status {
+            case .accepted:
+                _ =
+                    try await GatheringInvitationService
+                        .acceptInvitation(
+                            gatheringId:
+                                gatheringId
+                        )
+
+            case .declined:
+                _ =
+                    try await GatheringInvitationService
+                        .declineInvitation(
+                            gatheringId:
+                                gatheringId
+                        )
+
+            case .pending:
+                break
+            }
+
+            await loadGathering()
+
+        } catch {
+            invitationResponseError =
+                "Unable to respond to this invitation. Please try again."
+
+            print(
+                "GATHERING INVITATION RESPONSE ERROR:",
+                error.localizedDescription
+            )
+        }
+
+        isRespondingToInvitation = false
+    }
+}
 
 // MARK: - Tabs
 
@@ -1400,6 +1604,19 @@ private extension GatheringDetailView {
 
             currentUserId =
                 currentUser.id
+            
+            let participants =
+                try await GatheringInvitationService
+                    .fetchInvitations(
+                        gatheringId:
+                            gatheringId
+                    )
+
+            currentParticipant =
+                participants.first {
+                    $0.userId ==
+                        currentUser.id
+                }
 
             isHost =
                 loadedGathering.hostId ==
@@ -1417,6 +1634,7 @@ private extension GatheringDetailView {
             gatheringClaims = []
             contributorProfiles = []
             currentUserId = nil
+            currentParticipant = nil
 
             errorMessage =
                 "Unable to load gathering. Please try again."
