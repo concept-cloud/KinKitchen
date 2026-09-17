@@ -9,6 +9,7 @@ import SwiftUI
 
 
 struct HomeView: View {
+    @Environment(\.scenePhase) private var scenePhase
 
     @State private var showingAddRecipe = false
 
@@ -118,6 +119,7 @@ struct HomeView: View {
                                 "Gatherings tapped"
                             )
                         }
+                        
                     }
 
 
@@ -162,12 +164,19 @@ struct HomeView: View {
                 KinColors.background
             )
             .task {
-
                 await loadHome()
             }
-            .refreshable {
 
+            .refreshable {
                 await loadHome()
+            }
+
+            .onChange(of: scenePhase) {
+                if scenePhase == .active {
+                    Task {
+                        await loadHome()
+                    }
+                }
             }
 
 

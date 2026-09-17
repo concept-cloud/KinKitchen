@@ -1,0 +1,190 @@
+//
+//  GatheringInvitationService.swift
+//  KinKitchen
+//
+//  Created by Greg Hudler on 9/17/26.
+//
+import Foundation
+import Supabase
+
+// MARK: - Gathering Invitation Service
+
+enum GatheringInvitationService {
+
+    // MARK: - Create Invitation
+
+    static func createInvitation(
+        gatheringId: UUID,
+        userId: UUID
+    ) async throws -> GatheringParticipant {
+
+        let payload =
+            GatheringParticipantCreate(
+                gatheringId: gatheringId,
+                userId: userId,
+                role: .guest,
+                status: .pending
+            )
+
+        let invitation: GatheringParticipant =
+            try await SupabaseManager.client
+                .from("gathering_participants")
+                .insert(payload)
+                .select()
+                .single()
+                .execute()
+                .value
+
+        return invitation
+    }
+
+    // MARK: - Fetch Gathering Invitations
+
+    static func fetchInvitations(
+        gatheringId: UUID
+    ) async throws -> [GatheringParticipant] {
+
+        let invitations: [GatheringParticipant] =
+            try await SupabaseManager.client
+                .from("gathering_participants")
+                .select()
+                .eq(
+                    "gathering_id",
+                    value: gatheringId
+                )
+                .order(
+                    "invited_at",
+                    ascending: true
+                )
+                .execute()
+                .value
+
+        return invitations
+    }
+
+    // MARK: - Fetch Current User Invitations
+
+    static func fetchCurrentUserInvitations()
+        async throws -> [GatheringParticipant] {
+
+        let user =
+            try await SupabaseManager.client
+                .auth
+                .session
+                .user
+
+        let invitations: [GatheringParticipant] =
+            try await SupabaseManager.client
+                .from("gathering_participants")
+                .select()
+                .eq(
+                    "user_id",
+                    value: user.id
+                )
+                .order(
+                    "invited_at",
+                    ascending: false
+                )
+                .execute()
+                .value
+
+        return invitations
+    }
+
+    // MARK: - Fetch Pending Current User Invitations
+
+    static func fetchPendingInvitations()
+        async throws -> [GatheringParticipant] {
+
+        let user =
+            try await SupabaseManager.client
+                .auth
+                .session
+                .user
+
+        let invitations: [GatheringParticipant] =
+            try await SupabaseManager.client
+                .from("gathering_participants")
+                .select()
+                .eq(
+                    "user_id",
+                    value: user.id
+                )
+                .eq(
+                    "status",
+                    value: InvitationStatus.pending.rawValue
+                )
+                .order(
+                    "invited_at",
+                    ascending: false
+                )
+                .execute()
+                .value
+
+        return invitations
+    }
+
+    // MARK: - Update Invitation Status
+
+    static func updateInvitationStatus(
+        gatheringId: UUID,
+        status: InvitationStatus
+    ) async throws -> GatheringParticipant {
+
+        let user =
+            try await SupabaseManager.client
+                .auth
+                .session
+                .user
+
+        let payload =
+            GatheringParticipantStatusUpdate(
+                status: status,
+                respondedAt: Date()
+            )
+
+        let invitation: GatheringParticipant =
+            try await SupabaseManager.client
+                .from("gathering_participants")
+                .update(payload)
+                .eq(
+                    "gathering_id",
+                    value: gatheringId
+                )
+                .eq(
+                    "user_id",
+                    value: user.id
+                )
+                .select()
+                .single()
+                .execute()
+                .value
+
+        return invitation
+    }
+
+    // MARK: - Accept Invitation
+
+    static func acceptInvitation(
+        gatheringId: UUID
+    ) async throws -> GatheringParticipant {
+
+        try await updateInvitationStatus(
+            gatheringId: gatheringId,
+            status: .accepted
+        )
+    }
+
+    // MARK: - Decline Invitation
+
+    static func declineInvitation(
+        gatheringId: UUID
+    ) async throws -> GatheringParticipant {
+
+        try await updateInvitationStatus(
+            gatheringId: gatheringId,
+            status: .declined
+        )
+    }
+    
+}

@@ -1019,19 +1019,6 @@ enum GatheringRelationship:
 }
 
 
-// MARK: - Invitation Status
-
-enum InvitationStatus:
-    String,
-    Codable,
-    Hashable {
-
-    case pending
-
-    case accepted
-
-    case declined
-}
 
 
 // MARK: - Gathering Participant List Lookup

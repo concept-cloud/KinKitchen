@@ -20,6 +20,7 @@ struct GatheringNeedDetailView: View {
     @State private var isLoading = true
     @State private var errorMessage: String?
     @State private var recipe: Recipe?
+    @State private var showingRecipeDetail = false
     @State private var currentUserId: UUID?
     @State private var claimQuantity = 1
     @State private var isEditingClaim = false
@@ -81,6 +82,15 @@ struct GatheringNeedDetailView: View {
             }
         }
         .navigationBarHidden(true)
+        .navigationDestination(
+            isPresented: $showingRecipeDetail
+        ) {
+            if let recipe {
+                RecipeDetailView(
+                    recipeId: recipe.id
+                )
+            }
+        }
         .task {
             await loadDetails()
         }
@@ -335,6 +345,30 @@ private extension GatheringNeedDetailView {
                         KinRadius.large
                 )
             )
+            .overlay(
+                alignment: .trailing
+            ) {
+                Image(
+                    systemName: "chevron.right"
+                )
+                .font(.caption)
+                .foregroundStyle(
+                    KinColors.primary
+                )
+                .padding(
+                    .trailing,
+                    KinSpacing.large
+                )
+            }
+            .contentShape(
+                RoundedRectangle(
+                    cornerRadius:
+                        KinRadius.large
+                )
+            )
+            .onTapGesture {
+                showingRecipeDetail = true
+            }
         }
     }
 
