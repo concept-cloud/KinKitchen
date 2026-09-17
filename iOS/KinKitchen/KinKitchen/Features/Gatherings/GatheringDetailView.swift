@@ -743,11 +743,10 @@ private extension GatheringDetailView {
 // MARK: - Guests
 
 private extension GatheringDetailView {
-
     var guestsTab: some View {
         VStack(
             alignment: .leading,
-            spacing: KinSpacing.large
+            spacing: KinSpacing.xLarge
         ) {
             HStack {
                 Text("Guests")
@@ -779,63 +778,13 @@ private extension GatheringDetailView {
                 }
             }
 
-            if isHost {
-                if gatheringParticipants.isEmpty {
-                    Text(
-                        "No guests have been invited yet."
-                    )
-                    .font(
-                        KinTypography.body
-                    )
-                    .foregroundStyle(
-                        KinColors.secondaryText
-                    )
-                } else {
-                    VStack(
-                        spacing: KinSpacing.medium
-                    ) {
-                        ForEach(
-                            gatheringParticipants,
-                            id: \.userId
-                        ) { participant in
-                            participantStatusRow(
-                                participant
-                            )
-                        }
-                    }
-                }
-            } else if let currentParticipant {
-                VStack(
-                    alignment: .leading,
-                    spacing: KinSpacing.small
-                ) {
-                    Text("Your Invitation")
-                        .font(
-                            KinTypography.headline
-                        )
-                        .foregroundStyle(
-                            KinColors.primaryText
-                        )
+            participantSection
 
-                    invitationStatusBadge(
-                        currentParticipant.status
-                    )
-                }
-                .frame(
-                    maxWidth: .infinity,
-                    alignment: .leading
-                )
-                .padding(
-                    KinSpacing.large
-                )
-                .background(
-                    KinColors.surface
-                )
-                .clipShape(
-                    RoundedRectangle(
-                        cornerRadius:
-                            KinRadius.large
-                    )
+            if isHost {
+                invitationManagementSection
+            } else if let currentParticipant {
+                currentInvitationSection(
+                    currentParticipant
                 )
             }
         }
@@ -843,6 +792,274 @@ private extension GatheringDetailView {
             maxWidth: .infinity,
             alignment: .leading
         )
+    }
+
+    var participantSection: some View {
+        VStack(
+            alignment: .leading,
+            spacing: KinSpacing.medium
+        ) {
+            Text("Who's Coming")
+                .font(
+                    KinTypography.headline
+                )
+                .foregroundStyle(
+                    KinColors.primaryText
+                )
+
+            hostParticipantRow
+
+            ForEach(
+                visibleGatheringParticipants,
+                id: \.userId
+            ) { participant in
+                participantRow(
+                    participant
+                )
+            }
+        }
+    }
+
+    var hostParticipantRow: some View {
+        HStack(
+            spacing: KinSpacing.medium
+        ) {
+            VStack(
+                alignment: .leading,
+                spacing: KinSpacing.xSmall
+            ) {
+                Text("Host")
+                    .font(
+                        KinTypography.headline
+                    )
+                    .foregroundStyle(
+                        KinColors.primaryText
+                    )
+
+                Text("Gathering Host")
+                    .font(
+                        KinTypography.footnote
+                    )
+                    .foregroundStyle(
+                        KinColors.secondaryText
+                    )
+            }
+
+            Spacer()
+
+            Text("Host")
+                .font(
+                    KinTypography.caption
+                )
+                .foregroundStyle(
+                    KinColors.primary
+                )
+                .padding(
+                    .horizontal,
+                    KinSpacing.medium
+                )
+                .padding(
+                    .vertical,
+                    KinSpacing.xSmall
+                )
+                .background(
+                    KinColors.primary
+                        .opacity(0.10)
+                )
+                .clipShape(
+                    Capsule()
+                )
+        }
+        .padding(
+            KinSpacing.large
+        )
+        .background(
+            KinColors.surface
+        )
+        .clipShape(
+            RoundedRectangle(
+                cornerRadius:
+                    KinRadius.large
+            )
+        )
+    }
+
+    var visibleGatheringParticipants:
+        [GatheringParticipant] {
+        gatheringParticipants.filter {
+            $0.status == .accepted ||
+            $0.status == .pending
+        }
+    }
+
+    var invitationManagementSection:
+        some View {
+        VStack(
+            alignment: .leading,
+            spacing: KinSpacing.medium
+        ) {
+            Text("Invitations")
+                .font(
+                    KinTypography.headline
+                )
+                .foregroundStyle(
+                    KinColors.primaryText
+                )
+
+            if gatheringParticipants.isEmpty {
+                Text(
+                    "No guests have been invited yet."
+                )
+                .font(
+                    KinTypography.body
+                )
+                .foregroundStyle(
+                    KinColors.secondaryText
+                )
+            } else {
+                VStack(
+                    spacing: KinSpacing.medium
+                ) {
+                    ForEach(
+                        gatheringParticipants,
+                        id: \.userId
+                    ) { participant in
+                        participantStatusRow(
+                            participant
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    func currentInvitationSection(
+        _ participant: GatheringParticipant
+    ) -> some View {
+        VStack(
+            alignment: .leading,
+            spacing: KinSpacing.small
+        ) {
+            Text("Your Invitation")
+                .font(
+                    KinTypography.headline
+                )
+                .foregroundStyle(
+                    KinColors.primaryText
+                )
+
+            invitationStatusBadge(
+                participant.status
+            )
+        }
+        .frame(
+            maxWidth: .infinity,
+            alignment: .leading
+        )
+        .padding(
+            KinSpacing.large
+        )
+        .background(
+            KinColors.surface
+        )
+        .clipShape(
+            RoundedRectangle(
+                cornerRadius:
+                    KinRadius.large
+            )
+        )
+    }
+
+    func participantRow(
+        _ participant: GatheringParticipant
+    ) -> some View {
+        HStack(
+            spacing: KinSpacing.medium
+        ) {
+            VStack(
+                alignment: .leading,
+                spacing: KinSpacing.xSmall
+            ) {
+                Text(
+                    participantDisplayName(
+                        participant
+                    )
+                )
+                .font(
+                    KinTypography.headline
+                )
+                .foregroundStyle(
+                    KinColors.primaryText
+                )
+
+                if let username =
+                    participantUsername(
+                        participant
+                    ) {
+                    Text("@\(username)")
+                        .font(
+                            KinTypography.footnote
+                        )
+                        .foregroundStyle(
+                            KinColors.secondaryText
+                        )
+                }
+            }
+
+            Spacer()
+
+            participantAttendanceBadge(
+                participant.status
+            )
+        }
+        .padding(
+            KinSpacing.large
+        )
+        .background(
+            KinColors.surface
+        )
+        .clipShape(
+            RoundedRectangle(
+                cornerRadius:
+                    KinRadius.large
+            )
+        )
+    }
+
+    func participantAttendanceBadge(
+        _ status: InvitationStatus
+    ) -> some View {
+        let title =
+            status == .accepted
+                ? "Going"
+                : "Invited"
+
+        let color =
+            status == .accepted
+                ? KinColors.success
+                : KinColors.warning
+
+        return Text(title)
+            .font(
+                KinTypography.caption
+            )
+            .foregroundStyle(
+                color
+            )
+            .padding(
+                .horizontal,
+                KinSpacing.medium
+            )
+            .padding(
+                .vertical,
+                KinSpacing.xSmall
+            )
+            .background(
+                color.opacity(0.10)
+            )
+            .clipShape(
+                Capsule()
+            )
     }
 
     func participantStatusRow(
@@ -942,10 +1159,8 @@ private extension GatheringDetailView {
         switch status {
         case .pending:
             return "Pending"
-
         case .accepted:
             return "Accepted"
-
         case .declined:
             return "Declined"
         }
@@ -957,10 +1172,8 @@ private extension GatheringDetailView {
         switch status {
         case .pending:
             return KinColors.warning
-
         case .accepted:
             return KinColors.success
-
         case .declined:
             return KinColors.error
         }
