@@ -123,17 +123,9 @@ struct NotificationsView: View {
 
                         Spacer()
 
-                        if !notification.isRead {
-
-                            Circle()
-                                .fill(
-                                    KinColors.primary
-                                )
-                                .frame(
-                                    width: 8,
-                                    height: 8
-                                )
-                        }
+                        readStateButton(
+                            notification
+                        )
                     }
 
                     if
@@ -179,6 +171,51 @@ struct NotificationsView: View {
         }
     }
 
+    // MARK: - Read State Button
+
+    private func readStateButton(
+        _ notification: KinNotification
+    ) -> some View {
+
+        Button {
+
+            Task {
+                await toggleReadState(
+                    notification
+                )
+            }
+
+        } label: {
+
+            Image(
+                systemName:
+                    notification.isRead
+                        ? "circle"
+                        : "circle.fill"
+            )
+            .font(
+                .system(size: 10)
+            )
+            .foregroundStyle(
+                notification.isRead
+                    ? KinColors.secondaryText
+                    : KinColors.primary
+            )
+            .frame(
+                width: 32,
+                height: 32
+            )
+            .contentShape(
+                Rectangle()
+            )
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(
+            notification.isRead
+                ? "Mark as unread"
+                : "Mark as read"
+        )
+    }
     // MARK: - Notification Icon
 
     private func notificationIcon(
@@ -405,6 +442,49 @@ struct NotificationsView: View {
         )
     }
 
+    // MARK: - Toggle Read State
+
+    @MainActor
+    private func toggleReadState(
+        _ notification: KinNotification
+    ) async {
+
+        do {
+
+            if notification.isRead {
+
+                try await NotificationService
+                    .markAsUnread(
+                        notificationId:
+                            notification.id
+                    )
+
+            } else {
+
+                try await NotificationService
+                    .markAsRead(
+                        notificationId:
+                            notification.id
+                    )
+            }
+
+            notifications =
+                try await NotificationService
+                    .fetchNotifications()
+
+        } catch is CancellationError {
+
+            return
+
+        } catch {
+
+            print(
+                "NOTIFICATION READ STATE ERROR:",
+                error.localizedDescription
+            )
+        }
+    }
+    
     // MARK: - Load Notifications
 
     @MainActor
