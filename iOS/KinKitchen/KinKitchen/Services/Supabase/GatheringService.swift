@@ -329,17 +329,54 @@ enum GatheringService {
         guestLimit: Int?
     ) async throws -> Gathering {
 
-        let user =
-            try await SupabaseManager.client
-                .auth
-                .session
-                .user
+        struct Parameters: Encodable {
 
-        let payload =
-            GatheringUpdate(
-                name: name.trimmingCharacters(
-                    in: .whitespacesAndNewlines
-                ),
+            let gatheringId: UUID
+            let name: String
+            let theme: String?
+            let coverImagePath: String?
+            let description: String?
+            let location: String?
+            let startsAt: Date
+            let guestLimit: Int?
+
+            enum CodingKeys:
+                String,
+                CodingKey {
+
+                case gatheringId =
+                    "p_gathering_id"
+
+                case name =
+                    "p_name"
+
+                case theme =
+                    "p_theme"
+
+                case coverImagePath =
+                    "p_cover_image_path"
+
+                case description =
+                    "p_description"
+
+                case location =
+                    "p_location"
+
+                case startsAt =
+                    "p_starts_at"
+
+                case guestLimit =
+                    "p_guest_limit"
+            }
+        }
+
+        let parameters =
+            Parameters(
+                gatheringId: gatheringId,
+                name:
+                    name.trimmingCharacters(
+                        in: .whitespacesAndNewlines
+                    ),
                 theme:
                     cleanedOptionalString(
                         theme
@@ -356,25 +393,16 @@ enum GatheringService {
                     cleanedOptionalString(
                         location
                     ),
-                startsAt:
-                    startsAt,
-                guestLimit:
-                    guestLimit
+                startsAt: startsAt,
+                guestLimit: guestLimit
             )
 
         let gathering: Gathering =
             try await SupabaseManager.client
-                .from("gatherings")
-                .update(payload)
-                .eq(
-                    "id",
-                    value: gatheringId
+                .rpc(
+                    "update_gathering_with_notifications",
+                    params: parameters
                 )
-                .eq(
-                    "host_id",
-                    value: user.id
-                )
-                .select()
                 .single()
                 .execute()
                 .value
