@@ -191,6 +191,18 @@ struct HomeView: View {
             }
 
             .refreshable {
+
+                do {
+                    notifications =
+                        try await NotificationService
+                            .fetchNotifications()
+                } catch {
+                    print(
+                        "HOME NOTIFICATION REFRESH ERROR:",
+                        error.localizedDescription
+                    )
+                }
+
                 await loadHome()
             }
 
@@ -573,9 +585,73 @@ private extension HomeView {
 
 private extension HomeView {
     
+    // MARK: - Load Home
+
     @MainActor
     func loadHome() async {
+
         isLoadingGatherings = true
+
+        do {
+            notifications =
+                try await NotificationService
+                    .fetchNotifications()
+        } catch {
+            if !(error is CancellationError) {
+                print(
+                    "HOME NOTIFICATION LOAD ERROR:",
+                    error.localizedDescription
+                )
+            }
+        }
+
+        do {
+            let profile =
+                try await ProfileService
+                    .fetchCurrentProfile()
+
+            firstName =
+                profile.firstName?
+                    .trimmingCharacters(
+                        in: .whitespacesAndNewlines
+                    )
+                ?? ""
+
+        } catch {
+            if !(error is CancellationError) {
+                print(
+                    "HOME PROFILE LOAD ERROR:",
+                    error.localizedDescription
+                )
+            }
+        }
+
+        do {
+            let gatherings =
+                try await GatheringService
+                    .fetchUpcomingGatheringItems()
+
+            upcomingGatherings =
+                Array(
+                    gatherings.prefix(3)
+                )
+
+        } catch {
+            if !(error is CancellationError) {
+                print(
+                    "HOME GATHERINGS LOAD ERROR:",
+                    error.localizedDescription
+                )
+            }
+        }
+
+        isLoadingGatherings = false
+    }
+
+    // MARK: - Load Profile
+
+    @MainActor
+    func loadHomeProfile() async {
 
         do {
             let profile =
@@ -590,14 +666,22 @@ private extension HomeView {
                 ?? ""
 
         } catch is CancellationError {
-            isLoadingGatherings = false
+
             return
+
         } catch {
+
             print(
                 "HOME PROFILE LOAD ERROR:",
                 error.localizedDescription
             )
         }
+    }
+
+    // MARK: - Load Gatherings
+
+    @MainActor
+    func loadHomeGatherings() async {
 
         do {
             let gatherings =
@@ -610,31 +694,53 @@ private extension HomeView {
                 )
 
         } catch is CancellationError {
-            isLoadingGatherings = false
+
             return
+
         } catch {
+
             print(
                 "HOME GATHERINGS LOAD ERROR:",
                 error.localizedDescription
             )
         }
+    }
+
+    // MARK: - Load Notifications
+
+    @MainActor
+    func loadHomeNotifications() async {
+
+        print("HOME NOTIFICATIONS: refresh started")
 
         do {
-            notifications =
+            let fetchedNotifications =
                 try await NotificationService
                     .fetchNotifications()
 
+            print(
+                "HOME NOTIFICATIONS: fetched",
+                fetchedNotifications.count
+            )
+
+            notifications =
+                fetchedNotifications
+
         } catch is CancellationError {
-            isLoadingGatherings = false
+
+            print(
+                "HOME NOTIFICATIONS: cancelled"
+            )
+
             return
+
         } catch {
+
             print(
                 "HOME NOTIFICATION LOAD ERROR:",
                 error.localizedDescription
             )
         }
-
-        isLoadingGatherings = false
     }
 }
 

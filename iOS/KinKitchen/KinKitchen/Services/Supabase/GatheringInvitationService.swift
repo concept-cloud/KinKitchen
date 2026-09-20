@@ -18,19 +18,32 @@ enum GatheringInvitationService {
         userId: UUID
     ) async throws -> GatheringParticipant {
 
-        let payload =
-            GatheringParticipantCreate(
+        struct Parameters: Encodable {
+
+            let gatheringId: UUID
+            let userId: UUID
+
+            enum CodingKeys:
+                String,
+                CodingKey {
+
+                case gatheringId = "p_gathering_id"
+                case userId = "p_user_id"
+            }
+        }
+
+        let parameters =
+            Parameters(
                 gatheringId: gatheringId,
-                userId: userId,
-                role: .guest,
-                status: .pending
+                userId: userId
             )
 
         let invitation: GatheringParticipant =
             try await SupabaseManager.client
-                .from("gathering_participants")
-                .insert(payload)
-                .select()
+                .rpc(
+                    "create_gathering_invitation",
+                    params: parameters
+                )
                 .single()
                 .execute()
                 .value
