@@ -28,6 +28,7 @@ struct ProfileView: View {
     @State private var isEditingProfile = false
     @State private var isEditingDietaryProfile = false
     @State private var isShowingSettings = false
+    @State private var isShowingNotifications = false
 
     var body: some View {
 
@@ -157,6 +158,15 @@ struct ProfileView: View {
             ) {
 
                 DietaryProfileView()
+            }
+            
+            // MARK: - Notifications
+
+            .navigationDestination(
+                isPresented:
+                    $isShowingNotifications
+            ) {
+                NotificationsView()
             }
             .navigationDestination(
                 isPresented: $isShowingSettings
@@ -463,6 +473,13 @@ struct ProfileView: View {
                 systemImage: "bookmark"
             )
 
+            profileNavigationRow(
+                           title: "Notifications",
+                           systemImage: "bell"
+                       ) {
+                           isShowingNotifications = true
+                       }
+            
             // Settings
 
             profileNavigationRow(

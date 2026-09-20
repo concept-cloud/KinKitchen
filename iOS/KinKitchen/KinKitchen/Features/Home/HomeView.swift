@@ -19,7 +19,10 @@ struct HomeView: View {
     @State private var isLoadingGatherings = true
 
     @State private var firstName = ""
-
+    @State private var notifications:
+        [KinNotification] = []
+    
+    
 
     var body: some View {
 
@@ -68,6 +71,26 @@ struct HomeView: View {
                             )
                     }
 
+                    // MARK: - Alerts
+
+                    if !unreadNotifications.isEmpty {
+                        KinSectionHeader(
+                            title: "Alerts"
+                        )
+
+                        VStack(
+                            spacing: KinSpacing.medium
+                        ) {
+                            ForEach(
+                                unreadNotifications.prefix(3)
+                            ) { notification in
+                                homeNotificationCard(
+                                    notification
+                                )
+                            }
+                        }
+                    }
+                    
                     // MARK: - Upcoming Gatherings
 
                     KinSectionHeader(
@@ -188,6 +211,136 @@ struct HomeView: View {
 
                 AddRecipeView()
             }
+        }
+    }
+    // MARK: - Unread Notifications
+
+    private var unreadNotifications:
+        [KinNotification] {
+
+        notifications.filter {
+            !$0.isRead
+        }
+    }
+
+    // MARK: - Notification Card
+
+    private func homeNotificationCard(
+        _ notification: KinNotification
+    ) -> some View {
+
+        KinCard {
+            HStack(
+                alignment: .top,
+                spacing: KinSpacing.medium
+            ) {
+                ZStack {
+                    Circle()
+                        .fill(
+                            KinColors.primary
+                                .opacity(0.15)
+                        )
+                        .frame(
+                            width: 44,
+                            height: 44
+                        )
+
+                    Image(
+                        systemName:
+                            homeNotificationIcon(
+                                for: notification.type
+                            )
+                    )
+                    .foregroundStyle(
+                        KinColors.primary
+                    )
+                }
+
+                VStack(
+                    alignment: .leading,
+                    spacing: KinSpacing.xSmall
+                ) {
+                    HStack {
+                        Text(notification.title)
+                            .font(
+                                KinTypography.headline
+                            )
+                            .foregroundStyle(
+                                KinColors.primaryText
+                            )
+
+                        Spacer()
+
+                        Circle()
+                            .fill(
+                                KinColors.primary
+                            )
+                            .frame(
+                                width: 8,
+                                height: 8
+                            )
+                    }
+
+                    if let message =
+                        notification.message,
+                       !message.isEmpty {
+
+                        Text(message)
+                            .font(
+                                KinTypography.body
+                            )
+                            .foregroundStyle(
+                                KinColors.secondaryText
+                            )
+                    }
+
+                    Text(
+                        notification.createdAt,
+                        format:
+                            .relative(
+                                presentation:
+                                    .named
+                            )
+                    )
+                    .font(
+                        KinTypography.caption
+                    )
+                    .foregroundStyle(
+                        KinColors.secondaryText
+                    )
+                }
+            }
+            .frame(
+                maxWidth: .infinity,
+                alignment: .leading
+            )
+        }
+    }
+
+    // MARK: - Notification Icon
+
+    private func homeNotificationIcon(
+        for type: KinNotificationType
+    ) -> String {
+
+        switch type {
+        case .gatheringInvitation:
+            return "envelope.fill"
+
+        case .invitationAccepted:
+            return "checkmark.circle.fill"
+
+        case .invitationDeclined:
+            return "xmark.circle.fill"
+
+        case .gatheringUpdated:
+            return "calendar.badge.clock"
+
+        case .dishUpdated:
+            return "fork.knife"
+
+        case .recipeShared:
+            return "book.closed.fill"
         }
     }
 }
@@ -462,6 +615,21 @@ private extension HomeView {
         } catch {
             print(
                 "HOME GATHERINGS LOAD ERROR:",
+                error.localizedDescription
+            )
+        }
+
+        do {
+            notifications =
+                try await NotificationService
+                    .fetchNotifications()
+
+        } catch is CancellationError {
+            isLoadingGatherings = false
+            return
+        } catch {
+            print(
+                "HOME NOTIFICATION LOAD ERROR:",
                 error.localizedDescription
             )
         }
