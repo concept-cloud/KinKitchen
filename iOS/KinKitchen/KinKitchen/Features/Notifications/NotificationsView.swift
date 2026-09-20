@@ -16,6 +16,7 @@ struct NotificationsView: View {
 
     @State private var isLoading = true
     @State private var errorMessage: String?
+    @State private var selectedGatheringId: UUID?
 
     // MARK: - Body
 
@@ -47,6 +48,16 @@ struct NotificationsView: View {
         }
         .navigationTitle("Notifications")
         .navigationBarTitleDisplayMode(.inline)
+        // MARK: - Gathering Destination
+
+        .navigationDestination(
+            item: $selectedGatheringId
+        ) { gatheringId in
+
+            GatheringDetailView(
+                gatheringId: gatheringId
+            )
+        }
         .task {
             await loadNotifications()
         }
@@ -85,91 +96,102 @@ struct NotificationsView: View {
         _ notification: KinNotification
     ) -> some View {
 
-        KinCard {
+        Button {
 
-            HStack(
-                alignment: .top,
-                spacing: KinSpacing.medium
-            ) {
+            openNotification(
+                notification
+            )
 
-                notificationIcon(
-                    notification
-                )
+        } label: {
 
-                VStack(
-                    alignment: .leading,
-                    spacing: KinSpacing.xSmall
+            KinCard {
+
+                HStack(
+                    alignment: .top,
+                    spacing: KinSpacing.medium
                 ) {
 
-                    HStack(
-                        alignment: .top,
-                        spacing: KinSpacing.small
+                    notificationIcon(
+                        notification
+                    )
+
+                    VStack(
+                        alignment: .leading,
+                        spacing: KinSpacing.xSmall
                     ) {
 
-                        Text(
-                            notification.title
-                        )
-                        .font(
-                            notification.isRead
-                                ? KinTypography.body
-                                : KinTypography.headline
-                        )
-                        .foregroundStyle(
-                            KinColors.primaryText
-                        )
-                        .multilineTextAlignment(
-                            .leading
-                        )
+                        HStack(
+                            alignment: .top,
+                            spacing: KinSpacing.small
+                        ) {
 
-                        Spacer()
-
-                        readStateButton(
-                            notification
-                        )
-                    }
-
-                    if
-                        let message =
-                            notification.message,
-                        !message.isEmpty
-                    {
-
-                        Text(message)
+                            Text(
+                                notification.title
+                            )
                             .font(
-                                KinTypography.body
+                                notification.isRead
+                                    ? KinTypography.body
+                                    : KinTypography.headline
                             )
                             .foregroundStyle(
-                                KinColors.secondaryText
+                                KinColors.primaryText
                             )
                             .multilineTextAlignment(
                                 .leading
                             )
-                    }
 
-                    Text(
-                        formattedDate(
-                            notification.createdAt
+                            Spacer()
+
+                            readStateButton(
+                                notification
+                            )
+                        }
+
+                        if
+                            let message =
+                                notification.message,
+                            !message.isEmpty
+                        {
+
+                            Text(message)
+                                .font(
+                                    KinTypography.body
+                                )
+                                .foregroundStyle(
+                                    KinColors.secondaryText
+                                )
+                                .multilineTextAlignment(
+                                    .leading
+                                )
+                        }
+
+                        Text(
+                            formattedDate(
+                                notification.createdAt
+                            )
                         )
-                    )
-                    .font(
-                        KinTypography.caption
-                    )
-                    .foregroundStyle(
-                        KinColors.secondaryText
-                    )
+                        .font(
+                            KinTypography.caption
+                        )
+                        .foregroundStyle(
+                            KinColors.secondaryText
+                        )
+                    }
                 }
+                .frame(
+                    maxWidth: .infinity,
+                    alignment: .leading
+                )
+                .opacity(
+                    notification.isRead
+                        ? 0.7
+                        : 1
+                )
             }
-            .frame(
-                maxWidth: .infinity,
-                alignment: .leading
-            )
-            .opacity(
-                notification.isRead
-                    ? 0.7
-                    : 1
-            )
         }
+        .buttonStyle(.plain)
     }
+
 
     // MARK: - Read State Button
 
@@ -441,6 +463,24 @@ struct NotificationsView: View {
             KinSpacing.xLarge
         )
     }
+
+// MARK: - Open Notification
+
+private func openNotification(
+    _ notification: KinNotification
+) {
+
+    guard
+        notification.relatedType == "gathering",
+        let gatheringId =
+            notification.relatedId
+    else {
+        return
+    }
+
+    selectedGatheringId =
+        gatheringId
+}
 
     // MARK: - Toggle Read State
 

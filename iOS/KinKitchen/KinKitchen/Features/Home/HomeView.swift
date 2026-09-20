@@ -21,7 +21,7 @@ struct HomeView: View {
     @State private var firstName = ""
     @State private var notifications:
     [KinNotification] = []
-    
+    @State private var selectedGatheringId: UUID?
     
     
     var body: some View {
@@ -214,7 +214,16 @@ struct HomeView: View {
                 }
             }
             
-            
+            // MARK: - Gathering Destination
+
+            .navigationDestination(
+                item: $selectedGatheringId
+            ) { gatheringId in
+
+                GatheringDetailView(
+                    gatheringId: gatheringId
+                )
+            }
             // MARK: - Add Recipe Destination
             
             .navigationDestination(
@@ -235,107 +244,129 @@ struct HomeView: View {
         }
     }
     
-    // MARK: - Notification Card
     
+    // MARK: - Notification Card
+
     private func homeNotificationCard(
         _ notification: KinNotification
     ) -> some View {
-        
+
         let color =
-        homeNotificationColor(
-            for: notification.type
-        )
-        
-        return KinCard {
-            
-            HStack(
-                alignment: .top,
-                spacing: KinSpacing.medium
-            ) {
-                
-                ZStack {
-                    
-                    Circle()
-                        .fill(
-                            color.opacity(0.15)
-                        )
-                        .frame(
-                            width: 44,
-                            height: 44
-                        )
-                    
-                    Image(
-                        systemName:
-                            homeNotificationIcon(
-                                for: notification.type
-                            )
-                    )
-                    .foregroundStyle(
-                        color
-                    )
-                }
-                
-                VStack(
-                    alignment: .leading,
-                    spacing: KinSpacing.xSmall
+            homeNotificationColor(
+                for: notification.type
+            )
+
+        return Button {
+
+            guard
+                notification.relatedType == "gathering",
+                let gatheringId =
+                    notification.relatedId
+            else {
+                return
+            }
+
+            selectedGatheringId =
+                gatheringId
+
+        } label: {
+
+            KinCard {
+
+                HStack(
+                    alignment: .top,
+                    spacing: KinSpacing.medium
                 ) {
-                    
-                    HStack {
-                        
-                        Text(notification.title)
+
+                    ZStack {
+
+                        Circle()
+                            .fill(
+                                color.opacity(0.15)
+                            )
+                            .frame(
+                                width: 44,
+                                height: 44
+                            )
+
+                        Image(
+                            systemName:
+                                homeNotificationIcon(
+                                    for: notification.type
+                                )
+                        )
+                        .foregroundStyle(
+                            color
+                        )
+                    }
+
+                    VStack(
+                        alignment: .leading,
+                        spacing: KinSpacing.xSmall
+                    ) {
+
+                        HStack {
+
+                            Text(
+                                notification.title
+                            )
                             .font(
                                 KinTypography.headline
                             )
                             .foregroundStyle(
                                 KinColors.primaryText
                             )
-                        
-                        Spacer()
-                        
-                        Circle()
-                            .fill(
-                                KinColors.primary
-                            )
-                            .frame(
-                                width: 8,
-                                height: 8
-                            )
-                    }
-                    
-                    if let message =
-                        notification.message,
-                       !message.isEmpty {
-                        
-                        Text(message)
-                            .font(
-                                KinTypography.body
-                            )
-                            .foregroundStyle(
-                                KinColors.secondaryText
-                            )
-                    }
-                    
-                    Text(
-                        notification.createdAt,
-                        format:
+
+                            Spacer()
+
+                            Circle()
+                                .fill(
+                                    KinColors.primary
+                                )
+                                .frame(
+                                    width: 8,
+                                    height: 8
+                                )
+                        }
+
+                        if
+                            let message =
+                                notification.message,
+                            !message.isEmpty
+                        {
+
+                            Text(message)
+                                .font(
+                                    KinTypography.body
+                                )
+                                .foregroundStyle(
+                                    KinColors.secondaryText
+                                )
+                        }
+
+                        Text(
+                            notification.createdAt,
+                            format:
                                 .relative(
                                     presentation:
-                                            .named
+                                        .named
                                 )
-                    )
-                    .font(
-                        KinTypography.caption
-                    )
-                    .foregroundStyle(
-                        KinColors.secondaryText
-                    )
+                        )
+                        .font(
+                            KinTypography.caption
+                        )
+                        .foregroundStyle(
+                            KinColors.secondaryText
+                        )
+                    }
                 }
+                .frame(
+                    maxWidth: .infinity,
+                    alignment: .leading
+                )
             }
-            .frame(
-                maxWidth: .infinity,
-                alignment: .leading
-            )
         }
+        .buttonStyle(.plain)
     }
     
     // MARK: - Notification Color
@@ -474,121 +505,39 @@ private extension HomeView {
         let gathering =
             item.gathering
 
-        return KinCard {
+        return Button {
 
-            HStack(
-                spacing: KinSpacing.medium
-            ) {
+            selectedGatheringId =
+                gathering.id
 
-                Image(
-                    systemName:
-                        gatheringIcon(
-                            for: item
-                        )
-                )
-                .font(
-                    .system(
-                        size: 22,
-                        weight: .semibold
-                    )
-                )
-                .foregroundStyle(
-                    relationshipColor(
-                        for: item
-                    )
-                )
-                .frame(
-                    width: 44,
-                    height: 44
-                )
-                .background(
-                    relationshipColor(
-                        for: item
-                    )
-                    .opacity(0.10)
-                )
-                .clipShape(
-                    Circle()
-                )
+        } label: {
 
+            KinCard {
 
-                VStack(
-                    alignment: .leading,
-                    spacing: KinSpacing.xSmall
+                HStack(
+                    spacing: KinSpacing.medium
                 ) {
 
-                    Text(
-                        gathering.name
+                    Image(
+                        systemName:
+                            gatheringIcon(
+                                for: item
+                            )
                     )
                     .font(
-                        KinTypography.headline
-                    )
-                    .foregroundStyle(
-                        KinColors.primaryText
-                    )
-                    .lineLimit(2)
-
-
-                    Text(
-                        formattedGatheringDate(
-                            gathering.startsAt
+                        .system(
+                            size: 22,
+                            weight: .semibold
                         )
-                    )
-                    .font(
-                        KinTypography.caption
-                    )
-                    .foregroundStyle(
-                        KinColors.secondaryText
-                    )
-
-
-                    if let location =
-                        cleaned(
-                            gathering.location
-                        ) {
-
-                        Text(
-                            location
-                        )
-                        .font(
-                            KinTypography.caption
-                        )
-                        .foregroundStyle(
-                            KinColors.secondaryText
-                        )
-                        .lineLimit(1)
-                    }
-                }
-                .frame(
-                    maxWidth: .infinity,
-                    alignment: .leading
-                )
-
-
-                VStack(
-                    alignment: .trailing,
-                    spacing: KinSpacing.small
-                ) {
-
-                    Text(
-                        item.relationship
-                            .displayName
-                    )
-                    .font(
-                        KinTypography.caption
                     )
                     .foregroundStyle(
                         relationshipColor(
                             for: item
                         )
                     )
-                    .padding(
-                        .horizontal,
-                        KinSpacing.small
-                    )
-                    .padding(
-                        .vertical,
-                        KinSpacing.xSmall
+                    .frame(
+                        width: 44,
+                        height: 44
                     )
                     .background(
                         relationshipColor(
@@ -597,15 +546,104 @@ private extension HomeView {
                         .opacity(0.10)
                     )
                     .clipShape(
-                        Capsule()
+                        Circle()
+                    )
+
+                    VStack(
+                        alignment: .leading,
+                        spacing: KinSpacing.xSmall
+                    ) {
+
+                        Text(
+                            gathering.name
+                        )
+                        .font(
+                            KinTypography.headline
+                        )
+                        .foregroundStyle(
+                            KinColors.primaryText
+                        )
+                        .lineLimit(2)
+
+                        Text(
+                            formattedGatheringDate(
+                                gathering.startsAt
+                            )
+                        )
+                        .font(
+                            KinTypography.caption
+                        )
+                        .foregroundStyle(
+                            KinColors.secondaryText
+                        )
+
+                        if
+                            let location =
+                                cleaned(
+                                    gathering.location
+                                )
+                        {
+
+                            Text(
+                                location
+                            )
+                            .font(
+                                KinTypography.caption
+                            )
+                            .foregroundStyle(
+                                KinColors.secondaryText
+                            )
+                            .lineLimit(1)
+                        }
+                    }
+                    .frame(
+                        maxWidth: .infinity,
+                        alignment: .leading
+                    )
+
+                    VStack(
+                        alignment: .trailing,
+                        spacing: KinSpacing.small
+                    ) {
+
+                        Text(
+                            item.relationship
+                                .displayName
+                        )
+                        .font(
+                            KinTypography.caption
+                        )
+                        .foregroundStyle(
+                            relationshipColor(
+                                for: item
+                            )
+                        )
+                        .padding(
+                            .horizontal,
+                            KinSpacing.small
+                        )
+                        .padding(
+                            .vertical,
+                            KinSpacing.xSmall
+                        )
+                        .background(
+                            relationshipColor(
+                                for: item
+                            )
+                            .opacity(0.10)
+                        )
+                        .clipShape(
+                            Capsule()
+                        )
+                    }
+                    .fixedSize(
+                        horizontal: true,
+                        vertical: false
                     )
                 }
-                .fixedSize(
-                    horizontal: true,
-                    vertical: false
-                )
             }
         }
+        .buttonStyle(.plain)
     }
 }
 
