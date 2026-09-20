@@ -161,7 +161,6 @@ struct RecipesView: View {
                     }
                     .buttonStyle(.plain)
                 }
-
                 if showingFilterMessage {
                     Text(
                         "Advanced filtering is coming in Milestone B1."
@@ -179,7 +178,6 @@ struct RecipesView: View {
                         KinSpacing.small
                     )
                 }
-
                 // MARK: - Filters
                 HStack(
                     spacing: KinSpacing.small
@@ -260,7 +258,6 @@ struct RecipesView: View {
             .foregroundStyle(
                 KinColors.secondaryText
             )
-
             Text(
                 "No \(selectedFilter.rawValue) Recipes"
             )
@@ -270,7 +267,6 @@ struct RecipesView: View {
             .foregroundStyle(
                 KinColors.primaryText
             )
-
             Text(
                 "This feature is coming in Milestone B1."
             )
@@ -481,7 +477,7 @@ struct RecipesView: View {
                 .horizontal,
                 KinSpacing.xLarge
             )
-            Spacer()
+Spacer()
         }
         .padding(KinSpacing.large)
     }
