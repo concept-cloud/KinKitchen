@@ -185,14 +185,18 @@ struct NotificationsView: View {
         _ notification: KinNotification
     ) -> some View {
 
-        ZStack {
+        let color =
+            notificationColor(
+                for: notification.type
+            )
+
+        return ZStack {
 
             Circle()
                 .fill(
                     notification.isRead
                         ? KinColors.background
-                        : KinColors.primary
-                            .opacity(0.15)
+                        : color.opacity(0.15)
                 )
                 .frame(
                     width: 44,
@@ -211,11 +215,10 @@ struct NotificationsView: View {
             .foregroundStyle(
                 notification.isRead
                     ? KinColors.secondaryText
-                    : KinColors.primary
+                    : color
             )
         }
     }
-
     // MARK: - Notification Icon Name
 
     private func iconName(
@@ -247,6 +250,25 @@ struct NotificationsView: View {
         case .recipeShared:
 
             return "book.closed.fill"
+        }
+    }
+    
+    // MARK: - Notification Color
+
+    private func notificationColor(
+        for type: KinNotificationType
+    ) -> Color {
+
+        switch type {
+
+        case .invitationAccepted:
+            return .green
+
+        case .invitationDeclined:
+            return KinColors.error
+
+        default:
+            return KinColors.primary
         }
     }
 

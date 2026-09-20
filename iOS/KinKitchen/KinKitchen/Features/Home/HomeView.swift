@@ -10,38 +10,38 @@ import SwiftUI
 
 struct HomeView: View {
     @Environment(\.scenePhase) private var scenePhase
-
+    
     @State private var showingAddRecipe = false
-
+    
     @State private var upcomingGatherings:
-        [GatheringListItem] = []
-
+    [GatheringListItem] = []
+    
     @State private var isLoadingGatherings = true
-
+    
     @State private var firstName = ""
     @State private var notifications:
-        [KinNotification] = []
+    [KinNotification] = []
     
     
-
+    
     var body: some View {
-
+        
         NavigationStack {
-
+            
             ScrollView {
-
+                
                 VStack(
                     alignment: .leading,
                     spacing: KinSpacing.xLarge
                 ) {
-
+                    
                     // MARK: - Welcome
-
+                    
                     VStack(
                         alignment: .leading,
                         spacing: KinSpacing.xSmall
                     ) {
-
+                        
                         Text("Welcome back,")
                             .font(
                                 KinTypography.body
@@ -49,11 +49,11 @@ struct HomeView: View {
                             .foregroundStyle(
                                 KinColors.secondaryText
                             )
-
+                        
                         Text(
                             firstName.isEmpty
-                                ? "Chef"
-                                : firstName
+                            ? "Chef"
+                            : firstName
                         )
                         .font(
                             KinTypography.largeTitle
@@ -61,7 +61,7 @@ struct HomeView: View {
                         .foregroundStyle(
                             KinColors.primaryText
                         )
-
+                        
                         Text("What's cookin'?")
                             .font(
                                 KinTypography.body
@@ -70,14 +70,14 @@ struct HomeView: View {
                                 KinColors.secondaryText
                             )
                     }
-
+                    
                     // MARK: - Alerts
-
+                    
                     if !unreadNotifications.isEmpty {
                         KinSectionHeader(
                             title: "Alerts"
                         )
-
+                        
                         VStack(
                             spacing: KinSpacing.medium
                         ) {
@@ -92,82 +92,82 @@ struct HomeView: View {
                     }
                     
                     // MARK: - Upcoming Gatherings
-
+                    
                     KinSectionHeader(
                         title: "Upcoming Gatherings"
                     )
-
+                    
                     upcomingGatheringsSection
-
-
+                    
+                    
                     // MARK: - Quick Actions
-
+                    
                     KinSectionHeader(
                         title: "Quick Actions"
                     )
-
+                    
                     HStack(
                         spacing: KinSpacing.medium
                     ) {
-
+                        
                         // Add Recipe
-
+                        
                         KinIconButton(
                             icon: KinIcons.add
                         ) {
-
+                            
                             showingAddRecipe = true
                         }
-
-
+                        
+                        
                         // Recipes
-
+                        
                         KinIconButton(
                             icon: KinIcons.recipes
                         ) {
-
+                            
                             print(
                                 "Recipes tapped"
                             )
                         }
-
-
+                        
+                        
                         // Gatherings
-
+                        
                         KinIconButton(
                             icon: KinIcons.gatherings
                         ) {
-
+                            
                             print(
                                 "Gatherings tapped"
                             )
                         }
                         
                     }
-
-
+                    
+                    
                     // MARK: - My Collections
-
+                    
                     KinSectionHeader(
                         title: "My Collections"
                     )
-
+                    
                     KinEmptyState(
                         icon: KinIcons.cookbooks,
                         title: "No Collections Yet",
                         message:
                             "Your saved recipes and cookbooks will appear here."
                     )
-
-
+                    
+                    
                     // MARK: - For You
-
+                    
                     KinSectionHeader(
                         title: "For You"
                     )
-
+                    
                     KinCard {
-
+                        
                         Text(
                             "Personalized recommendations will appear here."
                         )
@@ -189,23 +189,23 @@ struct HomeView: View {
             .task {
                 await loadHome()
             }
-
+            
             .refreshable {
-
+                
                 do {
                     notifications =
-                        try await NotificationService
-                            .fetchNotifications()
+                    try await NotificationService
+                        .fetchNotifications()
                 } catch {
                     print(
                         "HOME NOTIFICATION REFRESH ERROR:",
                         error.localizedDescription
                     )
                 }
-
+                
                 await loadHome()
             }
-
+            
             .onChange(of: scenePhase) {
                 if scenePhase == .active {
                     Task {
@@ -213,50 +213,57 @@ struct HomeView: View {
                     }
                 }
             }
-
-
+            
+            
             // MARK: - Add Recipe Destination
-
+            
             .navigationDestination(
                 isPresented: $showingAddRecipe
             ) {
-
+                
                 AddRecipeView()
             }
         }
     }
     // MARK: - Unread Notifications
-
+    
     private var unreadNotifications:
-        [KinNotification] {
-
+    [KinNotification] {
+        
         notifications.filter {
             !$0.isRead
         }
     }
-
+    
     // MARK: - Notification Card
-
+    
     private func homeNotificationCard(
         _ notification: KinNotification
     ) -> some View {
-
-        KinCard {
+        
+        let color =
+        homeNotificationColor(
+            for: notification.type
+        )
+        
+        return KinCard {
+            
             HStack(
                 alignment: .top,
                 spacing: KinSpacing.medium
             ) {
+                
                 ZStack {
+                    
                     Circle()
                         .fill(
-                            KinColors.primary
-                                .opacity(0.15)
+                            color.opacity(0.15)
                         )
                         .frame(
                             width: 44,
                             height: 44
                         )
-
+                    
                     Image(
                         systemName:
                             homeNotificationIcon(
@@ -264,15 +271,17 @@ struct HomeView: View {
                             )
                     )
                     .foregroundStyle(
-                        KinColors.primary
+                        color
                     )
                 }
-
+                
                 VStack(
                     alignment: .leading,
                     spacing: KinSpacing.xSmall
                 ) {
+                    
                     HStack {
+                        
                         Text(notification.title)
                             .font(
                                 KinTypography.headline
@@ -280,9 +289,9 @@ struct HomeView: View {
                             .foregroundStyle(
                                 KinColors.primaryText
                             )
-
+                        
                         Spacer()
-
+                        
                         Circle()
                             .fill(
                                 KinColors.primary
@@ -292,11 +301,11 @@ struct HomeView: View {
                                 height: 8
                             )
                     }
-
+                    
                     if let message =
                         notification.message,
                        !message.isEmpty {
-
+                        
                         Text(message)
                             .font(
                                 KinTypography.body
@@ -305,14 +314,14 @@ struct HomeView: View {
                                 KinColors.secondaryText
                             )
                     }
-
+                    
                     Text(
                         notification.createdAt,
                         format:
-                            .relative(
-                                presentation:
-                                    .named
-                            )
+                                .relative(
+                                    presentation:
+                                            .named
+                                )
                     )
                     .font(
                         KinTypography.caption
@@ -328,29 +337,49 @@ struct HomeView: View {
             )
         }
     }
-
+    
+    // MARK: - Notification Color
+    
+    private func homeNotificationColor(
+        for type: KinNotificationType
+    ) -> Color {
+        
+        switch type {
+            
+        case .invitationAccepted:
+            return .green
+            
+        case .invitationDeclined:
+            return KinColors.error
+            
+        default:
+            return KinColors.primary
+        }
+    }
+    
     // MARK: - Notification Icon
-
+    
     private func homeNotificationIcon(
         for type: KinNotificationType
     ) -> String {
-
+        
         switch type {
+            
         case .gatheringInvitation:
             return "envelope.fill"
-
+            
         case .invitationAccepted:
             return "checkmark.circle.fill"
-
+            
         case .invitationDeclined:
             return "xmark.circle.fill"
-
+            
         case .gatheringUpdated:
             return "calendar.badge.clock"
-
+            
         case .dishUpdated:
             return "fork.knife"
-
+            
         case .recipeShared:
             return "book.closed.fill"
         }
@@ -648,100 +677,6 @@ private extension HomeView {
         isLoadingGatherings = false
     }
 
-    // MARK: - Load Profile
-
-    @MainActor
-    func loadHomeProfile() async {
-
-        do {
-            let profile =
-                try await ProfileService
-                    .fetchCurrentProfile()
-
-            firstName =
-                profile.firstName?
-                    .trimmingCharacters(
-                        in: .whitespacesAndNewlines
-                    )
-                ?? ""
-
-        } catch is CancellationError {
-
-            return
-
-        } catch {
-
-            print(
-                "HOME PROFILE LOAD ERROR:",
-                error.localizedDescription
-            )
-        }
-    }
-
-    // MARK: - Load Gatherings
-
-    @MainActor
-    func loadHomeGatherings() async {
-
-        do {
-            let gatherings =
-                try await GatheringService
-                    .fetchUpcomingGatheringItems()
-
-            upcomingGatherings =
-                Array(
-                    gatherings.prefix(3)
-                )
-
-        } catch is CancellationError {
-
-            return
-
-        } catch {
-
-            print(
-                "HOME GATHERINGS LOAD ERROR:",
-                error.localizedDescription
-            )
-        }
-    }
-
-    // MARK: - Load Notifications
-
-    @MainActor
-    func loadHomeNotifications() async {
-
-        print("HOME NOTIFICATIONS: refresh started")
-
-        do {
-            let fetchedNotifications =
-                try await NotificationService
-                    .fetchNotifications()
-
-            print(
-                "HOME NOTIFICATIONS: fetched",
-                fetchedNotifications.count
-            )
-
-            notifications =
-                fetchedNotifications
-
-        } catch is CancellationError {
-
-            print(
-                "HOME NOTIFICATIONS: cancelled"
-            )
-
-            return
-
-        } catch {
-
-            print(
-                "HOME NOTIFICATION LOAD ERROR:",
-                error.localizedDescription
-            )
-        }
-    }
 }
 
 // MARK: - Gathering Helpers

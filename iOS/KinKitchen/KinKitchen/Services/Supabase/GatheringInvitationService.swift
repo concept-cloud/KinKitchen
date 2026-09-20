@@ -1,9 +1,3 @@
-//
-//  GatheringInvitationService.swift
-//  KinKitchen
-//
-//  Created by Greg Hudler on 9/17/26.
-//
 import Foundation
 import Supabase
 
@@ -144,31 +138,32 @@ enum GatheringInvitationService {
         status: InvitationStatus
     ) async throws -> GatheringParticipant {
 
-        let user =
-            try await SupabaseManager.client
-                .auth
-                .session
-                .user
+        struct Parameters: Encodable {
 
-        let payload =
-            GatheringParticipantStatusUpdate(
-                status: status,
-                respondedAt: Date()
+            let gatheringId: UUID
+            let status: String
+
+            enum CodingKeys:
+                String,
+                CodingKey {
+
+                case gatheringId = "p_gathering_id"
+                case status = "p_status"
+            }
+        }
+
+        let parameters =
+            Parameters(
+                gatheringId: gatheringId,
+                status: status.rawValue
             )
 
         let invitation: GatheringParticipant =
             try await SupabaseManager.client
-                .from("gathering_participants")
-                .update(payload)
-                .eq(
-                    "gathering_id",
-                    value: gatheringId
+                .rpc(
+                    "respond_to_gathering_invitation",
+                    params: parameters
                 )
-                .eq(
-                    "user_id",
-                    value: user.id
-                )
-                .select()
                 .single()
                 .execute()
                 .value
@@ -199,5 +194,4 @@ enum GatheringInvitationService {
             status: .declined
         )
     }
-    
 }
