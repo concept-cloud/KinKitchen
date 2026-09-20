@@ -56,6 +56,14 @@ struct RecipeDetailView: View {
     @State private var dietaryCheckResult: RecipeDietaryCheckResult?
     @State private var showAllergenWarningDetail = false
     
+    @State private var showingRecipientSelection = false
+    @State private var selectedShareRecipient: ProfileSearchResult?
+    @State private var recipientDietaryResult: RecipientRecipeDietaryCheckResult?
+    @State private var isEvaluatingShareRecipient = false
+    @State private var shareEvaluationError: String?
+    @State private var showingShareReview = false
+    @State private var shareSuccessMessage: String?
+    
     
     
     init(
@@ -98,6 +106,45 @@ struct RecipeDetailView: View {
             isPresented: $showingVersions
         ) {
             versionsSheet
+        }
+        .sheet(
+            isPresented: $showingRecipientSelection
+        ) {
+            RecipeRecipientSelectionView {
+                recipient in
+
+                selectedShareRecipient = recipient
+                showingRecipientSelection = false
+
+                Task {
+                    await evaluateShareRecipient(
+                        recipient
+                    )
+                }
+            }
+        }
+        .sheet(
+            isPresented: $showingShareReview
+        ) {
+            if let recipient =
+                selectedShareRecipient,
+               let dietaryResult =
+                recipientDietaryResult {
+
+                RecipeShareReviewView(
+                    recipeId: recipeId,
+                    recipient: recipient,
+                    dietaryResult: dietaryResult,
+                    onShared: {
+                        shareSuccessMessage =
+                            "Recipe shared with \(shareRecipientName(recipient))."
+
+                        selectedShareRecipient = nil
+                        recipientDietaryResult = nil
+                        shareEvaluationError = nil
+                    }
+                )
+            }
         }
 
         .navigationDestination(
@@ -184,7 +231,7 @@ struct RecipeDetailView: View {
                     tabs
 
                     tabContent(detail)
-
+                    shareRecipeSection
                     addToCookbookButton
                 }
                 .padding(KinSpacing.large)
@@ -1005,6 +1052,219 @@ struct RecipeDetailView: View {
             }
             .buttonStyle(.plain)
         }
+    }
+    
+    // MARK: - Share Recipe
+
+    private var shareRecipeSection: some View {
+        VStack(
+            alignment: .leading,
+            spacing: KinSpacing.medium
+        ) {
+            if isEvaluatingShareRecipient {
+                KinCard {
+                    HStack(
+                        spacing: KinSpacing.medium
+                    ) {
+                        ProgressView()
+                            .tint(KinColors.primary)
+
+                        VStack(
+                            alignment: .leading,
+                            spacing: KinSpacing.xSmall
+                        ) {
+                            Text("Checking Dietary Profile")
+                                .font(KinTypography.headline)
+                                .foregroundStyle(
+                                    KinColors.primaryText
+                                )
+
+                            Text(
+                                "Reviewing this recipe for the selected recipient."
+                            )
+                            .font(KinTypography.caption)
+                            .foregroundStyle(
+                                KinColors.secondaryText
+                            )
+                        }
+                    }
+                }
+            }
+
+            if let shareEvaluationError {
+                KinCard {
+                    HStack(
+                        alignment: .top,
+                        spacing: KinSpacing.medium
+                    ) {
+                        Image(
+                            systemName:
+                                "exclamationmark.triangle.fill"
+                        )
+                        .foregroundStyle(
+                            KinColors.error
+                        )
+
+                        Text(shareEvaluationError)
+                            .font(KinTypography.body)
+                            .foregroundStyle(
+                                KinColors.primaryText
+                            )
+                    }
+                }
+            }
+
+            if let shareSuccessMessage {
+                KinCard {
+                    HStack(
+                        alignment: .top,
+                        spacing: KinSpacing.medium
+                    ) {
+                        Image(
+                            systemName:
+                                "checkmark.circle.fill"
+                        )
+                        .foregroundStyle(
+                            KinColors.success
+                        )
+
+                        Text(shareSuccessMessage)
+                            .font(KinTypography.body)
+                            .foregroundStyle(
+                                KinColors.primaryText
+                            )
+                    }
+                }
+            }
+
+            Button {
+                shareEvaluationError = nil
+                shareSuccessMessage = nil
+                selectedShareRecipient = nil
+                recipientDietaryResult = nil
+                showingRecipientSelection = true
+            } label: {
+                Label(
+                    "Share Recipe",
+                    systemImage:
+                        "square.and.arrow.up"
+                )
+                .font(KinTypography.button)
+                .foregroundStyle(.white)
+                .frame(maxWidth: .infinity)
+                .padding(
+                    .vertical,
+                    KinSpacing.medium
+                )
+                .background(
+                    KinColors.primary
+                )
+                .clipShape(
+                    RoundedRectangle(
+                        cornerRadius:
+                            KinRadius.medium
+                    )
+                )
+            }
+            .buttonStyle(.plain)
+            .disabled(
+                isEvaluatingShareRecipient
+            )
+        }
+        .padding(
+            .top,
+            KinSpacing.medium
+        )
+    }
+
+    // MARK: - Evaluate Share Recipient
+
+    @MainActor
+    private func evaluateShareRecipient(
+        _ recipient: ProfileSearchResult
+    ) async {
+        guard !isEvaluatingShareRecipient else {
+            return
+        }
+
+        isEvaluatingShareRecipient = true
+        shareEvaluationError = nil
+        recipientDietaryResult = nil
+
+        defer {
+            isEvaluatingShareRecipient = false
+        }
+
+        do {
+            let result =
+                try await RecipeDietaryCheckService
+                    .checkRecipe(
+                        recipeId: recipeId,
+                        for: recipient.id
+                    )
+
+            guard
+                selectedShareRecipient?.id ==
+                    recipient.id
+            else {
+                return
+            }
+
+            recipientDietaryResult = result
+            showingShareReview = true
+        } catch {
+            guard
+                selectedShareRecipient?.id ==
+                    recipient.id
+            else {
+                return
+            }
+
+            shareEvaluationError =
+                "The recipient's dietary information could not be evaluated. Please try again."
+        }
+    }
+
+    // MARK: - Share Recipient Name
+
+    private func shareRecipientName(
+        _ recipient: ProfileSearchResult
+    ) -> String {
+        if let displayName =
+            cleaned(
+                recipient.displayName
+            ) {
+            return displayName
+        }
+
+        let firstName =
+            cleaned(
+                recipient.firstName
+            ) ?? ""
+
+        let lastName =
+            cleaned(
+                recipient.lastName
+            ) ?? ""
+
+        let fullName =
+            "\(firstName) \(lastName)"
+                .trimmingCharacters(
+                    in: .whitespacesAndNewlines
+                )
+
+        if !fullName.isEmpty {
+            return fullName
+        }
+
+        if let username =
+            cleaned(
+                recipient.username
+            ) {
+            return "@\(username)"
+        }
+
+        return "recipient"
     }
 
     // MARK: - Add to Cookbook

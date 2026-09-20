@@ -15,12 +15,15 @@ struct RecipesView: View {
     @State private var selectedFilter:
         RecipeFilter = .all
     @State private var recipes: [Recipe] = []
+    @State private var sharedRecipes: [Recipe] = []
     @State private var isLoading = true
     @State private var errorMessage: String?
     @State private var showingAddRecipe = false
     @State private var selectedRecipeId: UUID?
     @State private var recipePhotoData: [UUID: Data] = [:]
     @State private var showingFilterMessage = false
+    
+    
     var body: some View {
         NavigationStack {
             ZStack(
@@ -114,7 +117,8 @@ struct RecipesView: View {
             errorState(
                 message: errorMessage
             )
-        } else if recipes.isEmpty {
+        } else if recipes.isEmpty &&
+                    sharedRecipes.isEmpty {
             emptyState
         } else {
             recipeList
@@ -268,7 +272,9 @@ struct RecipesView: View {
                 KinColors.primaryText
             )
             Text(
-                "This feature is coming in Milestone B1."
+                selectedFilter == .shared
+                ? "Recipes shared with you will appear here."
+                : "This feature is coming in Milestone B1."
             )
             .font(
                 KinTypography.body
@@ -284,18 +290,35 @@ struct RecipesView: View {
         .padding(.vertical, KinSpacing.xLarge)
     }
     // MARK: - Filtered Recipes
-    private var filteredRecipes:
-        [Recipe] {
+
+    private var filteredRecipes: [Recipe] {
         switch selectedFilter {
         case .all:
-            return recipes
+            return combinedRecipes
+
         case .mine:
             return recipes
+
         case .shared:
-            return []
+            return sharedRecipes
+
         case .favorites:
             return []
         }
+    }
+
+    // MARK: - Combined Recipes
+
+    private var combinedRecipes: [Recipe] {
+        var seen: Set<UUID> = []
+
+        return (recipes + sharedRecipes)
+            .filter {
+                seen.insert($0.id).inserted
+            }
+            .sorted {
+                $0.updatedAt > $1.updatedAt
+            }
     }
     // MARK: - Recipe Card
     private func recipeCard(
@@ -555,26 +578,72 @@ Spacer()
         .padding(KinSpacing.large)
     }
     // MARK: - Load Recipes
+
     @MainActor
     private func loadRecipes() async {
         isLoading = true
         errorMessage = nil
+
         defer {
             isLoading = false
         }
+
         do {
-            recipes =
-                try await RecipeService
+            async let ownedRecipeRequest =
+                RecipeService
                     .fetchCurrentUserRecipes()
+
+            async let receivedShareRequest =
+                RecipeSharingService
+                    .fetchReceivedShares()
+
+            let ownedRecipes =
+                try await ownedRecipeRequest
+
+            let receivedShares =
+                try await receivedShareRequest
+
+            var receivedRecipes: [Recipe] = []
+
+            for share in receivedShares {
+                do {
+                    let recipe =
+                        try await RecipeService
+                            .fetchRecipe(
+                                id: share.recipeId
+                            )
+
+                    receivedRecipes.append(
+                        recipe
+                    )
+                } catch {
+                    print(
+                        "SHARED RECIPE LOAD ERROR:",
+                        error.localizedDescription
+                    )
+                }
+            }
+
+            recipes = ownedRecipes
+
+            var seen: Set<UUID> = []
+
+            sharedRecipes =
+                receivedRecipes.filter {
+                    seen.insert($0.id).inserted
+                }
         } catch {
             errorMessage =
                 "Please check your connection and try again."
+
             print(
                 "RECIPE LIST LOAD ERROR:",
                 error.localizedDescription
             )
         }
     }
+    
+    
     @MainActor
     private func loadRecipePhoto(
         for recipe: Recipe
