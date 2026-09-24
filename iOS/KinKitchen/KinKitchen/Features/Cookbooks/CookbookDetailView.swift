@@ -6,6 +6,8 @@
 //
 
 import SwiftUI
+import PhotosUI
+import UIKit
 
 struct CookbookDetailView: View {
 
@@ -14,6 +16,11 @@ struct CookbookDetailView: View {
     @Environment(\.dismiss) private var dismiss
 
     @State private var cookbook: Cookbook?
+    @State private var coverImage: UIImage?
+    @State private var selectedCoverItem: PhotosPickerItem?
+    @State private var isUpdatingCover = false
+    
+    
     @State private var recipes: [Recipe] = []
     @State private var selectedRecipeId: UUID?
     @State private var recipeToRemove: Recipe?
@@ -22,6 +29,7 @@ struct CookbookDetailView: View {
     @State private var errorMessage: String?
 
     @State private var isShowingRecipePicker = false
+    @State private var isShowingCoverPicker = false
     @State private var isRemovingRecipe = false
 
     var body: some View {
@@ -37,6 +45,21 @@ struct CookbookDetailView: View {
         }
         .refreshable {
             await loadCookbook()
+        }
+        .photosPicker(
+            isPresented: $isShowingCoverPicker,
+            selection: $selectedCoverItem,
+            matching: .images
+        )
+        .onChange(of: selectedCoverItem) {
+
+            guard selectedCoverItem != nil else {
+                return
+            }
+
+            Task {
+                await updateCookbookCover()
+            }
         }
         .sheet(
             isPresented: $isShowingRecipePicker
@@ -211,6 +234,17 @@ private extension CookbookDetailView {
                             systemImage: "plus"
                         )
                     }
+                    
+                    Button {
+                        isShowingCoverPicker = true
+                    } label: {
+                        Label(
+                            cookbook.coverPath == nil
+                                ? "Add Cover Image"
+                                : "Change Cover Image",
+                            systemImage: "photo"
+                        )
+                    }
 
                     Divider()
 
@@ -279,7 +313,9 @@ private extension CookbookDetailView {
     func cookbookCover(
         _ cookbook: Cookbook
     ) -> some View {
+
         ZStack {
+
             RoundedRectangle(
                 cornerRadius: KinRadius.medium
             )
@@ -287,24 +323,47 @@ private extension CookbookDetailView {
                 KinColors.primary.opacity(0.12)
             )
 
-            Image(
-                systemName: KinIcons.cookbooks
-            )
-            .font(
-                .system(
-                    size: 54,
-                    weight: .semibold
+            if let coverImage {
+
+                Image(
+                    uiImage: coverImage
                 )
-            )
-            .foregroundStyle(
-                KinColors.primary
-            )
+                .resizable()
+                .scaledToFill()
+
+            } else if isUpdatingCover {
+
+                ProgressView()
+                    .tint(
+                        KinColors.primary
+                    )
+
+            } else {
+
+                Image(
+                    systemName: KinIcons.cookbooks
+                )
+                .font(
+                    .system(
+                        size: 54,
+                        weight: .semibold
+                    )
+                )
+                .foregroundStyle(
+                    KinColors.primary
+                )
+            }
         }
         .frame(
             maxWidth: .infinity
         )
         .frame(
             height: 190
+        )
+        .clipShape(
+            RoundedRectangle(
+                cornerRadius: KinRadius.medium
+            )
         )
     }
 }
@@ -748,6 +807,9 @@ private extension CookbookDetailView {
 
             cookbook = loadedCookbook
             recipes = loadedRecipes
+            await loadCookbookCover(
+                path: loadedCookbook.coverPath
+            )
             isLoading = false
         } catch is CancellationError {
             isLoading = false
@@ -756,6 +818,104 @@ private extension CookbookDetailView {
                 error.localizedDescription
 
             isLoading = false
+        }
+    }
+}
+
+
+// MARK: - Cookbook Cover Loading
+
+private extension CookbookDetailView {
+
+    @MainActor
+    func loadCookbookCover(
+        path: String?
+    ) async {
+
+        guard let path,
+              !path.isEmpty else {
+
+            coverImage = nil
+            return
+        }
+
+        do {
+
+            let data =
+                try await CookbookService
+                    .fetchCookbookCover(
+                        path: path
+                    )
+
+            coverImage =
+                UIImage(data: data)
+
+        } catch is CancellationError {
+
+        } catch {
+
+            coverImage = nil
+        }
+    }
+
+    @MainActor
+    func updateCookbookCover() async {
+
+        guard let selectedCoverItem,
+              let cookbook,
+              !isUpdatingCover else {
+            return
+        }
+
+        isUpdatingCover = true
+        errorMessage = nil
+
+        do {
+
+            guard let data =
+                try await selectedCoverItem
+                    .loadTransferable(
+                        type: Data.self
+                    ),
+                  let image =
+                    UIImage(data: data),
+                  let jpegData =
+                    image.jpegData(
+                        compressionQuality: 0.85
+                    )
+            else {
+
+                isUpdatingCover = false
+                return
+            }
+
+            let updatedCookbook =
+                try await CookbookService
+                    .replaceCookbookCover(
+                        cookbook: cookbook,
+                        imageData: jpegData
+                    )
+
+            self.cookbook =
+                updatedCookbook
+
+            coverImage =
+                image
+
+            self.selectedCoverItem = nil
+
+            isUpdatingCover = false
+
+        } catch is CancellationError {
+
+            isUpdatingCover = false
+
+        } catch {
+
+            errorMessage =
+                error.localizedDescription
+
+            isUpdatingCover = false
         }
     }
 }

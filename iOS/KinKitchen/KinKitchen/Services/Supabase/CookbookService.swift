@@ -326,6 +326,71 @@ enum CookbookService {
         return recipes
     }
 
+    // MARK: - Cookbook Cover
+
+    static func uploadCookbookCover(
+        cookbookId: UUID,
+        imageData: Data
+    ) async throws -> String {
+
+        _ =
+            try await fetchCookbook(
+                id: cookbookId
+            )
+
+        let user =
+            try await SupabaseManager.client
+                .auth
+                .session
+                .user
+
+        let path =
+            "\(user.id.uuidString.lowercased())/\(cookbookId.uuidString.lowercased())/cover.jpg"
+
+        try await SupabaseManager.client.storage
+            .from("cookbook-covers")
+            .upload(
+                path,
+                data: imageData,
+                options: FileOptions(
+                    contentType: "image/jpeg",
+                    upsert: true
+                )
+            )
+
+        return path
+    }
+
+    static func fetchCookbookCover(
+        path: String
+    ) async throws -> Data {
+
+        try await SupabaseManager.client.storage
+            .from("cookbook-covers")
+            .download(
+                path: path
+            )
+    }
+
+    static func replaceCookbookCover(
+        cookbook: Cookbook,
+        imageData: Data
+    ) async throws -> Cookbook {
+
+        let path =
+            try await uploadCookbookCover(
+                cookbookId: cookbook.id,
+                imageData: imageData
+            )
+
+        return try await updateCookbook(
+            id: cookbook.id,
+            name: cookbook.name,
+            description: cookbook.description,
+            coverPath: path
+        )
+    }
+    
     // MARK: - Optional String Cleanup
 
     private static func cleanedOptionalString(

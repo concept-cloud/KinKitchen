@@ -6,6 +6,8 @@
 //
 
 import SwiftUI
+import PhotosUI
+import UIKit
 
 struct CreateCookbookView: View {
 
@@ -15,21 +17,32 @@ struct CreateCookbookView: View {
 
     @State private var name = ""
     @State private var description = ""
+    @State private var selectedPhotoItem: PhotosPickerItem?
+    @State private var selectedImageData: Data?
+    @State private var selectedImage: UIImage?
     @State private var isSaving = false
     @State private var errorMessage: String?
 
     var body: some View {
+
         NavigationStack {
+
             ZStack {
+
                 KinColors.background
                     .ignoresSafeArea()
 
                 ScrollView {
+
                     VStack(
                         alignment: .leading,
                         spacing: KinSpacing.xLarge
                     ) {
+
                         cookbookPreview
+
+                        coverSelection
+
                         cookbookInformation
 
                         if let errorMessage {
@@ -42,9 +55,11 @@ struct CreateCookbookView: View {
             .navigationTitle("Create Cookbook")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
+
                 ToolbarItem(
                     placement: .cancellationAction
                 ) {
+
                     Button("Cancel") {
                         dismiss()
                     }
@@ -54,7 +69,9 @@ struct CreateCookbookView: View {
                 ToolbarItem(
                     placement: .confirmationAction
                 ) {
+
                     Button("Save") {
+
                         Task {
                             await saveCookbook()
                         }
@@ -66,6 +83,11 @@ struct CreateCookbookView: View {
                 }
             }
             .interactiveDismissDisabled(isSaving)
+            .onChange(of: selectedPhotoItem) {
+                Task {
+                    await loadSelectedPhoto()
+                }
+            }
         }
     }
 }
@@ -75,10 +97,13 @@ struct CreateCookbookView: View {
 private extension CreateCookbookView {
 
     var cookbookPreview: some View {
+
         VStack(
             spacing: KinSpacing.medium
         ) {
+
             ZStack {
+
                 RoundedRectangle(
                     cornerRadius: KinRadius.medium
                 )
@@ -86,22 +111,38 @@ private extension CreateCookbookView {
                     KinColors.primary.opacity(0.12)
                 )
 
-                Image(
-                    systemName: KinIcons.cookbooks
-                )
-                .font(
-                    .system(
-                        size: 42,
-                        weight: .semibold
+                if let selectedImage {
+
+                    Image(
+                        uiImage: selectedImage
                     )
-                )
-                .foregroundStyle(
-                    KinColors.primary
-                )
+                    .resizable()
+                    .scaledToFill()
+
+                } else {
+
+                    Image(
+                        systemName: KinIcons.cookbooks
+                    )
+                    .font(
+                        .system(
+                            size: 42,
+                            weight: .semibold
+                        )
+                    )
+                    .foregroundStyle(
+                        KinColors.primary
+                    )
+                }
             }
             .frame(
-                width: 120,
-                height: 120
+                width: 160,
+                height: 160
+            )
+            .clipShape(
+                RoundedRectangle(
+                    cornerRadius: KinRadius.medium
+                )
             )
 
             Text(
@@ -122,7 +163,104 @@ private extension CreateCookbookView {
                 )
         }
         .frame(maxWidth: .infinity)
-        .padding(.vertical, KinSpacing.medium)
+        .padding(
+            .vertical,
+            KinSpacing.medium
+        )
+    }
+}
+
+// MARK: - Cover Selection
+
+private extension CreateCookbookView {
+
+    var coverSelection: some View {
+
+        VStack(
+            alignment: .leading,
+            spacing: KinSpacing.small
+        ) {
+
+            Text("Cover Image")
+                .font(KinTypography.headline)
+                .foregroundStyle(
+                    KinColors.primaryText
+                )
+
+            PhotosPicker(
+                selection: $selectedPhotoItem,
+                matching: .images
+            ) {
+
+                HStack(
+                    spacing: KinSpacing.medium
+                ) {
+
+                    Image(
+                        systemName:
+                            selectedImage == nil
+                            ? "photo.badge.plus"
+                            : "photo.badge.arrow.down"
+                    )
+                    .font(
+                        .system(
+                            size: 22,
+                            weight: .semibold
+                        )
+                    )
+                    .foregroundStyle(
+                        KinColors.primary
+                    )
+
+                    VStack(
+                        alignment: .leading,
+                        spacing: KinSpacing.xSmall
+                    ) {
+
+                        Text(
+                            selectedImage == nil
+                                ? "Choose Cover Image"
+                                : "Change Cover Image"
+                        )
+                        .font(
+                            KinTypography.headline
+                        )
+                        .foregroundStyle(
+                            KinColors.primaryText
+                        )
+
+                        Text(
+                            "Optional"
+                        )
+                        .font(
+                            KinTypography.caption
+                        )
+                        .foregroundStyle(
+                            KinColors.secondaryText
+                        )
+                    }
+
+                    Spacer()
+
+                    Image(
+                        systemName: "chevron.right"
+                    )
+                    .foregroundStyle(
+                        KinColors.secondaryText
+                    )
+                }
+                .padding(KinSpacing.medium)
+                .background(KinColors.surface)
+                .clipShape(
+                    RoundedRectangle(
+                        cornerRadius:
+                            KinRadius.medium
+                    )
+                )
+            }
+            .buttonStyle(.plain)
+            .disabled(isSaving)
+        }
     }
 }
 
@@ -131,10 +269,12 @@ private extension CreateCookbookView {
 private extension CreateCookbookView {
 
     var cookbookInformation: some View {
+
         VStack(
             alignment: .leading,
             spacing: KinSpacing.medium
         ) {
+
             Text("Cookbook Information")
                 .font(KinTypography.headline)
                 .foregroundStyle(
@@ -145,6 +285,7 @@ private extension CreateCookbookView {
                 alignment: .leading,
                 spacing: KinSpacing.small
             ) {
+
                 Text("Name")
                     .font(KinTypography.body)
                     .foregroundStyle(
@@ -173,6 +314,7 @@ private extension CreateCookbookView {
                 alignment: .leading,
                 spacing: KinSpacing.small
             ) {
+
                 Text("Description")
                     .font(KinTypography.body)
                     .foregroundStyle(
@@ -211,10 +353,12 @@ private extension CreateCookbookView {
     func errorCard(
         _ message: String
     ) -> some View {
+
         HStack(
             alignment: .top,
             spacing: KinSpacing.medium
         ) {
+
             Image(
                 systemName:
                     "exclamationmark.triangle.fill"
@@ -227,6 +371,7 @@ private extension CreateCookbookView {
                 alignment: .leading,
                 spacing: KinSpacing.xSmall
             ) {
+
                 Text("Unable to Create Cookbook")
                     .font(KinTypography.headline)
                     .foregroundStyle(
@@ -257,6 +402,7 @@ private extension CreateCookbookView {
 private extension CreateCookbookView {
 
     var cleanName: String {
+
         name.trimmingCharacters(
             in: .whitespacesAndNewlines
         )
@@ -267,12 +413,54 @@ private extension CreateCookbookView {
     }
 }
 
+// MARK: - Photo Selection
+
+private extension CreateCookbookView {
+
+    @MainActor
+    func loadSelectedPhoto() async {
+
+        guard let selectedPhotoItem else {
+            return
+        }
+
+        do {
+
+            guard let data =
+                try await selectedPhotoItem
+                    .loadTransferable(
+                        type: Data.self
+                    ),
+                  let image =
+                    UIImage(data: data),
+                  let jpegData =
+                    image.jpegData(
+                        compressionQuality: 0.85
+                    )
+            else {
+                return
+            }
+
+            selectedImage = image
+            selectedImageData = jpegData
+
+        } catch is CancellationError {
+
+        } catch {
+
+            errorMessage =
+                error.localizedDescription
+        }
+    }
+}
+
 // MARK: - Save
 
 private extension CreateCookbookView {
 
     @MainActor
     func saveCookbook() async {
+
         guard canSave else {
             return
         }
@@ -281,7 +469,8 @@ private extension CreateCookbookView {
         errorMessage = nil
 
         do {
-            let cookbook =
+
+            var cookbook =
                 try await CookbookService
                     .createCookbook(
                         name: cleanName,
@@ -289,13 +478,39 @@ private extension CreateCookbookView {
                         coverPath: nil
                     )
 
+            if let selectedImageData {
+
+                let coverPath =
+                    try await CookbookService
+                        .uploadCookbookCover(
+                            cookbookId: cookbook.id,
+                            imageData:
+                                selectedImageData
+                        )
+
+                cookbook =
+                    try await CookbookService
+                        .updateCookbook(
+                            id: cookbook.id,
+                            name: cookbook.name,
+                            description:
+                                cookbook.description,
+                            coverPath: coverPath
+                        )
+            }
+
             onCreated(cookbook)
 
             isSaving = false
+
             dismiss()
+
         } catch is CancellationError {
+
             isSaving = false
+
         } catch {
+
             errorMessage =
                 error.localizedDescription
 
@@ -305,5 +520,6 @@ private extension CreateCookbookView {
 }
 
 #Preview {
+
     CreateCookbookView { _ in }
 }
