@@ -16,8 +16,13 @@ struct CookbookDetailView: View {
     @State private var cookbook: Cookbook?
     @State private var recipes: [Recipe] = []
     @State private var selectedRecipeId: UUID?
+    @State private var recipeToRemove: Recipe?
+
     @State private var isLoading = true
     @State private var errorMessage: String?
+
+    @State private var isShowingRecipePicker = false
+    @State private var isRemovingRecipe = false
 
     var body: some View {
         ZStack {
@@ -33,9 +38,64 @@ struct CookbookDetailView: View {
         .refreshable {
             await loadCookbook()
         }
+        .sheet(
+            isPresented: $isShowingRecipePicker
+        ) {
+            AddCookbookRecipesView(
+                cookbookId: cookbookId,
+                existingRecipeIds: Set(
+                    recipes.map(\.id)
+                ),
+                onRecipesAdded: {
+                    await loadCookbook(
+                        showLoadingState: false
+                    )
+                }
+            )
+        }
+        .confirmationDialog(
+            "Remove Recipe?",
+            isPresented: Binding(
+                get: {
+                    recipeToRemove != nil
+                },
+                set: {
+                    if !$0 {
+                        recipeToRemove = nil
+                    }
+                }
+            ),
+            titleVisibility: .visible
+        ) {
+            if let recipeToRemove {
+                Button(
+                    "Remove \(recipeToRemove.name)",
+                    role: .destructive
+                ) {
+                    Task {
+                        await removeRecipe(
+                            recipeToRemove
+                        )
+                    }
+                }
+
+                Button(
+                    "Cancel",
+                    role: .cancel
+                ) {
+                    self.recipeToRemove = nil
+                }
+            }
+        } message: {
+            Text(
+                "This removes the recipe from this cookbook. The original recipe will not be deleted."
+            )
+        }
         .navigationDestination(
             isPresented: Binding(
-                get: { selectedRecipeId != nil },
+                get: {
+                    selectedRecipeId != nil
+                },
                 set: {
                     if !$0 {
                         selectedRecipeId = nil
@@ -143,6 +203,17 @@ private extension CookbookDetailView {
                 Spacer()
 
                 Menu {
+                    Button {
+                        isShowingRecipePicker = true
+                    } label: {
+                        Label(
+                            "Add Recipes",
+                            systemImage: "plus"
+                        )
+                    }
+
+                    Divider()
+
                     Button {
                     } label: {
                         Label(
@@ -286,6 +357,33 @@ private extension CookbookDetailView {
                     .foregroundStyle(
                         KinColors.secondaryText
                     )
+
+                Button {
+                    isShowingRecipePicker = true
+                } label: {
+                    Image(
+                        systemName: "plus"
+                    )
+                    .font(
+                        .system(
+                            size: 16,
+                            weight: .bold
+                        )
+                    )
+                    .foregroundStyle(.white)
+                    .frame(
+                        width: 34,
+                        height: 34
+                    )
+                    .background(
+                        KinColors.primary
+                    )
+                    .clipShape(Circle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(
+                    "Add Recipes"
+                )
             }
 
             if recipes.isEmpty {
@@ -295,12 +393,7 @@ private extension CookbookDetailView {
                     spacing: KinSpacing.medium
                 ) {
                     ForEach(recipes) { recipe in
-                        Button {
-                            selectedRecipeId = recipe.id
-                        } label: {
-                            recipeCard(recipe)
-                        }
-                        .buttonStyle(.plain)
+                        recipeRow(recipe)
                     }
                 }
             }
@@ -330,7 +423,7 @@ private extension CookbookDetailView {
                 )
 
             Text(
-                "Recipes added to this cookbook will appear here."
+                "Add recipes to start building this cookbook."
             )
             .font(
                 KinTypography.body
@@ -339,6 +432,37 @@ private extension CookbookDetailView {
                 KinColors.secondaryText
             )
             .multilineTextAlignment(.center)
+
+            Button {
+                isShowingRecipePicker = true
+            } label: {
+                Label(
+                    "Add Recipes",
+                    systemImage: "plus"
+                )
+                .font(
+                    KinTypography.headline
+                )
+                .foregroundStyle(.white)
+                .padding(
+                    .horizontal,
+                    KinSpacing.large
+                )
+                .padding(
+                    .vertical,
+                    KinSpacing.medium
+                )
+                .background(
+                    KinColors.primary
+                )
+                .clipShape(
+                    RoundedRectangle(
+                        cornerRadius:
+                            KinRadius.medium
+                    )
+                )
+            }
+            .buttonStyle(.plain)
         }
         .frame(
             maxWidth: .infinity
@@ -359,6 +483,44 @@ private extension CookbookDetailView {
                 cornerRadius: KinRadius.medium
             )
         )
+    }
+
+    func recipeRow(
+        _ recipe: Recipe
+    ) -> some View {
+        HStack(
+            spacing: KinSpacing.small
+        ) {
+            Button {
+                selectedRecipeId = recipe.id
+            } label: {
+                recipeCard(recipe)
+            }
+            .buttonStyle(.plain)
+
+            Button {
+                recipeToRemove = recipe
+            } label: {
+                Image(
+                    systemName: "minus.circle.fill"
+                )
+                .font(
+                    .system(size: 24)
+                )
+                .foregroundStyle(
+                    KinColors.error
+                )
+                .frame(
+                    width: 36,
+                    height: 44
+                )
+            }
+            .buttonStyle(.plain)
+            .disabled(isRemovingRecipe)
+            .accessibilityLabel(
+                "Remove \(recipe.name)"
+            )
+        }
     }
 
     func recipeCard(
@@ -556,8 +718,13 @@ private extension CookbookDetailView {
 private extension CookbookDetailView {
 
     @MainActor
-    func loadCookbook() async {
-        isLoading = true
+    func loadCookbook(
+        showLoadingState: Bool = true
+    ) async {
+        if showLoadingState {
+            isLoading = true
+        }
+
         errorMessage = nil
 
         do {
@@ -589,6 +756,412 @@ private extension CookbookDetailView {
                 error.localizedDescription
 
             isLoading = false
+        }
+    }
+}
+
+// MARK: - Remove Recipe
+
+private extension CookbookDetailView {
+
+    @MainActor
+    func removeRecipe(
+        _ recipe: Recipe
+    ) async {
+        guard !isRemovingRecipe else {
+            return
+        }
+
+        isRemovingRecipe = true
+
+        do {
+            try await CookbookService.removeRecipe(
+                recipeId: recipe.id,
+                from: cookbookId
+            )
+
+            recipeToRemove = nil
+
+            recipes.removeAll {
+                $0.id == recipe.id
+            }
+        } catch is CancellationError {
+            recipeToRemove = nil
+        } catch {
+            errorMessage =
+                error.localizedDescription
+
+            recipeToRemove = nil
+        }
+
+        isRemovingRecipe = false
+    }
+}
+
+// MARK: - Add Cookbook Recipes View
+
+private struct AddCookbookRecipesView: View {
+
+    let cookbookId: UUID
+    let existingRecipeIds: Set<UUID>
+    let onRecipesAdded: () async -> Void
+
+    @Environment(\.dismiss)
+    private var dismiss
+
+    @State private var recipes: [Recipe] = []
+    @State private var selectedRecipeIds:
+        Set<UUID> = []
+
+    @State private var isLoading = true
+    @State private var isSaving = false
+    @State private var errorMessage: String?
+
+    var body: some View {
+        NavigationStack {
+            ZStack {
+                KinColors.background
+                    .ignoresSafeArea()
+
+                content
+            }
+            .navigationTitle("Add Recipes")
+            .navigationBarTitleDisplayMode(
+                .inline
+            )
+            .toolbar {
+                ToolbarItem(
+                    placement: .cancellationAction
+                ) {
+                    Button("Cancel") {
+                        dismiss()
+                    }
+                    .disabled(isSaving)
+                }
+
+                ToolbarItem(
+                    placement: .confirmationAction
+                ) {
+                    Button("Add") {
+                        Task {
+                            await addSelectedRecipes()
+                        }
+                    }
+                    .disabled(
+                        selectedRecipeIds.isEmpty ||
+                        isSaving
+                    )
+                }
+            }
+            .task {
+                await loadRecipes()
+            }
+        }
+    }
+}
+
+// MARK: - Add Recipes Content
+
+private extension AddCookbookRecipesView {
+
+    @ViewBuilder
+    var content: some View {
+        if isLoading {
+            ProgressView()
+                .tint(
+                    KinColors.primary
+                )
+        } else if let errorMessage {
+            VStack(
+                spacing: KinSpacing.medium
+            ) {
+                Image(
+                    systemName:
+                        "exclamationmark.triangle.fill"
+                )
+                .font(
+                    .system(size: 36)
+                )
+                .foregroundStyle(
+                    KinColors.error
+                )
+
+                Text("Unable to Load Recipes")
+                    .font(
+                        KinTypography.title3
+                    )
+                    .foregroundStyle(
+                        KinColors.primaryText
+                    )
+
+                Text(errorMessage)
+                    .font(
+                        KinTypography.body
+                    )
+                    .foregroundStyle(
+                        KinColors.secondaryText
+                    )
+                    .multilineTextAlignment(
+                        .center
+                    )
+
+                Button("Try Again") {
+                    Task {
+                        await loadRecipes()
+                    }
+                }
+                .font(
+                    KinTypography.headline
+                )
+                .foregroundStyle(
+                    KinColors.primary
+                )
+            }
+            .padding(
+                KinSpacing.xLarge
+            )
+        } else if availableRecipes.isEmpty {
+            VStack(
+                spacing: KinSpacing.medium
+            ) {
+                Image(
+                    systemName: "checkmark.circle"
+                )
+                .font(
+                    .system(size: 42)
+                )
+                .foregroundStyle(
+                    KinColors.primary
+                )
+
+                Text("All Recipes Added")
+                    .font(
+                        KinTypography.title3
+                    )
+                    .foregroundStyle(
+                        KinColors.primaryText
+                    )
+
+                Text(
+                    "All of your recipes are already in this cookbook."
+                )
+                .font(
+                    KinTypography.body
+                )
+                .foregroundStyle(
+                    KinColors.secondaryText
+                )
+                .multilineTextAlignment(
+                    .center
+                )
+            }
+            .padding(
+                KinSpacing.xLarge
+            )
+        } else {
+            recipeList
+        }
+    }
+
+    var availableRecipes: [Recipe] {
+        recipes.filter {
+            !existingRecipeIds.contains(
+                $0.id
+            )
+        }
+    }
+}
+
+// MARK: - Add Recipes List
+
+private extension AddCookbookRecipesView {
+
+    var recipeList: some View {
+        ScrollView {
+            LazyVStack(
+                spacing: KinSpacing.medium
+            ) {
+                ForEach(
+                    availableRecipes
+                ) { recipe in
+                    Button {
+                        toggleRecipe(recipe)
+                    } label: {
+                        recipeSelectionCard(
+                            recipe
+                        )
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(isSaving)
+                }
+            }
+            .padding(
+                KinSpacing.large
+            )
+        }
+    }
+
+    func recipeSelectionCard(
+        _ recipe: Recipe
+    ) -> some View {
+        HStack(
+            spacing: KinSpacing.medium
+        ) {
+            ZStack {
+                RoundedRectangle(
+                    cornerRadius:
+                        KinRadius.medium
+                )
+                .fill(
+                    KinColors.primary
+                        .opacity(0.12)
+                )
+
+                Image(
+                    systemName:
+                        "fork.knife"
+                )
+                .font(
+                    .system(
+                        size: 22,
+                        weight: .semibold
+                    )
+                )
+                .foregroundStyle(
+                    KinColors.primary
+                )
+            }
+            .frame(
+                width: 56,
+                height: 56
+            )
+
+            Text(recipe.name)
+                .font(
+                    KinTypography.headline
+                )
+                .foregroundStyle(
+                    KinColors.primaryText
+                )
+                .multilineTextAlignment(
+                    .leading
+                )
+
+            Spacer()
+
+            Image(
+                systemName:
+                    selectedRecipeIds
+                        .contains(recipe.id)
+                    ? "checkmark.circle.fill"
+                    : "circle"
+            )
+            .font(
+                .system(size: 24)
+            )
+            .foregroundStyle(
+                selectedRecipeIds
+                    .contains(recipe.id)
+                ? KinColors.primary
+                : KinColors.secondaryText
+            )
+        }
+        .padding(
+            KinSpacing.medium
+        )
+        .background(
+            KinColors.surface
+        )
+        .clipShape(
+            RoundedRectangle(
+                cornerRadius:
+                    KinRadius.medium
+            )
+        )
+    }
+}
+
+// MARK: - Recipe Selection
+
+private extension AddCookbookRecipesView {
+
+    func toggleRecipe(
+        _ recipe: Recipe
+    ) {
+        if selectedRecipeIds.contains(
+            recipe.id
+        ) {
+            selectedRecipeIds.remove(
+                recipe.id
+            )
+        } else {
+            selectedRecipeIds.insert(
+                recipe.id
+            )
+        }
+    }
+}
+
+// MARK: - Load Available Recipes
+
+private extension AddCookbookRecipesView {
+
+    @MainActor
+    func loadRecipes() async {
+        isLoading = true
+        errorMessage = nil
+
+        do {
+            recipes =
+                try await RecipeService
+                    .fetchCurrentUserRecipes()
+
+            isLoading = false
+        } catch is CancellationError {
+            isLoading = false
+        } catch {
+            errorMessage =
+                error.localizedDescription
+
+            isLoading = false
+        }
+    }
+}
+
+// MARK: - Add Selected Recipes
+
+private extension AddCookbookRecipesView {
+
+    @MainActor
+    func addSelectedRecipes() async {
+        guard !selectedRecipeIds.isEmpty,
+              !isSaving else {
+            return
+        }
+
+        isSaving = true
+        errorMessage = nil
+
+        do {
+            for recipeId in selectedRecipeIds {
+                _ =
+                    try await CookbookService
+                        .addRecipe(
+                            recipeId: recipeId,
+                            to: cookbookId
+                        )
+            }
+
+            await onRecipesAdded()
+
+            dismiss()
+        } catch is CancellationError {
+            isSaving = false
+        } catch {
+            errorMessage =
+                error.localizedDescription
+
+            isSaving = false
         }
     }
 }
