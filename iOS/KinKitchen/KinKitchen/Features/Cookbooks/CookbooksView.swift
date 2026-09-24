@@ -27,6 +27,13 @@ struct CookbooksView: View {
                 }
             }
             .navigationBarHidden(true)
+            .navigationDestination(
+                for: UUID.self
+            ) { cookbookId in
+                CookbookDetailView(
+                    cookbookId: cookbookId
+                )
+            }
             .task {
                 await loadCookbooks()
             }
@@ -145,6 +152,7 @@ private extension CookbooksView {
         _ cookbook: Cookbook
     ) -> some View {
         Button {
+            navigationPath.append(cookbook.id)
         } label: {
             HStack(
                 spacing: KinSpacing.medium
