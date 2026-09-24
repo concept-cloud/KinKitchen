@@ -25,6 +25,7 @@ struct GatheringDetailView: View {
     
     @State private var gatheringNeeds: [GatheringNeed] = []
     @State private var gatheringClaims: [GatheringNeedClaim] = []
+    @State private var gatheringRequirements: [GatheringNeedRequirement] = []
     
     @State private var contributorProfiles: [Profile] = []
     @State private var currentUserId: UUID?
@@ -1497,6 +1498,14 @@ private extension GatheringDetailView {
             )
         )
     }
+    
+    func requirements(
+        for need: GatheringNeed
+    ) -> [GatheringNeedRequirement] {
+        gatheringRequirements.filter {
+            $0.gatheringNeedId == need.id
+        }
+    }
 
     func gatheringNeedCard(
         _ need: GatheringNeed
@@ -1533,6 +1542,49 @@ private extension GatheringDetailView {
                 Text(need.category.displayName)
                     .font(KinTypography.footnote)
                     .foregroundStyle(KinColors.secondaryText)
+
+                let equipment =
+                    requirements(
+                        for: need
+                    )
+
+                if !equipment.isEmpty {
+                    HStack(
+                        spacing: KinSpacing.xSmall
+                    ) {
+                        Image(
+                            systemName:
+                                "wrench.and.screwdriver.fill"
+                        )
+
+                        Text(
+                            equipment
+                                .map {
+                                    if $0.need == .other,
+                                       let description =
+                                        $0.description?
+                                            .trimmingCharacters(
+                                                in:
+                                                    .whitespacesAndNewlines
+                                            ),
+                                       !description.isEmpty {
+                                        return description
+                                    }
+
+                                    return $0.need.displayName
+                                }
+                                .joined(
+                                    separator: " • "
+                                )
+                        )
+                    }
+                    .font(
+                        KinTypography.caption
+                    )
+                    .foregroundStyle(
+                        KinColors.secondaryText
+                    )
+                }
 
                 if need.quantityNeeded > 1 {
                     Text(
@@ -2284,6 +2336,21 @@ private extension GatheringDetailView {
             let loadedNeeds =
                 try await needsRequest
 
+            var loadedRequirements:
+                [GatheringNeedRequirement] = []
+
+            for need in loadedNeeds {
+                let requirements =
+                    try await GatheringDishService
+                        .fetchNeedRequirements(
+                            needId: need.id
+                        )
+
+                loadedRequirements.append(
+                    contentsOf: requirements
+                )
+            }
+
             async let claimsRequest =
                 GatheringDishService
                     .fetchClaims(
@@ -2316,6 +2383,9 @@ private extension GatheringDetailView {
 
             gatheringClaims =
                 loadedClaims
+
+            gatheringRequirements =
+                loadedRequirements
 
             contributorProfiles =
                 loadedProfiles
@@ -2359,6 +2429,7 @@ private extension GatheringDetailView {
             isHost = false
             isLoading = false
             gatheringClaims = []
+            gatheringRequirements = []
             contributorProfiles = []
             currentUserId = nil
             currentParticipant = nil
