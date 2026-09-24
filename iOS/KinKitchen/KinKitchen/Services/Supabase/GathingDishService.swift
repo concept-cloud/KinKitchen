@@ -226,6 +226,181 @@ enum GatheringDishService {
             )
             .execute()
     }
+    
+    // MARK: - Duplicate Dish Comparison
+
+    static func findPotentialDuplicateNeed(
+        gatheringId: UUID,
+        proposedName: String
+    ) async -> GatheringNeed? {
+        let normalizedProposedName =
+            normalizedDishName(
+                proposedName
+            )
+
+        guard !normalizedProposedName.isEmpty else {
+            return nil
+        }
+
+        do {
+            let existingNeeds =
+                try await fetchNeeds(
+                    gatheringId: gatheringId
+                )
+
+            let dishNeeds =
+                existingNeeds.filter {
+                    !isStandaloneSupplyNeed($0)
+                }
+
+            if let exactMatch =
+                dishNeeds.first(
+                    where: {
+                        normalizedDishName(
+                            $0.name
+                        ) == normalizedProposedName
+                    }
+                ) {
+                return exactMatch
+            }
+
+            let proposedWords =
+                dishWords(
+                    normalizedProposedName
+                )
+
+            guard !proposedWords.isEmpty else {
+                return nil
+            }
+
+            var bestMatch:
+                GatheringNeed?
+
+            var bestScore = 0.0
+
+            for existingNeed in dishNeeds {
+                let normalizedExistingName =
+                    normalizedDishName(
+                        existingNeed.name
+                    )
+
+                let existingWords =
+                    dishWords(
+                        normalizedExistingName
+                    )
+
+                guard !existingWords.isEmpty else {
+                    continue
+                }
+
+                let sharedWords =
+                    proposedWords.intersection(
+                        existingWords
+                    )
+
+                guard !sharedWords.isEmpty else {
+                    continue
+                }
+
+                let longestCount =
+                    max(
+                        proposedWords.count,
+                        existingWords.count
+                    )
+
+                let wordScore =
+                    Double(sharedWords.count) /
+                    Double(longestCount)
+
+                let containsName =
+                    normalizedProposedName.contains(
+                        normalizedExistingName
+                    ) ||
+                    normalizedExistingName.contains(
+                        normalizedProposedName
+                    )
+
+                let score =
+                    containsName
+                    ? max(wordScore, 0.75)
+                    : wordScore
+
+                if score >= 0.60,
+                   score > bestScore {
+                    bestScore = score
+                    bestMatch = existingNeed
+                }
+            }
+
+            return bestMatch
+
+        } catch {
+            return nil
+        }
+    }
+
+    private static func normalizedDishName(
+        _ name: String
+    ) -> String {
+        name
+            .folding(
+                options: [
+                    .diacriticInsensitive,
+                    .caseInsensitive
+                ],
+                locale: .current
+            )
+            .lowercased()
+            .components(
+                separatedBy:
+                    CharacterSet
+                        .alphanumerics
+                        .inverted
+            )
+            .filter {
+                !$0.isEmpty
+            }
+            .joined(
+                separator: " "
+            )
+    }
+
+    private static func dishWords(
+        _ normalizedName: String
+    ) -> Set<String> {
+        let ignoredWords: Set<String> = [
+            "a",
+            "an",
+            "and",
+            "of",
+            "the",
+            "with"
+        ]
+
+        return Set(
+            normalizedName
+                .split(
+                    separator: " "
+                )
+                .map(String.init)
+                .filter {
+                    !ignoredWords.contains($0)
+                }
+        )
+    }
+
+    private static func isStandaloneSupplyNeed(
+        _ need: GatheringNeed
+    ) -> Bool {
+        DishSupply.allCases.contains {
+            $0.displayName
+                .caseInsensitiveCompare(
+                    need.name
+                ) == .orderedSame
+        } &&
+        need.category == .other &&
+        need.recipeId == nil
+    }
 
     // MARK: - Dish Needs
 
