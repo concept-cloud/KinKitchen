@@ -228,6 +228,8 @@ struct RecipeDetailView: View {
 
                     recipeInformation(detail.recipe)
 
+                    recipeLegacyInformation(detail.recipe)
+
                     tabs
 
                     tabContent(detail)
@@ -429,7 +431,118 @@ struct RecipeDetailView: View {
 
         }
     }
-    
+
+    // MARK: - Story and Legacy
+
+    @ViewBuilder
+    private func recipeLegacyInformation(
+        _ recipe: Recipe
+    ) -> some View {
+        let story = cleaned(recipe.story)
+        let contributor =
+            cleaned(recipe.originalContributor)
+
+        if story != nil || contributor != nil {
+            VStack(
+                alignment: .leading,
+                spacing: KinSpacing.medium
+            ) {
+                HStack(
+                    spacing: KinSpacing.small
+                ) {
+                    Image(
+                        systemName: "book.closed.fill"
+                    )
+                    .foregroundStyle(
+                        KinColors.primary
+                    )
+
+                    Text("Story & Legacy")
+                        .font(KinTypography.title3)
+                        .foregroundStyle(
+                            KinColors.primaryText
+                        )
+                }
+
+                KinCard {
+                    VStack(
+                        alignment: .leading,
+                        spacing: KinSpacing.large
+                    ) {
+                        if let contributor {
+                            VStack(
+                                alignment: .leading,
+                                spacing: KinSpacing.xSmall
+                            ) {
+                                Text(
+                                    "Original Contributor"
+                                )
+                                .font(
+                                    KinTypography.caption
+                                )
+                                .foregroundStyle(
+                                    KinColors.secondaryText
+                                )
+
+                                HStack(
+                                    spacing: KinSpacing.small
+                                ) {
+                                    Image(
+                                        systemName:
+                                            "person.fill"
+                                    )
+                                    .foregroundStyle(
+                                        KinColors.primary
+                                    )
+
+                                    Text(contributor)
+                                        .font(
+                                            KinTypography.title3
+                                        )
+                                        .foregroundStyle(
+                                            KinColors.primaryText
+                                        )
+                                }
+                            }
+                        }
+
+                        if contributor != nil &&
+                            story != nil {
+                            Divider()
+                        }
+
+                        if let story {
+                            VStack(
+                                alignment: .leading,
+                                spacing: KinSpacing.small
+                            ) {
+                                Text("The Story")
+                                    .font(
+                                        KinTypography.caption
+                                    )
+                                    .foregroundStyle(
+                                        KinColors.secondaryText
+                                    )
+
+                                Text(story)
+                                    .font(
+                                        KinTypography.body
+                                    )
+                                    .foregroundStyle(
+                                        KinColors.primaryText
+                                    )
+                                    .fixedSize(
+                                        horizontal: false,
+                                        vertical: true
+                                    )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     // MARK: - Allergen Warning
 
     @ViewBuilder
