@@ -13,6 +13,7 @@ struct CookbooksView: View {
     @State private var isLoading = true
     @State private var errorMessage: String?
     @State private var navigationPath = NavigationPath()
+    @State private var isShowingCreateCookbook = false
 
     var body: some View {
         NavigationStack(path: $navigationPath) {
@@ -32,6 +33,16 @@ struct CookbooksView: View {
             .refreshable {
                 await loadCookbooks()
             }
+            .sheet(
+                isPresented: $isShowingCreateCookbook
+            ) {
+                CreateCookbookView { cookbook in
+                    cookbooks.insert(
+                        cookbook,
+                        at: 0
+                    )
+                }
+            }
         }
     }
 }
@@ -49,6 +60,7 @@ private extension CookbooksView {
             Spacer()
 
             Button {
+                isShowingCreateCookbook = true
             } label: {
                 Image(systemName: "plus")
                     .font(
