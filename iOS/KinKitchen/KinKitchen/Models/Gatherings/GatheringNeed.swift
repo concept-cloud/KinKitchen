@@ -27,25 +27,34 @@ struct GatheringNeed: Codable, Identifiable, Hashable {
 // MARK: - Dish Category
 
 enum DishCategory: String, Codable, CaseIterable, Hashable {
+    case appetizer
     case entree
     case side
+    case salad
+    case bread
     case dessert
     case drink
-    case supplies
+    case condimentSauce = "condiment_sauce"
     case other
 
     var displayName: String {
         switch self {
+        case .appetizer:
+            return "Appetizer"
         case .entree:
             return "Entrée"
         case .side:
-            return "Side Dish"
+            return "Side"
+        case .salad:
+            return "Salad"
+        case .bread:
+            return "Bread"
         case .dessert:
             return "Dessert"
         case .drink:
             return "Drink"
-        case .supplies:
-            return "Supplies"
+        case .condimentSauce:
+            return "Condiment / Sauce"
         case .other:
             return "Other"
         }

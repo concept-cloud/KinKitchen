@@ -1707,16 +1707,22 @@ private extension GatheringDetailView {
         for category: DishCategory
     ) -> String {
         switch category {
+        case .appetizer:
+            return "takeoutbag.and.cup.and.straw"
         case .entree:
             return "fork.knife"
         case .side:
             return "takeoutbag.and.cup.and.straw"
+        case .salad:
+            return "leaf.fill"
+        case .bread:
+            return "basket.fill"
         case .dessert:
             return "birthday.cake"
         case .drink:
             return "cup.and.saucer"
-        case .supplies:
-            return "shippingbox"
+        case .condimentSauce:
+            return "takeoutbag.and.cup.and.straw"
         case .other:
             return "fork.knife"
         }
