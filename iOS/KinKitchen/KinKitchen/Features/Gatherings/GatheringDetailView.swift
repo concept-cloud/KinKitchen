@@ -1323,6 +1323,8 @@ private extension GatheringDetailView {
             )
 
             dishesSection
+
+            suppliesSection
         }
     }
 }
@@ -1443,13 +1445,13 @@ private extension GatheringDetailView {
                 }
             }
 
-            if gatheringNeeds.isEmpty {
+            if dishGatheringNeeds.isEmpty {
                 emptyDishesView
             } else {
                 VStack(
                     spacing: KinSpacing.medium
                 ) {
-                    ForEach(gatheringNeeds) { need in
+                    ForEach(dishGatheringNeeds) { need in
                         NavigationLink {
                             GatheringNeedDetailView(
                                 need: need,
@@ -1726,6 +1728,251 @@ private extension GatheringDetailView {
         case .other:
             return "fork.knife"
         }
+    }
+}
+
+// MARK: - Gathering Supplies
+
+private extension GatheringDetailView {
+
+    var dishGatheringNeeds: [GatheringNeed] {
+        gatheringNeeds.filter {
+            !isSupplyNeed($0)
+        }
+    }
+
+    var supplyGatheringNeeds: [GatheringNeed] {
+        gatheringNeeds.filter {
+            isSupplyNeed($0)
+        }
+    }
+
+    var suppliesSection: some View {
+        VStack(
+            alignment: .leading,
+            spacing: KinSpacing.medium
+        ) {
+            HStack {
+                Text("Supplies Needed")
+                    .font(
+                        KinTypography.sectionTitle
+                    )
+                    .foregroundStyle(
+                        KinColors.primaryText
+                    )
+
+                Spacer()
+
+                if isHost {
+                    NavigationLink {
+                        AddGatheringSuppliesView(
+                            gatheringId:
+                                gatheringId
+                        )
+                    } label: {
+                        Text("Add Supplies")
+                            .font(
+                                KinTypography.footnote
+                            )
+                            .foregroundStyle(
+                                KinColors.primary
+                            )
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+
+            if supplyGatheringNeeds.isEmpty {
+                emptySuppliesView
+            } else {
+                VStack(
+                    spacing: KinSpacing.medium
+                ) {
+                    ForEach(
+                        supplyGatheringNeeds
+                    ) { need in
+                        NavigationLink {
+                            GatheringNeedDetailView(
+                                need: need,
+                                isHost: isHost
+                            )
+                        } label: {
+                            supplyNeedCard(need)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+            }
+        }
+    }
+
+    var emptySuppliesView: some View {
+        VStack(
+            spacing: KinSpacing.medium
+        ) {
+            Image(
+                systemName: "shippingbox"
+            )
+            .font(
+                .system(
+                    size: 30,
+                    weight: .medium
+                )
+            )
+            .foregroundStyle(
+                KinColors.primary
+            )
+
+            Text("No supplies needed")
+                .font(
+                    KinTypography.headline
+                )
+                .foregroundStyle(
+                    KinColors.primaryText
+                )
+
+            Text(
+                "Gathering supplies will appear here."
+            )
+            .font(
+                KinTypography.footnote
+            )
+            .foregroundStyle(
+                KinColors.secondaryText
+            )
+        }
+        .frame(
+            maxWidth: .infinity
+        )
+        .padding(
+            .vertical,
+            KinSpacing.xLarge
+        )
+        .background(
+            KinColors.surface
+        )
+        .clipShape(
+            RoundedRectangle(
+                cornerRadius:
+                    KinRadius.large
+            )
+        )
+    }
+
+    func supplyNeedCard(
+        _ need: GatheringNeed
+    ) -> some View {
+        HStack(
+            spacing: KinSpacing.medium
+        ) {
+            ZStack {
+                Circle()
+                    .fill(
+                        KinColors.primary
+                            .opacity(0.10)
+                    )
+                    .frame(
+                        width: 46,
+                        height: 46
+                    )
+
+                Image(
+                    systemName:
+                        "shippingbox.fill"
+                )
+                .foregroundStyle(
+                    KinColors.primary
+                )
+            }
+
+            VStack(
+                alignment: .leading,
+                spacing: KinSpacing.xSmall
+            ) {
+                Text(need.name)
+                    .font(
+                        KinTypography.headline
+                    )
+                    .foregroundStyle(
+                        KinColors.primaryText
+                    )
+
+                if need.quantityNeeded > 1 {
+                    Text(
+                        "\(need.quantityNeeded) needed"
+                    )
+                    .font(
+                        KinTypography.caption
+                    )
+                    .foregroundStyle(
+                        KinColors.secondaryText
+                    )
+                }
+
+                Text(
+                    claimStatus(
+                        for: need
+                    )
+                )
+                .font(
+                    KinTypography.caption
+                )
+                .foregroundStyle(
+                    remainingQuantity(
+                        for: need
+                    ) == 0
+                    ? KinColors.success
+                    : KinColors.primary
+                )
+
+                if let contributor =
+                    contributorText(
+                        for: need
+                    ) {
+                    Text(contributor)
+                        .font(
+                            KinTypography.caption
+                        )
+                        .foregroundStyle(
+                            KinColors.secondaryText
+                        )
+                }
+            }
+
+            Spacer()
+
+            Image(
+                systemName: "chevron.right"
+            )
+            .font(
+                KinTypography.footnote
+            )
+            .foregroundStyle(
+                KinColors.secondaryText
+            )
+        }
+        .padding(
+            KinSpacing.large
+        )
+        .background(
+            KinColors.surface
+        )
+        .clipShape(
+            RoundedRectangle(
+                cornerRadius:
+                    KinRadius.large
+            )
+        )
+    }
+
+    func isSupplyNeed(
+        _ need: GatheringNeed
+    ) -> Bool {
+        DishSupply.allCases.contains {
+            $0.displayName == need.name
+        } &&
+        need.category == .other &&
+        need.recipeId == nil
     }
 }
 

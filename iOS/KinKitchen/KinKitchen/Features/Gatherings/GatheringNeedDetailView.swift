@@ -14,6 +14,7 @@ struct GatheringNeedDetailView: View {
     let need: GatheringNeed
     let isHost: Bool
     
+    @State private var currentNeed: GatheringNeed
     @State private var requirements: [GatheringNeedRequirement] = []
     @State private var supplies: [GatheringNeedSupply] = []
     @State private var claims: [GatheringNeedClaim] = []
@@ -23,9 +24,29 @@ struct GatheringNeedDetailView: View {
     @State private var showingRecipeDetail = false
     @State private var currentUserId: UUID?
     @State private var claimQuantity = 1
+    @State private var claimQuantityText = "1"
     @State private var isEditingClaim = false
     @State private var isClaiming = false
     @State private var claimErrorMessage: String?
+    @State private var isEditingNeed = false
+    @State private var needQuantityText = ""
+    @State private var isSavingNeed = false
+    @State private var needEditErrorMessage: String?
+
+    init(
+        need: GatheringNeed,
+        isHost: Bool
+    ) {
+        self.need = need
+        self.isHost = isHost
+        _currentNeed = State(
+            initialValue: need
+        )
+        _needQuantityText = State(
+            initialValue:
+                String(currentNeed.quantityNeeded)
+        )
+    }
 
     var body: some View {
         ZStack {
@@ -100,42 +121,92 @@ struct GatheringNeedDetailView: View {
 // MARK: - Header
 
 private extension GatheringNeedDetailView {
+
+    var isStandaloneSupply: Bool {
+        !supplies.isEmpty &&
+        requirements.isEmpty &&
+        currentNeed.category == .other &&
+        currentNeed.recipeId == nil &&
+        supplies.contains {
+            $0.supply.displayName ==
+                currentNeed.name
+        }
+    }
+
     var header: some View {
         ZStack {
-            Text("Dish Details")
-                .font(KinTypography.navigationTitle)
-                .foregroundStyle(KinColors.primaryText)
+            Text(
+                isStandaloneSupply
+                ? "Supply Details"
+                : "Dish Details"
+            )
+            .font(
+                KinTypography.navigationTitle
+            )
+            .foregroundStyle(
+                KinColors.primaryText
+            )
 
             HStack {
                 Button {
                     dismiss()
                 } label: {
-                    Image(systemName: "chevron.left")
-                        .font(
-                            .system(
-                                size: 20,
-                                weight: .semibold
-                            )
+                    Image(
+                        systemName: "chevron.left"
+                    )
+                    .font(
+                        .system(
+                            size: 20,
+                            weight: .semibold
                         )
-                        .foregroundStyle(KinColors.primaryText)
-                        .frame(
-                            width: 48,
-                            height: 48
-                        )
-                        .background(KinColors.surface)
-                        .clipShape(Circle())
+                    )
+                    .foregroundStyle(
+                        KinColors.primaryText
+                    )
+                    .frame(
+                        width: 48,
+                        height: 48
+                    )
+                    .background(
+                        KinColors.surface
+                    )
+                    .clipShape(
+                        Circle()
+                    )
                 }
                 .buttonStyle(.plain)
 
                 Spacer()
+
+                if isHost {
+                    Button {
+                        needQuantityText =
+                            String(
+                                currentNeed
+                                    .quantityNeeded
+                            )
+
+                        isEditingNeed = true
+                    } label: {
+                        Text("Edit")
+                            .font(
+                                KinTypography.callout
+                            )
+                            .foregroundStyle(
+                                KinColors.primary
+                            )
+                    }
+                    .buttonStyle(.plain)
+                }
             }
         }
     }
 }
 
-// MARK: - Dish Header
+// MARK: - Need Header
 
 private extension GatheringNeedDetailView {
+
     var dishHeader: some View {
         VStack(
             alignment: .leading,
@@ -148,7 +219,8 @@ private extension GatheringNeedDetailView {
                 ZStack {
                     Circle()
                         .fill(
-                            KinColors.primary.opacity(0.10)
+                            KinColors.primary
+                                .opacity(0.10)
                         )
                         .frame(
                             width: 58,
@@ -156,7 +228,10 @@ private extension GatheringNeedDetailView {
                         )
 
                     Image(
-                        systemName: dishIcon
+                        systemName:
+                            isStandaloneSupply
+                            ? "shippingbox.fill"
+                            : dishIcon
                     )
                     .font(
                         .system(
@@ -164,40 +239,63 @@ private extension GatheringNeedDetailView {
                             weight: .medium
                         )
                     )
-                    .foregroundStyle(KinColors.primary)
+                    .foregroundStyle(
+                        KinColors.primary
+                    )
                 }
 
                 VStack(
                     alignment: .leading,
                     spacing: KinSpacing.xSmall
                 ) {
-                    Text(need.name)
-                        .font(KinTypography.title2)
-                        .foregroundStyle(KinColors.primaryText)
+                    Text(
+                        currentNeed.name
+                    )
+                    .font(
+                        KinTypography.title2
+                    )
+                    .foregroundStyle(
+                        KinColors.primaryText
+                    )
 
-                    Text(need.category.displayName)
-                        .font(KinTypography.body)
-                        .foregroundStyle(KinColors.secondaryText)
+                    Text(
+                        isStandaloneSupply
+                        ? "Gathering Supply"
+                        : currentNeed
+                            .category
+                            .displayName
+                    )
+                    .font(
+                        KinTypography.body
+                    )
+                    .foregroundStyle(
+                        KinColors.secondaryText
+                    )
                 }
 
                 Spacer()
             }
         }
-        .padding(KinSpacing.large)
+        .padding(
+            KinSpacing.large
+        )
         .frame(
             maxWidth: .infinity,
             alignment: .leading
         )
-        .background(KinColors.surface)
+        .background(
+            KinColors.surface
+        )
         .clipShape(
             RoundedRectangle(
-                cornerRadius: KinRadius.large
+                cornerRadius:
+                    KinRadius.large
             )
         )
     }
 
     var dishIcon: String {
-        switch need.category {
+        switch currentNeed.category {
         case .appetizer:
             return "takeoutbag.and.cup.and.straw"
         case .entree:
@@ -219,6 +317,7 @@ private extension GatheringNeedDetailView {
         }
     }
 }
+
 
 // MARK: - Recipe
 
@@ -411,35 +510,245 @@ private extension GatheringNeedDetailView {
 }
 
 
-// MARK: - Dishes Needed
+// MARK: - Quantity Needed
 
 private extension GatheringNeedDetailView {
-    var dishesNeededSection: some View {
-        HStack {
-            VStack(
-                alignment: .leading,
-                spacing: KinSpacing.xSmall
-            ) {
-                Text("Dishes Needed")
-                    .font(KinTypography.headline)
-                    .foregroundStyle(KinColors.primaryText)
 
-                Text(claimStatusText)
-                    .font(KinTypography.footnote)
-                    .foregroundStyle(KinColors.secondaryText)
+    var dishesNeededSection: some View {
+        VStack(
+            alignment: .leading,
+            spacing: KinSpacing.medium
+        ) {
+            HStack {
+                VStack(
+                    alignment: .leading,
+                    spacing: KinSpacing.xSmall
+                ) {
+                    Text(
+                        isStandaloneSupply
+                        ? "Supplies Needed"
+                        : "Dishes Needed"
+                    )
+                    .font(
+                        KinTypography.headline
+                    )
+                    .foregroundStyle(
+                        KinColors.primaryText
+                    )
+
+                    Text(claimStatusText)
+                        .font(
+                            KinTypography.footnote
+                        )
+                        .foregroundStyle(
+                            KinColors.secondaryText
+                        )
+                }
+
+                Spacer()
+
+                Text(
+                    "\(currentNeed.quantityNeeded)"
+                )
+                .font(
+                    KinTypography.title2
+                )
+                .foregroundStyle(
+                    KinColors.primary
+                )
             }
 
-            Spacer()
+            if isEditingNeed {
+                Divider()
 
-            Text("\(need.quantityNeeded)")
-                .font(KinTypography.title2)
-                .foregroundStyle(KinColors.primary)
+                HStack(
+                    spacing: KinSpacing.medium
+                ) {
+                    Text("Quantity")
+                        .font(
+                            KinTypography.body
+                        )
+                        .foregroundStyle(
+                            KinColors.primaryText
+                        )
+
+                    Spacer()
+
+                    Button {
+                        changeNeedQuantity(
+                            by: -1
+                        )
+                    } label: {
+                        Image(
+                            systemName: "minus"
+                        )
+                        .frame(
+                            width: 44,
+                            height: 44
+                        )
+                        .background(
+                            KinColors.background
+                        )
+                        .clipShape(
+                            Circle()
+                        )
+                    }
+                    .buttonStyle(.plain)
+
+                    TextField(
+                        "1",
+                        text:
+                            $needQuantityText
+                    )
+                    .keyboardType(
+                        .numberPad
+                    )
+                    .multilineTextAlignment(
+                        .center
+                    )
+                    .font(
+                        KinTypography.headline
+                    )
+                    .foregroundStyle(
+                        KinColors.primaryText
+                    )
+                    .frame(width: 80)
+                    .padding(
+                        .vertical,
+                        KinSpacing.small
+                    )
+                    .background(
+                        KinColors.background
+                    )
+                    .clipShape(
+                        RoundedRectangle(
+                            cornerRadius:
+                                KinRadius.medium
+                        )
+                    )
+                    .onChange(
+                        of: needQuantityText
+                    ) { _, newValue in
+                        needQuantityText =
+                            newValue.filter {
+                                $0.isNumber
+                            }
+                    }
+
+                    Button {
+                        changeNeedQuantity(
+                            by: 1
+                        )
+                    } label: {
+                        Image(
+                            systemName: "plus"
+                        )
+                        .frame(
+                            width: 44,
+                            height: 44
+                        )
+                        .background(
+                            KinColors.background
+                        )
+                        .clipShape(
+                            Circle()
+                        )
+                    }
+                    .buttonStyle(.plain)
+                }
+
+                if let needEditErrorMessage {
+                    Text(
+                        needEditErrorMessage
+                    )
+                    .font(
+                        KinTypography.footnote
+                    )
+                    .foregroundStyle(
+                        KinColors.error
+                    )
+                }
+
+                HStack(
+                    spacing: KinSpacing.medium
+                ) {
+                    Button {
+                        isEditingNeed = false
+                        needEditErrorMessage = nil
+
+                        needQuantityText =
+                            String(
+                                currentNeed
+                                    .quantityNeeded
+                            )
+                    } label: {
+                        Text("Cancel")
+                            .font(
+                                KinTypography.headline
+                            )
+                            .foregroundStyle(
+                                KinColors.primary
+                            )
+                            .frame(
+                                maxWidth: .infinity
+                            )
+                            .padding(
+                                .vertical,
+                                KinSpacing.medium
+                            )
+                    }
+                    .buttonStyle(.plain)
+
+                    Button {
+                        Task {
+                            await saveNeedQuantity()
+                        }
+                    } label: {
+                        Text(
+                            isSavingNeed
+                            ? "Saving..."
+                            : "Save"
+                        )
+                        .font(
+                            KinTypography.headline
+                        )
+                        .foregroundStyle(
+                            Color.white
+                        )
+                        .frame(
+                            maxWidth: .infinity
+                        )
+                        .padding(
+                            .vertical,
+                            KinSpacing.medium
+                        )
+                        .background(
+                            KinColors.primary
+                        )
+                        .clipShape(
+                            RoundedRectangle(
+                                cornerRadius:
+                                    KinRadius.medium
+                            )
+                        )
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(
+                        isSavingNeed
+                    )
+                }
+            }
         }
-        .padding(KinSpacing.large)
-        .background(KinColors.surface)
+        .padding(
+            KinSpacing.large
+        )
+        .background(
+            KinColors.surface
+        )
         .clipShape(
             RoundedRectangle(
-                cornerRadius: KinRadius.large
+                cornerRadius:
+                    KinRadius.large
             )
         )
     }
@@ -452,7 +761,8 @@ private extension GatheringNeedDetailView {
 
         let remaining =
             max(
-                need.quantityNeeded - claimed,
+                currentNeed.quantityNeeded -
+                    claimed,
                 0
             )
 
@@ -465,6 +775,81 @@ private extension GatheringNeedDetailView {
         }
 
         return "\(remaining) remaining"
+    }
+
+    func changeNeedQuantity(
+        by amount: Int
+    ) {
+        let current =
+            Int(needQuantityText) ??
+            currentNeed.quantityNeeded
+
+        needQuantityText =
+            String(
+                max(
+                    1,
+                    current + amount
+                )
+            )
+    }
+
+    @MainActor
+    func saveNeedQuantity() async {
+        guard
+            let quantity =
+                Int(needQuantityText),
+            quantity > 0
+        else {
+            needEditErrorMessage =
+                "Enter a valid quantity."
+            return
+        }
+
+        isSavingNeed = true
+        needEditErrorMessage = nil
+
+        do {
+            let updated =
+                try await GatheringDishService
+                    .updateNeed(
+                        id: currentNeed.id,
+                        name: currentNeed.name,
+                        category:
+                            currentNeed.category,
+                        quantityNeeded:
+                            quantity,
+                        recipeId:
+                            currentNeed.recipeId,
+                        notes:
+                            currentNeed.notes,
+                        needs:
+                            Set(
+                                requirements.map {
+                                    $0.need
+                                }
+                            ),
+                        supplies:
+                            Set(
+                                supplies.map {
+                                    $0.supply
+                                }
+                            )
+                    )
+
+            currentNeed = updated
+            needQuantityText =
+                String(
+                    updated.quantityNeeded
+                )
+
+            isEditingNeed = false
+
+        } catch {
+            needEditErrorMessage =
+                error.localizedDescription
+        }
+
+        isSavingNeed = false
     }
 }
 
@@ -479,7 +864,8 @@ private extension GatheringNeedDetailView {
 
     var remainingQuantity: Int {
         max(
-            need.quantityNeeded - totalClaimed,
+            currentNeed.quantityNeeded -
+                totalClaimed,
             0
         )
     }
@@ -622,6 +1008,11 @@ private extension GatheringNeedDetailView {
                             claimQuantity =
                                 currentUserClaim.quantity
 
+                            claimQuantityText =
+                                String(
+                                    currentUserClaim.quantity
+                                )
+
                             isEditingClaim = false
                         } label: {
                             Text("Cancel")
@@ -637,6 +1028,11 @@ private extension GatheringNeedDetailView {
                         Button {
                             claimQuantity =
                                 currentUserClaim.quantity
+
+                            claimQuantityText =
+                                String(
+                                    currentUserClaim.quantity
+                                )
 
                             isEditingClaim = true
                         } label: {
@@ -788,60 +1184,162 @@ private extension GatheringNeedDetailView {
     func claimQuantityControl(
         maximum: Int
     ) -> some View {
-        HStack {
-            Text("Dishes")
-                .font(KinTypography.body)
-                .foregroundStyle(
-                    KinColors.primaryText
-                )
+        HStack(
+            spacing: KinSpacing.medium
+        ) {
+            Text(
+                isStandaloneSupply
+                ? "Quantity"
+                : "Dishes"
+            )
+            .font(
+                KinTypography.body
+            )
+            .foregroundStyle(
+                KinColors.primaryText
+            )
 
             Spacer()
 
-            HStack(
-                spacing: KinSpacing.medium
-            ) {
-                Button {
-                    if claimQuantity > 1 {
-                        claimQuantity -= 1
-                    }
-                } label: {
-                    Image(systemName: "minus")
-                        .frame(
-                            width: 44,
-                            height: 44
-                        )
-                }
-                .buttonStyle(.plain)
-                .disabled(
-                    claimQuantity <= 1
+            Button {
+                let current =
+                    validatedClaimQuantity(
+                        maximum: maximum
+                    )
+
+                let newValue =
+                    max(
+                        1,
+                        current - 1
+                    )
+
+                claimQuantity =
+                    newValue
+
+                claimQuantityText =
+                    String(newValue)
+
+            } label: {
+                Image(
+                    systemName: "minus"
                 )
-
-                Text("\(claimQuantity)")
-                    .font(KinTypography.headline)
-                    .foregroundStyle(
-                        KinColors.primaryText
-                    )
-                    .frame(
-                        minWidth: 30
-                    )
-
-                Button {
-                    if claimQuantity < maximum {
-                        claimQuantity += 1
-                    }
-                } label: {
-                    Image(systemName: "plus")
-                        .frame(
-                            width: 44,
-                            height: 44
-                        )
-                }
-                .buttonStyle(.plain)
-                .disabled(
-                    claimQuantity >= maximum
+                .frame(
+                    width: 44,
+                    height: 44
+                )
+                .background(
+                    KinColors.background
+                )
+                .clipShape(
+                    Circle()
                 )
             }
+            .buttonStyle(.plain)
+            .disabled(
+                claimQuantity <= 1
+            )
+
+            TextField(
+                "1",
+                text: $claimQuantityText
+            )
+            .keyboardType(
+                .numberPad
+            )
+            .multilineTextAlignment(
+                .center
+            )
+            .font(
+                KinTypography.headline
+            )
+            .foregroundStyle(
+                KinColors.primaryText
+            )
+            .frame(width: 80)
+            .padding(
+                .vertical,
+                KinSpacing.small
+            )
+            .background(
+                KinColors.background
+            )
+            .clipShape(
+                RoundedRectangle(
+                    cornerRadius:
+                        KinRadius.medium
+                )
+            )
+            .onChange(
+                of: claimQuantityText
+            ) { _, newValue in
+                let digits =
+                    newValue.filter {
+                        $0.isNumber
+                    }
+
+                claimQuantityText =
+                    digits
+
+                if let value = Int(digits) {
+                    claimQuantity =
+                        min(
+                            max(1, value),
+                            maximum
+                        )
+                }
+            }
+
+            Button {
+                let current =
+                    validatedClaimQuantity(
+                        maximum: maximum
+                    )
+
+                let newValue =
+                    min(
+                        maximum,
+                        current + 1
+                    )
+
+                claimQuantity =
+                    newValue
+
+                claimQuantityText =
+                    String(newValue)
+
+            } label: {
+                Image(
+                    systemName: "plus"
+                )
+                .frame(
+                    width: 44,
+                    height: 44
+                )
+                .background(
+                    KinColors.background
+                )
+                .clipShape(
+                    Circle()
+                )
+            }
+            .buttonStyle(.plain)
+            .disabled(
+                claimQuantity >= maximum
+            )
         }
+    }
+
+    func validatedClaimQuantity(
+        maximum: Int
+    ) -> Int {
+        let typed =
+            Int(claimQuantityText) ??
+            claimQuantity
+
+        return min(
+            max(1, typed),
+            maximum
+        )
     }
 
     @MainActor
@@ -854,6 +1352,17 @@ private extension GatheringNeedDetailView {
             return
         }
 
+        claimQuantity =
+            validatedClaimQuantity(
+                maximum:
+                    currentUserClaim == nil
+                    ? remainingQuantity
+                    : maximumClaimQuantity
+            )
+
+        claimQuantityText =
+            String(claimQuantity)
+        
         isClaiming = true
         claimErrorMessage = nil
 
@@ -872,6 +1381,7 @@ private extension GatheringNeedDetailView {
                     )
 
             claimQuantity = 1
+            claimQuantityText = "1"
         } catch {
             claimErrorMessage =
                 error.localizedDescription
@@ -886,6 +1396,17 @@ private extension GatheringNeedDetailView {
             return
         }
 
+        claimQuantity =
+            validatedClaimQuantity(
+                maximum:
+                    currentUserClaim == nil
+                    ? remainingQuantity
+                    : maximumClaimQuantity
+            )
+
+        claimQuantityText =
+            String(claimQuantity)
+        
         isClaiming = true
         claimErrorMessage = nil
 
