@@ -15,6 +15,7 @@ enum RecipeService {
     static func createRecipe(
         name: String,
         description: String?,
+        story: String? = nil,
         instructions: String?,
         servings: Int?,
         prepTimeMinutes: Int?,
@@ -41,6 +42,10 @@ enum RecipeService {
                 description:
                     cleanedOptionalString(
                         description
+                    ),
+                story:
+                    cleanedOptionalString(
+                        story
                     ),
                 instructions:
                     cleanedOptionalString(
@@ -157,6 +162,7 @@ enum RecipeService {
         id recipeId: UUID,
         name: String,
         description: String?,
+        story: String? = nil,
         instructions: String?,
         servings: Int?,
         prepTimeMinutes: Int?,
@@ -180,6 +186,10 @@ enum RecipeService {
                 description:
                     cleanedOptionalString(
                         description
+                    ),
+                story:
+                    cleanedOptionalString(
+                        story
                     ),
                 instructions:
                     cleanedOptionalString(
