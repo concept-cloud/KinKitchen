@@ -14,6 +14,7 @@ struct CookbooksView: View {
     @State private var errorMessage: String?
     @State private var navigationPath = NavigationPath()
     @State private var isShowingCreateCookbook = false
+    @State private var selectedCookbookId: UUID?
 
     var body: some View {
         NavigationStack(path: $navigationPath) {
@@ -33,6 +34,11 @@ struct CookbooksView: View {
                 CookbookDetailView(
                     cookbookId: cookbookId
                 )
+                .onDisappear {
+                    Task {
+                        await loadCookbooks()
+                    }
+                }
             }
             .task {
                 await loadCookbooks()

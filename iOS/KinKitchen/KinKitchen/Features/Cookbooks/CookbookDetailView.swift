@@ -31,6 +31,9 @@ struct CookbookDetailView: View {
     @State private var isShowingRecipePicker = false
     @State private var isShowingCoverPicker = false
     @State private var isRemovingRecipe = false
+    @State private var isShowingEditCookbook = false
+    @State private var isShowingDeleteConfirmation = false
+    @State private var isDeletingCookbook = false
 
     var body: some View {
         ZStack {
@@ -74,6 +77,42 @@ struct CookbookDetailView: View {
                         showLoadingState: false
                     )
                 }
+            )
+        }
+        .sheet(
+            isPresented: $isShowingEditCookbook
+        ) {
+            if let cookbook {
+                EditCookbookView(
+                    cookbook: cookbook,
+                    onUpdated: { updatedCookbook in
+                        self.cookbook = updatedCookbook
+                    }
+                )
+            }
+        }
+        .confirmationDialog(
+            "Delete Cookbook?",
+            isPresented: $isShowingDeleteConfirmation,
+            titleVisibility: .visible
+        ) {
+            Button(
+                "Delete Cookbook",
+                role: .destructive
+            ) {
+                Task {
+                    await deleteCookbook()
+                }
+            }
+
+            Button(
+                "Cancel",
+                role: .cancel
+            ) {
+            }
+        } message: {
+            Text(
+                "This permanently deletes the cookbook and removes its recipe organization. Your original recipes will not be deleted."
             )
         }
         .confirmationDialog(
@@ -249,6 +288,7 @@ private extension CookbookDetailView {
                     Divider()
 
                     Button {
+                        isShowingEditCookbook = true
                     } label: {
                         Label(
                             "Edit Cookbook",
@@ -259,6 +299,7 @@ private extension CookbookDetailView {
                     Button(
                         role: .destructive
                     ) {
+                        isShowingDeleteConfirmation = true
                     } label: {
                         Label(
                             "Delete Cookbook",
@@ -920,6 +961,43 @@ private extension CookbookDetailView {
     }
 }
 
+// MARK: - Delete Cookbook
+
+private extension CookbookDetailView {
+
+    @MainActor
+    func deleteCookbook() async {
+
+        guard !isDeletingCookbook else {
+            return
+        }
+
+        isDeletingCookbook = true
+        errorMessage = nil
+
+        do {
+
+            try await CookbookService
+                .deleteCookbook(
+                    id: cookbookId
+                )
+
+            dismiss()
+
+        } catch is CancellationError {
+
+            isDeletingCookbook = false
+
+        } catch {
+
+            errorMessage =
+                error.localizedDescription
+
+            isDeletingCookbook = false
+        }
+    }
+}
+
 // MARK: - Remove Recipe
 
 private extension CookbookDetailView {
@@ -957,6 +1035,341 @@ private extension CookbookDetailView {
         isRemovingRecipe = false
     }
 }
+
+// MARK: - Edit Cookbook View
+
+private struct EditCookbookView: View {
+
+    let cookbook: Cookbook
+    let onUpdated: (Cookbook) -> Void
+
+    @Environment(\.dismiss)
+    private var dismiss
+
+    @State private var name: String
+    @State private var description: String
+
+    @State private var isSaving = false
+    @State private var errorMessage: String?
+
+    init(
+        cookbook: Cookbook,
+        onUpdated: @escaping (Cookbook) -> Void
+    ) {
+        self.cookbook = cookbook
+        self.onUpdated = onUpdated
+
+        _name =
+            State(
+                initialValue: cookbook.name
+            )
+
+        _description =
+            State(
+                initialValue:
+                    cookbook.description ?? ""
+            )
+    }
+
+    var body: some View {
+
+        NavigationStack {
+
+            ZStack {
+
+                KinColors.background
+                    .ignoresSafeArea()
+
+                ScrollView {
+
+                    VStack(
+                        alignment: .leading,
+                        spacing: KinSpacing.xLarge
+                    ) {
+
+                        cookbookInformation
+
+                        if let errorMessage {
+                            errorCard(
+                                errorMessage
+                            )
+                        }
+                    }
+                    .padding(
+                        KinSpacing.large
+                    )
+                }
+            }
+            .navigationTitle(
+                "Edit Cookbook"
+            )
+            .navigationBarTitleDisplayMode(
+                .inline
+            )
+            .toolbar {
+
+                ToolbarItem(
+                    placement:
+                        .cancellationAction
+                ) {
+
+                    Button("Cancel") {
+                        dismiss()
+                    }
+                    .disabled(isSaving)
+                }
+
+                ToolbarItem(
+                    placement:
+                        .confirmationAction
+                ) {
+
+                    Button("Save") {
+
+                        Task {
+                            await saveCookbook()
+                        }
+                    }
+                    .fontWeight(.semibold)
+                    .disabled(
+                        !canSave ||
+                        isSaving
+                    )
+                }
+            }
+            .interactiveDismissDisabled(
+                isSaving
+            )
+        }
+    }
+}
+
+// MARK: - Edit Cookbook Information
+
+private extension EditCookbookView {
+
+    var cookbookInformation: some View {
+
+        VStack(
+            alignment: .leading,
+            spacing: KinSpacing.medium
+        ) {
+
+            Text("Cookbook Information")
+                .font(
+                    KinTypography.headline
+                )
+                .foregroundStyle(
+                    KinColors.primaryText
+                )
+
+            VStack(
+                alignment: .leading,
+                spacing: KinSpacing.small
+            ) {
+
+                Text("Name")
+                    .font(
+                        KinTypography.body
+                    )
+                    .foregroundStyle(
+                        KinColors.primaryText
+                    )
+
+                TextField(
+                    "Cookbook Name",
+                    text: $name
+                )
+                .textInputAutocapitalization(
+                    .words
+                )
+                .submitLabel(.done)
+                .padding(
+                    KinSpacing.medium
+                )
+                .background(
+                    KinColors.surface
+                )
+                .clipShape(
+                    RoundedRectangle(
+                        cornerRadius:
+                            KinRadius.medium
+                    )
+                )
+            }
+
+            VStack(
+                alignment: .leading,
+                spacing: KinSpacing.small
+            ) {
+
+                Text("Description")
+                    .font(
+                        KinTypography.body
+                    )
+                    .foregroundStyle(
+                        KinColors.primaryText
+                    )
+
+                TextField(
+                    "Add a description...",
+                    text: $description,
+                    axis: .vertical
+                )
+                .lineLimit(4...8)
+                .padding(
+                    KinSpacing.medium
+                )
+                .background(
+                    KinColors.surface
+                )
+                .clipShape(
+                    RoundedRectangle(
+                        cornerRadius:
+                            KinRadius.medium
+                    )
+                )
+
+                Text("Optional")
+                    .font(
+                        KinTypography.caption
+                    )
+                    .foregroundStyle(
+                        KinColors.secondaryText
+                    )
+            }
+        }
+    }
+}
+
+// MARK: - Edit Cookbook Error
+
+private extension EditCookbookView {
+
+    func errorCard(
+        _ message: String
+    ) -> some View {
+
+        HStack(
+            alignment: .top,
+            spacing: KinSpacing.medium
+        ) {
+
+            Image(
+                systemName:
+                    "exclamationmark.triangle.fill"
+            )
+            .foregroundStyle(
+                KinColors.error
+            )
+
+            VStack(
+                alignment: .leading,
+                spacing: KinSpacing.xSmall
+            ) {
+
+                Text(
+                    "Unable to Update Cookbook"
+                )
+                .font(
+                    KinTypography.headline
+                )
+                .foregroundStyle(
+                    KinColors.primaryText
+                )
+
+                Text(message)
+                    .font(
+                        KinTypography.body
+                    )
+                    .foregroundStyle(
+                        KinColors.secondaryText
+                    )
+            }
+
+            Spacer()
+        }
+        .padding(
+            KinSpacing.medium
+        )
+        .background(
+            KinColors.surface
+        )
+        .clipShape(
+            RoundedRectangle(
+                cornerRadius:
+                    KinRadius.medium
+            )
+        )
+    }
+}
+
+// MARK: - Edit Cookbook Validation
+
+private extension EditCookbookView {
+
+    var cleanName: String {
+
+        name.trimmingCharacters(
+            in: .whitespacesAndNewlines
+        )
+    }
+
+    var canSave: Bool {
+        !cleanName.isEmpty
+    }
+}
+
+// MARK: - Save Cookbook Changes
+
+private extension EditCookbookView {
+
+    @MainActor
+    func saveCookbook() async {
+
+        guard canSave,
+              !isSaving else {
+            return
+        }
+
+        isSaving = true
+        errorMessage = nil
+
+        do {
+
+            let updatedCookbook =
+                try await CookbookService
+                    .updateCookbook(
+                        id: cookbook.id,
+                        name: cleanName,
+                        description:
+                            description,
+                        coverPath:
+                            cookbook.coverPath
+                    )
+
+            onUpdated(
+                updatedCookbook
+            )
+
+            isSaving = false
+
+            dismiss()
+
+        } catch is CancellationError {
+
+            isSaving = false
+
+        } catch {
+
+            errorMessage =
+                error.localizedDescription
+
+            isSaving = false
+        }
+    }
+}
+
 
 // MARK: - Add Cookbook Recipes View
 
