@@ -15,6 +15,8 @@ struct AddRecipeView: View {
 
     @State private var recipeName = ""
     @State private var recipeDescription = ""
+    @State private var recipeStory = ""
+    @State private var originalContributor = ""
     
     @State private var selectedPhotoItem: PhotosPickerItem?
     @State private var selectedPhotoData: Data?
@@ -91,6 +93,7 @@ struct AddRecipeView: View {
                                 .clipShape(RoundedRectangle(cornerRadius: KinRadius.medium))
                         }
                         
+                        legacySection
                         servingsSection
                         timesSection
                         categorySection
@@ -285,6 +288,63 @@ struct AddRecipeView: View {
         }
     }
 
+    // MARK: - Story and Legacy
+
+    private var legacySection: some View {
+        VStack(
+            alignment: .leading,
+            spacing: KinSpacing.medium
+        ) {
+            Text("Story & Legacy")
+                .font(KinTypography.title)
+                .foregroundStyle(KinColors.primaryText)
+
+            Text(
+                "Preserve the person and story connected to this recipe."
+            )
+            .font(KinTypography.caption)
+            .foregroundStyle(KinColors.secondaryText)
+
+            fieldSection(
+                title: "Original Contributor"
+            ) {
+                TextField(
+                    "Grandma Rose",
+                    text: $originalContributor
+                )
+                .font(KinTypography.body)
+                .foregroundStyle(KinColors.primaryText)
+                .textInputAutocapitalization(.words)
+                .padding(KinSpacing.medium)
+                .background(KinColors.surface)
+                .clipShape(
+                    RoundedRectangle(
+                        cornerRadius: KinRadius.medium
+                    )
+                )
+            }
+
+            fieldSection(
+                title: "Recipe Story"
+            ) {
+                TextEditor(
+                    text: $recipeStory
+                )
+                .font(KinTypography.body)
+                .foregroundStyle(KinColors.primaryText)
+                .frame(minHeight: 140)
+                .padding(KinSpacing.small)
+                .scrollContentBackground(.hidden)
+                .background(KinColors.surface)
+                .clipShape(
+                    RoundedRectangle(
+                        cornerRadius: KinRadius.medium
+                    )
+                )
+            }
+        }
+    }
+    
     private var servingsSection: some View {
         HStack {
             Text("Servings")
@@ -1032,6 +1092,13 @@ struct AddRecipeView: View {
                 description: cleanedOptionalString(
                     recipeDescription
                 ),
+                story: cleanedOptionalString(
+                    recipeStory
+                ),
+                originalContributor:
+                    cleanedOptionalString(
+                        originalContributor
+                    ),
                 instructions: instructionText,
                 servings: servings,
                 prepTimeMinutes: Int(prepTime),
@@ -1097,6 +1164,9 @@ struct AddRecipeView: View {
                             id: recipe.id,
                             name: recipe.name,
                             description: recipe.description,
+                            story: recipe.story,
+                            originalContributor:
+                                recipe.originalContributor,
                             instructions: recipe.instructions,
                             servings: recipe.servings,
                             prepTimeMinutes:

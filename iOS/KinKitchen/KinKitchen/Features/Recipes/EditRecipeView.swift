@@ -34,6 +34,8 @@ struct EditRecipeView: View {
 
     @State private var recipeName = ""
     @State private var recipeDescription = ""
+    @State private var recipeStory = ""
+    @State private var originalContributor = ""
     @State private var category = ""
 
     @State private var servings = ""
@@ -136,9 +138,9 @@ struct EditRecipeView: View {
 
                     recipeDetailsSection
 
-                    ingredientsSection
+                    legacySection
 
-                    instructionsSection
+                    ingredientsSection
 
                     saveButton
 
@@ -404,7 +406,52 @@ struct EditRecipeView: View {
         }
     }
 
+    // MARK: - Story and Legacy
 
+    private var legacySection: some View {
+        VStack(
+            alignment: .leading,
+            spacing: KinSpacing.medium
+        ) {
+            KinSectionHeader(
+                title: "Story & Legacy"
+            )
+
+            fieldCard {
+                VStack(
+                    alignment: .leading,
+                    spacing: KinSpacing.medium
+                ) {
+                    fieldLabel(
+                        "Original Contributor"
+                    )
+
+                    TextField(
+                        "Grandma Rose",
+                        text: $originalContributor
+                    )
+                    .textInputAutocapitalization(
+                        .words
+                    )
+                    .submitLabel(.next)
+
+                    Divider()
+
+                    fieldLabel(
+                        "Recipe Story"
+                    )
+
+                    TextField(
+                        "Tell the story behind this recipe...",
+                        text: $recipeStory,
+                        axis: .vertical
+                    )
+                    .lineLimit(5...12)
+                }
+            }
+        }
+    }
+    
     // MARK: - Ingredients
 
     private var ingredientsSection: some View {
@@ -1282,6 +1329,12 @@ struct EditRecipeView: View {
 
             recipeDescription =
                 recipe.description ?? ""
+            
+            recipeStory =
+                recipe.story ?? ""
+
+            originalContributor =
+                recipe.originalContributor ?? ""
 
             category =
                 recipe.category ?? ""
@@ -1465,6 +1518,14 @@ struct EditRecipeView: View {
                     description: cleanedOptionalString(
                         recipeDescription
                     ),
+                    story:
+                        cleanedOptionalString(
+                            recipeStory
+                        ),
+                    originalContributor:
+                        cleanedOptionalString(
+                            originalContributor
+                        ),
                     instructions: cleanedOptionalString(
                         instructionText
                     ),
