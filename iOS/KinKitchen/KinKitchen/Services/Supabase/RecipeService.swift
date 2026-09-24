@@ -16,6 +16,7 @@ enum RecipeService {
         name: String,
         description: String?,
         story: String? = nil,
+        originalContributor: String? = nil,
         instructions: String?,
         servings: Int?,
         prepTimeMinutes: Int?,
@@ -46,6 +47,10 @@ enum RecipeService {
                 story:
                     cleanedOptionalString(
                         story
+                    ),
+                originalContributor:
+                    cleanedOptionalString(
+                        originalContributor
                     ),
                 instructions:
                     cleanedOptionalString(
@@ -163,6 +168,7 @@ enum RecipeService {
         name: String,
         description: String?,
         story: String? = nil,
+        originalContributor: String? = nil,
         instructions: String?,
         servings: Int?,
         prepTimeMinutes: Int?,
@@ -190,6 +196,10 @@ enum RecipeService {
                 story:
                     cleanedOptionalString(
                         story
+                    ),
+                originalContributor:
+                    cleanedOptionalString(
+                        originalContributor
                     ),
                 instructions:
                     cleanedOptionalString(

@@ -15,6 +15,7 @@ struct Recipe: Codable, Identifiable, Hashable {
     var name: String
     var description: String?
     var story: String?
+    var originalContributor: String?
     var instructions: String?
     var servings: Int?
 
@@ -38,6 +39,7 @@ struct Recipe: Codable, Identifiable, Hashable {
         case name
         case description
         case story
+        case originalContributor = "original_contributor"
         case instructions
         case servings
         case prepTimeMinutes = "prep_time_minutes"
@@ -59,6 +61,7 @@ struct RecipeCreate: Encodable {
     let name: String
     let description: String?
     let story: String?
+    let originalContributor: String?
     let instructions: String?
     let servings: Int?
     let prepTimeMinutes: Int?
@@ -73,6 +76,7 @@ struct RecipeCreate: Encodable {
         name: String,
         description: String?,
         story: String? = nil,
+        originalContributor: String? = nil,
         instructions: String?,
         servings: Int?,
         prepTimeMinutes: Int?,
@@ -86,6 +90,7 @@ struct RecipeCreate: Encodable {
         self.name = name
         self.description = description
         self.story = story
+        self.originalContributor = originalContributor
         self.instructions = instructions
         self.servings = servings
         self.prepTimeMinutes = prepTimeMinutes
@@ -101,6 +106,7 @@ struct RecipeCreate: Encodable {
         case name
         case description
         case story
+        case originalContributor = "original_contributor"
         case instructions
         case servings
         case prepTimeMinutes = "prep_time_minutes"
@@ -121,6 +127,7 @@ struct RecipeUpdate: Encodable {
 
     let description: String?
     let story: String?
+    let originalContributor: String?
     let instructions: String?
     let servings: Int?
 
@@ -138,6 +145,8 @@ struct RecipeUpdate: Encodable {
         case description
         
         case story
+        
+        case originalContributor = "original_contributor"
 
         case instructions
 
