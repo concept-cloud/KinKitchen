@@ -16,6 +16,7 @@ struct AddDishView: View {
     @State private var servings = 1
     @State private var notes = ""
     @State private var selectedNeeds: Set<DishNeed> = []
+    @State private var otherNeedDescription = ""
     @State private var selectedSupplies: Set<DishSupply> = []
 
     @State private var selectedRecipe: Recipe?
@@ -324,6 +325,24 @@ private extension AddDishView {
                     needButton(need)
                 }
             }
+
+            if selectedNeeds.contains(.other) {
+                VStack(
+                    alignment: .leading,
+                    spacing: KinSpacing.small
+                ) {
+                    Text("Other Equipment Need")
+                        .font(KinTypography.footnote)
+                        .foregroundStyle(
+                            KinColors.secondaryText
+                        )
+
+                    KinTextField(
+                        title: "Describe equipment needed",
+                        text: $otherNeedDescription
+                    )
+                }
+            }
         }
     }
 
@@ -336,6 +355,10 @@ private extension AddDishView {
         return Button {
             if isSelected {
                 selectedNeeds.remove(need)
+
+                if need == .other {
+                    otherNeedDescription = ""
+                }
             } else {
                 selectedNeeds.insert(need)
             }
@@ -654,6 +677,20 @@ private extension AddDishView {
             return
         }
 
+        if selectedNeeds.contains(.other) {
+            let cleanOtherNeed =
+                otherNeedDescription
+                    .trimmingCharacters(
+                        in: .whitespacesAndNewlines
+                    )
+
+            guard !cleanOtherNeed.isEmpty else {
+                errorMessage =
+                    "Please describe the other equipment need."
+                return
+            }
+        }
+        
         isSaving = true
 
         defer {
@@ -678,6 +715,10 @@ private extension AddDishView {
                             notes,
                         needs:
                             selectedNeeds,
+                        otherNeedDescription:
+                            selectedNeeds.contains(.other)
+                            ? otherNeedDescription
+                            : nil,
                         supplies:
                             selectedSupplies
                     )

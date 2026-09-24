@@ -20,6 +20,7 @@ enum GatheringDishService {
         recipeId: UUID? = nil,
         notes: String? = nil,
         needs: Set<DishNeed> = [],
+        otherNeedDescription: String? = nil,
         supplies: Set<DishSupply> = []
     ) async throws -> GatheringNeed {
 
@@ -58,7 +59,13 @@ enum GatheringDishService {
                 let needPayloads = needs.map {
                     GatheringNeedRequirementCreate(
                         gatheringNeedId: createdNeed.id,
-                        need: $0
+                        need: $0,
+                        description:
+                            $0 == .other
+                            ? cleanedOptionalString(
+                                otherNeedDescription
+                            )
+                            : nil
                     )
                 }
 
@@ -242,9 +249,9 @@ enum GatheringDishService {
 
     static func replaceNeedRequirements(
         needId: UUID,
-        needs: Set<DishNeed>
+        needs: Set<DishNeed>,
+        otherNeedDescription: String? = nil
     ) async throws {
-
         try await SupabaseManager.client
             .from("gathering_need_needs")
             .delete()
@@ -261,7 +268,13 @@ enum GatheringDishService {
         let payloads = needs.map {
             GatheringNeedRequirementCreate(
                 gatheringNeedId: needId,
-                need: $0
+                need: $0,
+                description:
+                    $0 == .other
+                    ? cleanedOptionalString(
+                        otherNeedDescription
+                    )
+                    : nil
             )
         }
 
@@ -658,10 +671,12 @@ enum GatheringDishService {
 private struct GatheringNeedRequirementCreate: Encodable {
     let gatheringNeedId: UUID
     let need: DishNeed
+    let description: String?
 
     enum CodingKeys: String, CodingKey {
         case gatheringNeedId = "gathering_need_id"
         case need
+        case description
     }
 }
 

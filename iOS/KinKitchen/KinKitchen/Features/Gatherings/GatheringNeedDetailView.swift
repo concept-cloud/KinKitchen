@@ -952,31 +952,84 @@ private extension GatheringNeedDetailView {
         ) {
             Text("Dish Needs")
                 .font(KinTypography.headline)
-                .foregroundStyle(KinColors.primaryText)
+                .foregroundStyle(
+                    KinColors.primaryText
+                )
 
-            FlowLayout(
+            VStack(
                 spacing: KinSpacing.small
             ) {
                 ForEach(
                     requirements,
                     id: \.need
                 ) { requirement in
-                    Text(requirement.need.displayName)
-                        .font(KinTypography.footnote)
-                        .foregroundStyle(KinColors.primaryText)
-                        .padding(
-                            .horizontal,
-                            KinSpacing.medium
-                        )
-                        .padding(
-                            .vertical,
-                            KinSpacing.small
-                        )
-                        .background(KinColors.surface)
-                        .clipShape(Capsule())
+                    requirementRow(requirement)
                 }
             }
         }
+    }
+
+    func requirementRow(
+        _ requirement: GatheringNeedRequirement
+    ) -> some View {
+        HStack(
+            alignment: .top,
+            spacing: KinSpacing.medium
+        ) {
+            Image(
+                systemName:
+                    requirement.need == .other
+                    ? "wrench.and.screwdriver"
+                    : "checkmark.circle.fill"
+            )
+            .font(KinTypography.body)
+            .foregroundStyle(
+                KinColors.primary
+            )
+
+            VStack(
+                alignment: .leading,
+                spacing: KinSpacing.xSmall
+            ) {
+                Text(
+                    requirement.need.displayName
+                )
+                .font(KinTypography.body)
+                .foregroundStyle(
+                    KinColors.primaryText
+                )
+
+                if let description =
+                    requirement.description?
+                        .trimmingCharacters(
+                            in: .whitespacesAndNewlines
+                        ),
+                   !description.isEmpty {
+                    Text(description)
+                        .font(
+                            KinTypography.footnote
+                        )
+                        .foregroundStyle(
+                            KinColors.secondaryText
+                        )
+                }
+            }
+
+            Spacer()
+        }
+        .padding(KinSpacing.large)
+        .frame(
+            maxWidth: .infinity,
+            alignment: .leading
+        )
+        .background(
+            KinColors.surface
+        )
+        .clipShape(
+            RoundedRectangle(
+                cornerRadius: KinRadius.medium
+            )
+        )
     }
 }
 

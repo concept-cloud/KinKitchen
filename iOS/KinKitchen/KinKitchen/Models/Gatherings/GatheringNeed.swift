@@ -74,6 +74,7 @@ enum DishNeed: String, Codable, CaseIterable, Hashable {
     case keepWarm = "keep_warm"
     case keepCold = "keep_cold"
     case prepSpace = "prep_space"
+    case other
 
     var displayName: String {
         switch self {
@@ -97,6 +98,8 @@ enum DishNeed: String, Codable, CaseIterable, Hashable {
             return "Keep Cold"
         case .prepSpace:
             return "Prep Space"
+        case .other:
+            return "Other"
         }
     }
 }
@@ -175,10 +178,12 @@ struct GatheringNeedClaim: Codable, Identifiable, Hashable {
 struct GatheringNeedRequirement: Codable, Hashable {
     let gatheringNeedId: UUID
     let need: DishNeed
+    let description: String?
 
     enum CodingKeys: String, CodingKey {
         case gatheringNeedId = "gathering_need_id"
         case need
+        case description
     }
 }
 
