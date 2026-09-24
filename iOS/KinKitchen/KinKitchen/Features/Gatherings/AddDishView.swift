@@ -24,6 +24,8 @@ struct AddDishView: View {
     @State private var isSuppliesExpanded = false
     @State private var isSaving = false
     @State private var errorMessage: String?
+    @State private var potentialDuplicate: GatheringNeed?
+    @State private var isShowingDuplicateWarning = false
 
     var body: some View {
         ZStack {
@@ -56,6 +58,11 @@ struct AddDishView: View {
             RecipeSelectionView(
                 selectedRecipe: $selectedRecipe
             )
+        }
+        .sheet(
+            isPresented: $isShowingDuplicateWarning
+        ) {
+            duplicateWarningSheet
         }
     }
 }
@@ -629,6 +636,215 @@ private extension AddDishView {
     }
 }
 
+// MARK: - Duplicate Warning
+
+private extension AddDishView {
+
+    var duplicateWarningSheet: some View {
+        ZStack {
+            KinColors.background
+                .ignoresSafeArea()
+
+            ScrollView {
+                VStack(
+                    spacing: KinSpacing.xLarge
+                ) {
+                    Image(
+                        systemName:
+                            "exclamationmark.triangle.fill"
+                    )
+                    .font(
+                        .system(size: 48)
+                    )
+                    .foregroundStyle(
+                        KinColors.primary
+                    )
+
+                    VStack(
+                        spacing: KinSpacing.medium
+                    ) {
+                        Text(
+                            "Possible Duplicate Dish"
+                        )
+                        .font(
+                            KinTypography.title2
+                        )
+                        .foregroundStyle(
+                            KinColors.primaryText
+                        )
+                        .multilineTextAlignment(
+                            .center
+                        )
+
+                        Text(
+                            "This dish may already be represented in the gathering. Review the potential match before adding another dish."
+                        )
+                        .font(
+                            KinTypography.body
+                        )
+                        .foregroundStyle(
+                            KinColors.secondaryText
+                        )
+                        .multilineTextAlignment(
+                            .center
+                        )
+                        .fixedSize(
+                            horizontal: false,
+                            vertical: true
+                        )
+                        .frame(
+                            maxWidth: .infinity
+                        )
+                    }
+
+                    if let potentialDuplicate {
+                        VStack(
+                            alignment: .leading,
+                            spacing: KinSpacing.medium
+                        ) {
+                            Text(
+                                "Potential Match"
+                            )
+                            .font(
+                                KinTypography.footnote
+                            )
+                            .foregroundStyle(
+                                KinColors.secondaryText
+                            )
+
+                            HStack(
+                                spacing: KinSpacing.medium
+                            ) {
+                                Image(
+                                    systemName:
+                                        "fork.knife"
+                                )
+                                .font(
+                                    .system(size: 24)
+                                )
+                                .foregroundStyle(
+                                    KinColors.primary
+                                )
+
+                                VStack(
+                                    alignment: .leading,
+                                    spacing:
+                                        KinSpacing.xSmall
+                                ) {
+                                    Text(
+                                        potentialDuplicate
+                                            .name
+                                    )
+                                    .font(
+                                        KinTypography.headline
+                                    )
+                                    .foregroundStyle(
+                                        KinColors.primaryText
+                                    )
+
+                                    Text(
+                                        potentialDuplicate
+                                            .category
+                                            .displayName
+                                    )
+                                    .font(
+                                        KinTypography.footnote
+                                    )
+                                    .foregroundStyle(
+                                        KinColors.secondaryText
+                                    )
+                                }
+
+                                Spacer()
+                            }
+                        }
+                        .padding(
+                            KinSpacing.large
+                        )
+                        .frame(
+                            maxWidth: .infinity,
+                            alignment: .leading
+                        )
+                        .background(
+                            KinColors.surface
+                        )
+                        .clipShape(
+                            RoundedRectangle(
+                                cornerRadius:
+                                    KinRadius.large
+                            )
+                        )
+                    }
+
+                    VStack(
+                        spacing: KinSpacing.medium
+                    ) {
+                        KinPrimaryButton(
+                            title: "Add Anyway"
+                        ) {
+                            Task {
+                                await addDishIgnoringDuplicate()
+                            }
+                        }
+                        .disabled(isSaving)
+                        .opacity(
+                            isSaving
+                            ? 0.6
+                            : 1
+                        )
+
+                        Button {
+                            isShowingDuplicateWarning =
+                                false
+
+                            potentialDuplicate =
+                                nil
+                        } label: {
+                            Text("Go Back")
+                                .font(
+                                    KinTypography.headline
+                                )
+                                .foregroundStyle(
+                                    KinColors.primary
+                                )
+                                .frame(
+                                    maxWidth: .infinity
+                                )
+                                .padding(
+                                    .vertical,
+                                    KinSpacing.medium
+                                )
+                                .background(
+                                    KinColors.surface
+                                )
+                                .clipShape(
+                                    RoundedRectangle(
+                                        cornerRadius:
+                                            KinRadius.medium
+                                    )
+                                )
+                        }
+                        .buttonStyle(.plain)
+                        .disabled(isSaving)
+                    }
+                }
+                .padding(
+                    KinSpacing.xLarge
+                )
+            }
+        }
+        .presentationDetents(
+            [.large]
+        )
+        .presentationDragIndicator(
+            .visible
+        )
+        .interactiveDismissDisabled(
+            isSaving
+        )
+    }
+}
+
 // MARK: - Add Dish Button
 
 private extension AddDishView {
@@ -658,44 +874,104 @@ private extension AddDishView {
     @MainActor
     func addDish() async {
         errorMessage = nil
+        
+        let cleanName =
+        dishName.trimmingCharacters(
+            in: .whitespacesAndNewlines
+        )
+        
+        guard !cleanName.isEmpty else {
+            errorMessage =
+            "Please enter a dish name."
+            return
+        }
+        
+        guard servings > 0 else {
+            errorMessage =
+            "Servings must be at least 1."
+            return
+        }
+        
+        isSaving = true
+        
+        let duplicate =
+        await GatheringDishService
+            .findPotentialDuplicateNeed(
+                gatheringId:
+                    gatheringId,
+                proposedName:
+                    cleanName
+            )
+        
+        if let duplicate {
+            potentialDuplicate =
+            duplicate
+            
+            isShowingDuplicateWarning =
+            true
+            
+            isSaving = false
+            return
+        }
+        
+        do {
+            _ =
+            try await GatheringDishService
+                .createNeed(
+                    gatheringId:
+                        gatheringId,
+                    name:
+                        cleanName,
+                    category:
+                        selectedCategory,
+                    quantityNeeded:
+                        servings,
+                    recipeId:
+                        selectedRecipe?.id,
+                    notes:
+                        notes,
+                    needs:
+                        selectedNeeds,
+                    otherNeedDescription:
+                        otherNeedDescription,
+                    supplies:
+                        selectedSupplies
+                )
+            
+            dismiss()
+            
+        } catch {
+            errorMessage =
+            error.localizedDescription
+        }
+        
+        isSaving = false
+    }
+    
+    @MainActor
+    func addDishIgnoringDuplicate() async {
+        errorMessage = nil
 
         let cleanName =
             dishName.trimmingCharacters(
-                in:
-                    .whitespacesAndNewlines
+                in: .whitespacesAndNewlines
             )
 
         guard !cleanName.isEmpty else {
+            isShowingDuplicateWarning = false
             errorMessage =
                 "Please enter a dish name."
             return
         }
 
         guard servings > 0 else {
+            isShowingDuplicateWarning = false
             errorMessage =
                 "Servings must be at least 1."
             return
         }
 
-        if selectedNeeds.contains(.other) {
-            let cleanOtherNeed =
-                otherNeedDescription
-                    .trimmingCharacters(
-                        in: .whitespacesAndNewlines
-                    )
-
-            guard !cleanOtherNeed.isEmpty else {
-                errorMessage =
-                    "Please describe the other equipment need."
-                return
-            }
-        }
-        
         isSaving = true
-
-        defer {
-            isSaving = false
-        }
 
         do {
             _ =
@@ -716,17 +992,25 @@ private extension AddDishView {
                         needs:
                             selectedNeeds,
                         otherNeedDescription:
-                            selectedNeeds.contains(.other)
-                            ? otherNeedDescription
-                            : nil,
+                            otherNeedDescription,
                         supplies:
                             selectedSupplies
                     )
 
+            potentialDuplicate = nil
+            isShowingDuplicateWarning = false
+            isSaving = false
+
             dismiss()
+
         } catch {
+            isSaving = false
+
             errorMessage =
                 error.localizedDescription
+
+            isShowingDuplicateWarning =
+                false
         }
     }
 }
