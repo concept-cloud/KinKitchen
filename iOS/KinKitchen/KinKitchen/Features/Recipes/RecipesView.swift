@@ -11,7 +11,7 @@ struct RecipesView: View {
         case all = "All"
         case mine = "Mine"
         case shared = "Shared"
-        case favorites = "Favorites"
+        case saved = "Saved"
     }
     @State private var selectedFilter:
         RecipeFilter = .all
@@ -26,6 +26,8 @@ struct RecipesView: View {
     /// Shared recipe ID → user ID of its original author.
     @State private var originalAuthorIds: [UUID: UUID] = [:]
     @State private var currentUserId: UUID?
+    /// The user's saved links to shared recipes.
+    @State private var savedRecipes: [SavedRecipe] = []
     @State private var isLoading = true
     @State private var errorMessage: String?
     @State private var showingAddRecipe = false
@@ -562,8 +564,10 @@ struct RecipesView: View {
                 : "Recipes other Kin Kitchen users share with you will appear here."
         case .mine:
             return "Recipes you add will appear here."
-        case .all, .favorites:
-            return "This feature is coming soon."
+        case .saved:
+            return "Save a recipe someone shared with you and it will appear here."
+        case .all:
+            return "Add a recipe to get started."
         }
     }
 
@@ -695,8 +699,17 @@ struct RecipesView: View {
         case .shared:
             return sharedRecipes
 
-        case .favorites:
-            return []
+        case .saved:
+            // Saved links point at the original shared recipes,
+            // newest save first.
+            let sharedById =
+                Dictionary(
+                    uniqueKeysWithValues:
+                        sharedRecipes.map { ($0.id, $0) }
+                )
+            return savedRecipes.compactMap {
+                sharedById[$0.recipeId]
+            }
         }
     }
 
@@ -1197,6 +1210,12 @@ Spacer()
                 Set(shares.map(\.recipeId))
                     .subtracting(sharedRecipesById.keys)
                     .count
+
+            // Saved state is supplemental; a failure (or the table
+            // not existing yet) just leaves Saved empty.
+            savedRecipes =
+                (try? await SavedRecipeService
+                    .fetchSavedRecipes()) ?? []
 
             currentUserId =
                 try? await SupabaseManager.client

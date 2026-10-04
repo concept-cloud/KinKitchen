@@ -55,6 +55,12 @@ struct RecipeDetailView: View {
     
     @State private var dietaryCheckResult: RecipeDietaryCheckResult?
     @State private var dietaryTagNames: [String] = []
+
+    /// Newest share of this recipe to the user, if any.
+    @State private var receivedShare: RecipeShare?
+    @State private var isSaved = false
+    @State private var isUpdatingSaved = false
+    @State private var saveErrorMessage: String?
     @State private var showAllergenWarningDetail = false
     
     @State private var showingRecipientSelection = false
@@ -383,6 +389,41 @@ struct RecipeDetailView: View {
 
                 Spacer()
 
+                if receivedShare != nil,
+                   currentUserId != recipe.ownerId {
+                    Button {
+                        Task {
+                            await toggleSaved()
+                        }
+                    } label: {
+                        Group {
+                            if isUpdatingSaved {
+                                ProgressView()
+                                    .tint(KinColors.primary)
+                            } else {
+                                Image(
+                                    systemName:
+                                        isSaved
+                                            ? "bookmark.fill"
+                                            : "bookmark"
+                                )
+                                .font(.title3)
+                                .foregroundStyle(KinColors.primary)
+                            }
+                        }
+                        .frame(width: 44, height: 44)
+                        .background(KinColors.surface)
+                        .clipShape(Circle())
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(isUpdatingSaved)
+                    .accessibilityLabel(
+                        isSaved
+                            ? "Remove from Saved"
+                            : "Save Recipe"
+                    )
+                }
+
                 if currentUserId == recipe.ownerId {
                     Button {
                         showingEditRecipe = true
@@ -397,6 +438,12 @@ struct RecipeDetailView: View {
                     .buttonStyle(.plain)
                     .accessibilityLabel("Edit Recipe")
                 }
+            }
+
+            if let saveErrorMessage {
+                Text(saveErrorMessage)
+                    .font(KinTypography.caption)
+                    .foregroundStyle(KinColors.error)
             }
 
             HStack(spacing: KinSpacing.medium) {
@@ -1514,6 +1561,82 @@ struct RecipeDetailView: View {
     
     // MARK: - Load Recipe
 
+    // MARK: - Saved State
+
+    /// Saving is only offered for recipes shared with the user
+    /// that they don't own. Failures leave Save unavailable
+    /// rather than showing a wrong state.
+    @MainActor
+    private func loadSavedState(
+        for recipe: Recipe
+    ) async {
+        guard currentUserId != recipe.ownerId else {
+            receivedShare = nil
+            isSaved = false
+            return
+        }
+
+        receivedShare =
+            (try? await RecipeSharingService
+                .fetchReceivedShares())?
+                .first { $0.recipeId == recipe.id }
+
+        guard receivedShare != nil else {
+            isSaved = false
+            return
+        }
+
+        isSaved =
+            (try? await SavedRecipeService
+                .isSaved(recipeId: recipe.id))
+            ?? false
+    }
+
+    @MainActor
+    private func toggleSaved() async {
+        guard !isUpdatingSaved else {
+            return
+        }
+
+        isUpdatingSaved = true
+        saveErrorMessage = nil
+
+        defer {
+            isUpdatingSaved = false
+        }
+
+        do {
+            if isSaved {
+                try await SavedRecipeService
+                    .unsaveRecipe(
+                        recipeId: recipeId
+                    )
+            } else {
+                try await SavedRecipeService
+                    .saveRecipe(
+                        recipeId: recipeId,
+                        shareId: receivedShare?.id
+                    )
+            }
+
+            // Only show the new state once it's confirmed.
+            isSaved =
+                try await SavedRecipeService
+                    .isSaved(recipeId: recipeId)
+
+        } catch {
+            saveErrorMessage =
+                isSaved
+                    ? "The recipe couldn't be removed from Saved. Please try again."
+                    : "The recipe couldn't be saved. Please try again."
+
+            print(
+                "RECIPE SAVE ERROR:",
+                error.localizedDescription
+            )
+        }
+    }
+
     /// Names of restrictions the owner marked this recipe with.
     /// Failures just leave the tags hidden.
     @MainActor
@@ -1612,6 +1735,10 @@ struct RecipeDetailView: View {
             } else {
                 originalRecipe = nil
             }
+
+            await loadSavedState(
+                for: recipe
+            )
 
         } catch {
             errorMessage =
