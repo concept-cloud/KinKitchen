@@ -20,6 +20,8 @@ struct RecipesView: View {
     @State private var receivedShares: [RecipeShare] = []
     /// Shared recipes whose original can no longer be loaded.
     @State private var unavailableSharedRecipeCount = 0
+    /// Profiles of users who shared recipes with the user.
+    @State private var senderProfiles: [UUID: Profile] = [:]
     @State private var isLoading = true
     @State private var errorMessage: String?
     @State private var showingAddRecipe = false
@@ -561,6 +563,38 @@ struct RecipesView: View {
         }
     }
 
+    // MARK: - Senders
+
+    /// Who shared this recipe with the user, newest share first,
+    /// taken from each sharing relationship. Nil when it wasn't
+    /// shared with them.
+    private func senderNames(
+        for recipe: Recipe
+    ) -> String? {
+        var seen: Set<UUID> = []
+
+        let names =
+            receivedShares
+                .filter { $0.recipeId == recipe.id }
+                .filter { seen.insert($0.senderId).inserted }
+                .map {
+                    senderProfiles[$0.senderId]?
+                        .bestDisplayName
+                        ?? "a Kin Kitchen user"
+                }
+
+        switch names.count {
+        case 0:
+            return nil
+        case 1:
+            return names[0]
+        case 2:
+            return "\(names[0]) and \(names[1])"
+        default:
+            return "\(names[0]) and \(names.count - 1) others"
+        }
+    }
+
     // MARK: - Unavailable Shared Note
     @ViewBuilder
     private var unavailableSharedNote: some View {
@@ -681,6 +715,16 @@ struct RecipesView: View {
                     .foregroundStyle(
                         KinColors.secondaryText
                     )
+                    if let senders =
+                        senderNames(for: recipe) {
+                        Label(
+                            "Shared by \(senders)",
+                            systemImage: "person.fill"
+                        )
+                        .font(KinTypography.caption)
+                        .foregroundStyle(KinColors.primary)
+                        .lineLimit(1)
+                    }
                     restrictionLabels(
                         for: recipe
                     )
@@ -1073,6 +1117,24 @@ Spacer()
                 Set(shares.map(\.recipeId))
                     .subtracting(sharedRecipesById.keys)
                     .count
+
+            // Senders come from the share, not the recipe owner,
+            // since the sender may not be the author. Missing
+            // profiles fall back to a generic name.
+            let senderIds =
+                Set(shares.map(\.senderId))
+
+            if let profiles =
+                try? await ProfileService
+                    .fetchProfiles(
+                        userIds: Array(senderIds)
+                    ) {
+                senderProfiles =
+                    Dictionary(
+                        uniqueKeysWithValues:
+                            profiles.map { ($0.id, $0) }
+                    )
+            }
         } catch {
             errorMessage =
                 "Please check your connection and try again."

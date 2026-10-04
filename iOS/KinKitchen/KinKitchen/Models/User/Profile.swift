@@ -37,3 +37,35 @@ struct Profile: Codable, Identifiable {
         case updatedAt = "updated_at"
     }
 }
+
+// MARK: - Display Name
+
+extension Profile {
+
+    /// Display name, then full name, then username.
+    var bestDisplayName: String {
+
+        func cleaned(_ value: String?) -> String? {
+            let trimmed =
+                value?.trimmingCharacters(
+                    in: .whitespacesAndNewlines
+                ) ?? ""
+            return trimmed.isEmpty ? nil : trimmed
+        }
+
+        if let displayName = cleaned(displayName) {
+            return displayName
+        }
+
+        let fullName =
+            [cleaned(firstName), cleaned(lastName)]
+                .compactMap { $0 }
+                .joined(separator: " ")
+
+        if !fullName.isEmpty {
+            return fullName
+        }
+
+        return cleaned(username) ?? "a Kin Kitchen user"
+    }
+}
