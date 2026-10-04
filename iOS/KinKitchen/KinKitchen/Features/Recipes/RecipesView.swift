@@ -105,7 +105,9 @@ struct RecipesView: View {
                 RecipeFilterSheet(
                     criteria: $criteria,
                     restrictions:
-                        discoveryContext.restrictions
+                        discoveryContext.restrictions,
+                    allergens:
+                        discoveryContext.allergens
                 )
             }
             // MARK: - Load
@@ -246,6 +248,19 @@ struct RecipesView: View {
                                 ) {
                                     criteria.restrictionIds.remove(
                                         restriction.id
+                                    )
+                                }
+                            }
+                            ForEach(
+                                criteria.selectedAllergens(
+                                    from: discoveryContext.allergens
+                                )
+                            ) { allergen in
+                                activeFilterChip(
+                                    title: "No \(allergen.name)"
+                                ) {
+                                    criteria.allergenIds.remove(
+                                        allergen.id
                                     )
                                 }
                             }
@@ -576,6 +591,9 @@ struct RecipesView: View {
                     restrictionLabels(
                         for: recipe
                     )
+                    allergenLabel(
+                        for: recipe
+                    )
                 }
                 Spacer()
                 // MARK: - Favorite Placeholder
@@ -648,6 +666,40 @@ struct RecipesView: View {
             .foregroundStyle(KinColors.secondaryText)
         case .conflict:
             EmptyView()
+        }
+    }
+    // MARK: - Allergen Label
+    /// One label summarizing the selected allergens. Recipes
+    /// known to contain one are already filtered out, and a
+    /// fully checked recipe gets no label rather than "safe".
+    @ViewBuilder
+    private func allergenLabel(
+        for recipe: Recipe
+    ) -> some View {
+        let statuses =
+            criteria.selectedAllergens(
+                from: discoveryContext.allergens
+            )
+            .map {
+                discoveryContext.allergenStatus(
+                    of: recipe,
+                    for: $0
+                )
+            }
+        if statuses.contains(.checking) {
+            Label(
+                "Checking allergens…",
+                systemImage: "hourglass"
+            )
+            .font(KinTypography.caption)
+            .foregroundStyle(KinColors.secondaryText)
+        } else if statuses.contains(.incomplete) {
+            Label(
+                "Allergen info incomplete",
+                systemImage: "exclamationmark.triangle"
+            )
+            .font(KinTypography.caption)
+            .foregroundStyle(KinColors.warning)
         }
     }
     // MARK: - Metadata
@@ -918,8 +970,20 @@ Spacer()
                     recipeIds: recipeIds
                 )
 
+        async let allergenRequest =
+            DietaryService
+                .fetchAllergens()
+
         discoveryContext.restrictions =
             (try? await restrictionRequest) ?? []
+
+        discoveryContext.allergens =
+            ((try? await allergenRequest) ?? [])
+                .sorted {
+                    $0.name.localizedCaseInsensitiveCompare(
+                        $1.name
+                    ) == .orderedAscending
+                }
 
         let tags =
             (try? await tagRequest) ?? [:]

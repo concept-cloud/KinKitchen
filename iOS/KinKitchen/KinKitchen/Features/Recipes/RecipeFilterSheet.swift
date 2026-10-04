@@ -17,6 +17,8 @@ struct RecipeFilterSheet: View {
 
     let restrictions: [DietaryRestriction]
 
+    let allergens: [Allergen]
+
 
     var body: some View {
 
@@ -32,6 +34,8 @@ struct RecipeFilterSheet: View {
                     categorySection
 
                     restrictionSection
+
+                    allergenSection
                 }
                 .padding(
                     KinSpacing.large
@@ -217,6 +221,97 @@ private extension RecipeFilterSheet {
     }
 }
 
+// MARK: - Allergens
+
+private extension RecipeFilterSheet {
+
+    var allergenSection: some View {
+
+        VStack(
+            alignment: .leading,
+            spacing: KinSpacing.medium
+        ) {
+
+            Text("Avoid Allergens")
+                .font(
+                    KinTypography.headline
+                )
+                .foregroundStyle(
+                    KinColors.primaryText
+                )
+
+            if allergens.isEmpty {
+
+                Text(
+                    "Allergens couldn't be loaded."
+                )
+                .font(
+                    KinTypography.caption
+                )
+                .foregroundStyle(
+                    KinColors.secondaryText
+                )
+
+            } else {
+
+                LazyVGrid(
+                    columns: [
+                        GridItem(
+                            .adaptive(
+                                minimum: 100
+                            ),
+                            spacing: KinSpacing.small
+                        )
+                    ],
+                    alignment: .leading,
+                    spacing: KinSpacing.small
+                ) {
+
+                    ForEach(
+                        allergens
+                    ) { allergen in
+
+                        filterChip(
+                            title: allergen.name,
+                            isSelected:
+                                criteria.allergenIds
+                                    .contains(
+                                        allergen.id
+                                    )
+                        ) {
+
+                            if criteria.allergenIds
+                                .contains(
+                                    allergen.id
+                                ) {
+                                criteria.allergenIds
+                                    .remove(
+                                        allergen.id
+                                    )
+                            } else {
+                                criteria.allergenIds
+                                    .insert(
+                                        allergen.id
+                                    )
+                            }
+                        }
+                    }
+                }
+
+                Text(
+                    "Recipes known to contain a selected allergen are hidden. Recipes with ingredients that couldn't be checked stay visible and are labeled."
+                )
+                .font(
+                    KinTypography.caption
+                )
+                .foregroundStyle(
+                    KinColors.secondaryText
+                )
+            }
+        }
+    }
+}
+
 // MARK: - Chip
 
 private extension RecipeFilterSheet {
@@ -269,6 +364,7 @@ private extension RecipeFilterSheet {
         criteria: .constant(
             RecipeDiscoveryCriteria()
         ),
-        restrictions: []
+        restrictions: [],
+        allergens: []
     )
 }

@@ -26,6 +26,10 @@ struct RecipeDiscoveryCriteria:
     /// when it has a known conflict with any of them.
     var restrictionIds: Set<UUID> = []
 
+    /// Selected allergen IDs. A recipe is hidden when it is
+    /// known to contain any of them.
+    var allergenIds: Set<UUID> = []
+
 
     var trimmedSearchText: String {
 
@@ -46,6 +50,18 @@ struct RecipeDiscoveryCriteria:
 
         categories.count
             + restrictionIds.count
+            + allergenIds.count
+    }
+
+
+    /// Selected allergens in display order.
+    func selectedAllergens(
+        from allergens: [Allergen]
+    ) -> [Allergen] {
+
+        allergens.filter {
+            allergenIds.contains($0.id)
+        }
     }
 
 
@@ -116,6 +132,21 @@ struct RecipeDiscoveryCriteria:
             }
         }
 
+        // Same for allergens: only a known allergen hides a
+        // recipe. Incomplete information stays visible.
+        for allergen in selectedAllergens(
+            from: context.allergens
+        ) {
+
+            if case .contains =
+                context.allergenStatus(
+                    of: recipe,
+                    for: allergen
+                ) {
+                return false
+            }
+        }
+
         return true
     }
 
@@ -175,12 +206,34 @@ enum RecipeRestrictionStatus:
     case notVerified
 }
 
+// MARK: - Allergen Status
+
+enum RecipeAllergenStatus:
+    Equatable {
+
+    /// An ingredient is known to contain the allergen.
+    case contains
+
+    /// Still checking; nothing found yet.
+    case checking
+
+    /// Some ingredients couldn't be evaluated (or there are none),
+    /// so the allergen can't be ruled out.
+    case incomplete
+
+    /// Every ingredient was evaluated and none contain it.
+    /// Not a guarantee of safety.
+    case noKnownAllergen
+}
+
 // MARK: - Discovery Context
 
 /// Loaded data the criteria are evaluated against.
 struct RecipeDiscoveryContext {
 
     var restrictions: [DietaryRestriction] = []
+
+    var allergens: [Allergen] = []
 
     var insights: [UUID: RecipeDietaryInsight] = [:]
 
@@ -219,5 +272,46 @@ struct RecipeDiscoveryContext {
             .contains(restriction.id)
                 ? .markedByOwner
                 : .notVerified
+    }
+
+
+    /// Uses the existing allergen evaluation. Unknown
+    /// ingredients are never treated as allergen-free.
+    func allergenStatus(
+        of recipe: Recipe,
+        for allergen: Allergen
+    ) -> RecipeAllergenStatus {
+
+        guard
+            let insight =
+                insights[recipe.id]
+        else {
+            return .incomplete
+        }
+
+        if insight.isCheckingAllergens {
+            return .checking
+        }
+
+        guard
+            let result =
+                insight.allergenResult
+        else {
+            // The check failed.
+            return .incomplete
+        }
+
+        if result.allergenAssociations.contains(where: {
+            $0.allergen.id == allergen.id
+        }) {
+            return .contains
+        }
+
+        if insight.ingredientNames.isEmpty
+            || result.hasUnknownIngredients {
+            return .incomplete
+        }
+
+        return .noKnownAllergen
     }
 }
