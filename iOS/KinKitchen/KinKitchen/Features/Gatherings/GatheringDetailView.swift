@@ -45,6 +45,10 @@ struct GatheringDetailView: View {
     @State private var isRespondingToInvitation = false
     @State private var invitationResponseError: String?
 
+    @State private var showingCompleteConfirmation = false
+    @State private var isCompleting = false
+    @State private var completeErrorMessage: String?
+
 
     var body: some View {
 
@@ -180,6 +184,11 @@ private extension GatheringDetailView {
                     gatheringMetadata(
                         gathering
                     )
+
+                    if isHost,
+                       gathering.status == .upcoming {
+                        markCompletedSection
+                    }
 
                     if currentParticipant?.status == .pending {
                         invitationResponseSection(
@@ -347,7 +356,7 @@ private extension GatheringDetailView {
             HStack {
 
                 statusBadge(
-                    gathering.status
+                    gathering.displayStatus()
                 )
 
                 if let theme =
@@ -543,6 +552,110 @@ private extension GatheringDetailView {
             )
 
         return "\(dateText) • \(timeText)"
+    }
+}
+
+
+// MARK: - Mark Completed
+
+private extension GatheringDetailView {
+
+    /// Lets the host mark the gathering completed. Past gatherings
+    /// already count as completed; this records it explicitly and
+    /// works before the date too (e.g. ended early).
+    var markCompletedSection: some View {
+
+        VStack(
+            alignment: .leading,
+            spacing: KinSpacing.small
+        ) {
+
+            Button {
+                showingCompleteConfirmation = true
+            } label: {
+                HStack {
+                    if isCompleting {
+                        ProgressView()
+                            .tint(KinColors.success)
+                    } else {
+                        Image(
+                            systemName: "checkmark.circle"
+                        )
+                    }
+
+                    Text("Mark as Completed")
+                        .font(KinTypography.button)
+                }
+                .foregroundStyle(KinColors.success)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, KinSpacing.medium)
+                .background(
+                    KinColors.success.opacity(0.10)
+                )
+                .clipShape(
+                    RoundedRectangle(
+                        cornerRadius: KinRadius.medium
+                    )
+                )
+            }
+            .buttonStyle(.plain)
+            .disabled(isCompleting)
+            .confirmationDialog(
+                "Mark this gathering as completed?",
+                isPresented: $showingCompleteConfirmation,
+                titleVisibility: .visible
+            ) {
+                Button("Mark as Completed") {
+                    Task {
+                        await completeGathering()
+                    }
+                }
+                Button("Cancel", role: .cancel) {}
+            } message: {
+                Text(
+                    "It moves to Gathering History. Guests, dishes and claims are kept."
+                )
+            }
+
+            if let completeErrorMessage {
+                Text(completeErrorMessage)
+                    .font(KinTypography.caption)
+                    .foregroundStyle(KinColors.error)
+            }
+        }
+    }
+
+
+    @MainActor
+    func completeGathering() async {
+
+        guard !isCompleting else {
+            return
+        }
+
+        isCompleting = true
+        completeErrorMessage = nil
+
+        defer {
+            isCompleting = false
+        }
+
+        do {
+            // Same record, only its status changes.
+            gathering =
+                try await GatheringService
+                    .completeGathering(
+                        id: gatheringId
+                    )
+        } catch {
+            completeErrorMessage =
+                "The gathering couldn't be marked completed. Please try again."
+
+            print(
+                "GATHERING COMPLETE ERROR:",
+                error.localizedDescription
+            )
+        }
     }
 }
 

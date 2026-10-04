@@ -81,6 +81,51 @@ enum GatheringStatus:
 }
 
 
+// MARK: - Completion
+
+extension Gathering {
+
+    /// Completed when the host marked it, or automatically once
+    /// its start time has passed. Cancelled gatherings are never
+    /// completed.
+    func isCompleted(
+        asOf now: Date = Date()
+    ) -> Bool {
+
+        switch status {
+        case .completed:
+            return true
+        case .upcoming:
+            return startsAt < now
+        case .cancelled:
+            return false
+        }
+    }
+
+
+    /// Still upcoming: not completed (by the host or by date)
+    /// and not cancelled.
+    func isActive(
+        asOf now: Date = Date()
+    ) -> Bool {
+
+        status == .upcoming
+            && startsAt >= now
+    }
+
+
+    /// Status to show, with past gatherings shown as completed.
+    func displayStatus(
+        asOf now: Date = Date()
+    ) -> GatheringStatus {
+
+        isCompleted(asOf: now)
+            ? .completed
+            : status
+    }
+}
+
+
 // MARK: - Gathering Create
 
 struct GatheringCreate:
