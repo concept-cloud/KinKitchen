@@ -579,35 +579,23 @@ struct RecipesView: View {
     private func senderNames(
         for recipe: Recipe
     ) -> String? {
-        var seen: Set<UUID> = []
-
-        let names =
-            receivedShares
-                .filter { $0.recipeId == recipe.id }
-                .filter { seen.insert($0.senderId).inserted }
+        RecipeAttribution.senderSummary(
+            RecipeAttribution
+                .senderIds(
+                    of: recipe.id,
+                    in: receivedShares
+                )
                 .map {
-                    userProfiles[$0.senderId]?
+                    userProfiles[$0]?
                         .bestDisplayName
                         ?? "a Kin Kitchen user"
                 }
-
-        switch names.count {
-        case 0:
-            return nil
-        case 1:
-            return names[0]
-        case 2:
-            return "\(names[0]) and \(names[1])"
-        default:
-            return "\(names[0]) and \(names.count - 1) others"
-        }
+        )
     }
 
     // MARK: - Original Author
 
-    /// e.g. "By Rose", "By Rose · version by Sam",
-    /// "Originally from Grandma Rose". Only for recipes shared
-    /// with the user.
+    /// Only for recipes shared with the user.
     private func authorLine(
         for recipe: Recipe
     ) -> String? {
@@ -619,43 +607,11 @@ struct RecipesView: View {
             return nil
         }
 
-        var parts: [String] = []
-
-        if let authorId =
-            originalAuthorIds[recipe.id] {
-            parts.append(
-                "By \(name(for: authorId))"
-            )
-
-            // Someone's version of the original.
-            if recipe.ownerId != authorId {
-                parts.append(
-                    "version by \(name(for: recipe.ownerId))"
-                )
-            }
-        }
-
-        // Story & Legacy contributor, kept as entered.
-        if let contributor =
-            recipe.originalContributor?
-                .trimmingCharacters(
-                    in: .whitespacesAndNewlines
-                ),
-           !contributor.isEmpty {
-            parts.append(
-                "originally from \(contributor)"
-            )
-        }
-
-        guard !parts.isEmpty else {
-            return nil
-        }
-
-        let line =
-            parts.joined(separator: " · ")
-
-        return line.prefix(1).uppercased()
-            + line.dropFirst()
+        return RecipeAttribution.authorLine(
+            for: recipe,
+            authorId: originalAuthorIds[recipe.id],
+            name: name(for:)
+        )
     }
 
     private func name(
@@ -1244,15 +1200,11 @@ Spacer()
                 Dictionary(
                     uniqueKeysWithValues:
                         sharedRecipes.compactMap { recipe in
-                            guard
-                                let originalId =
-                                    recipe.originalRecipeId
-                            else {
-                                return (recipe.id, recipe.ownerId)
-                            }
-                            // Original unavailable: author unknown,
-                            // rather than crediting the copy's owner.
-                            return originalOwners[originalId]
+                            RecipeAttribution
+                                .originalAuthorId(
+                                    of: recipe,
+                                    originalOwners: originalOwners
+                                )
                                 .map { (recipe.id, $0) }
                         }
                 )
