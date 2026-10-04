@@ -104,6 +104,75 @@ enum NotificationService {
             .execute()
     }
 
+    // MARK: - Mark Related Read
+
+    static func markRelatedAsRead(
+        relatedType: String,
+        relatedId: UUID
+    ) async throws {
+
+        let user =
+            try await SupabaseManager.client
+                .auth
+                .session
+                .user
+
+        let payload =
+            KinNotificationReadUpdate(
+                isRead: true
+            )
+
+        try await SupabaseManager.client
+            .from("notifications")
+            .update(payload)
+            .eq(
+                "user_id",
+                value: user.id
+            )
+            .eq(
+                "related_type",
+                value: relatedType
+            )
+            .eq(
+                "related_id",
+                value: relatedId
+            )
+            .eq(
+                "is_read",
+                value: false
+            )
+            .execute()
+    }
+
+    // MARK: - Mark All Read
+
+    static func markAllAsRead() async throws {
+
+        let user =
+            try await SupabaseManager.client
+                .auth
+                .session
+                .user
+
+        let payload =
+            KinNotificationReadUpdate(
+                isRead: true
+            )
+
+        try await SupabaseManager.client
+            .from("notifications")
+            .update(payload)
+            .eq(
+                "user_id",
+                value: user.id
+            )
+            .eq(
+                "is_read",
+                value: false
+            )
+            .execute()
+    }
+
     // MARK: - Mark Unread
 
     static func markAsUnread(

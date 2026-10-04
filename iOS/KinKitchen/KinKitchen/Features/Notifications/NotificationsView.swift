@@ -27,7 +27,7 @@ struct NotificationsView: View {
             KinColors.background
                 .ignoresSafeArea()
 
-            if isLoading {
+            if isLoading && notifications.isEmpty {
 
                 loadingState
 
@@ -48,6 +48,29 @@ struct NotificationsView: View {
         }
         .navigationTitle("Notifications")
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+
+            if !unreadNotifications.isEmpty {
+
+                ToolbarItem(
+                    placement: .topBarTrailing
+                ) {
+
+                    Button("Mark All Read") {
+
+                        Task {
+                            await markAllAsRead()
+                        }
+                    }
+                    .font(
+                        KinTypography.subheadline
+                    )
+                    .foregroundStyle(
+                        KinColors.primary
+                    )
+                }
+            }
+        }
         // MARK: - Gathering Destination
 
         .navigationDestination(
@@ -66,6 +89,24 @@ struct NotificationsView: View {
         }
     }
 
+    // MARK: - Unread / Read
+
+    private var unreadNotifications:
+        [KinNotification] {
+
+        notifications.filter {
+            !$0.isRead
+        }
+    }
+
+    private var readNotifications:
+        [KinNotification] {
+
+        notifications.filter {
+            $0.isRead
+        }
+    }
+
     // MARK: - Notification List
 
     private var notificationList: some View {
@@ -73,21 +114,65 @@ struct NotificationsView: View {
         ScrollView {
 
             LazyVStack(
+                alignment: .leading,
                 spacing: KinSpacing.medium
             ) {
 
-                ForEach(notifications) {
-                    notification in
+                if !unreadNotifications.isEmpty {
 
-                    notificationCard(
-                        notification
+                    sectionTitle(
+                        "New"
                     )
+
+                    ForEach(unreadNotifications) {
+                        notification in
+
+                        notificationCard(
+                            notification
+                        )
+                    }
+                }
+
+                if !readNotifications.isEmpty {
+
+                    sectionTitle(
+                        "Earlier"
+                    )
+                    .padding(
+                        .top,
+                        unreadNotifications.isEmpty
+                            ? 0
+                            : KinSpacing.medium
+                    )
+
+                    ForEach(readNotifications) {
+                        notification in
+
+                        notificationCard(
+                            notification
+                        )
+                    }
                 }
             }
             .padding(
                 KinSpacing.large
             )
         }
+    }
+
+    // MARK: - Section Title
+
+    private func sectionTitle(
+        _ title: String
+    ) -> some View {
+
+        Text(title)
+            .font(
+                KinTypography.headline
+            )
+            .foregroundStyle(
+                KinColors.secondaryText
+            )
     }
 
     // MARK: - Notification Card
@@ -147,11 +232,8 @@ struct NotificationsView: View {
                             )
                         }
 
-                        if
-                            let message =
-                                notification.message,
-                            !message.isEmpty
-                        {
+                        if let message =
+                            notification.displayMessage {
 
                             Text(message)
                                 .font(
@@ -188,8 +270,44 @@ struct NotificationsView: View {
                         : 1
                 )
             }
+            // Unread tint and accent bar
+            .overlay(
+                alignment: .leading
+            ) {
+
+                if !notification.isRead {
+
+                    ZStack(
+                        alignment: .leading
+                    ) {
+
+                        notification.type.color
+                            .opacity(0.06)
+
+                        Rectangle()
+                            .fill(
+                                notification.type.color
+                            )
+                            .frame(
+                                width: 4
+                            )
+                    }
+                    .allowsHitTesting(false)
+                }
+            }
+            .clipShape(
+                RoundedRectangle(
+                    cornerRadius:
+                        KinRadius.large
+                )
+            )
         }
         .buttonStyle(.plain)
+        .accessibilityValue(
+            notification.isRead
+                ? "Read"
+                : "Unread"
+        )
     }
 
 
@@ -212,11 +330,11 @@ struct NotificationsView: View {
             Image(
                 systemName:
                     notification.isRead
-                        ? "circle"
-                        : "circle.fill"
+                        ? "bell"
+                        : "bell.fill"
             )
             .font(
-                .system(size: 10)
+                .system(size: 20)
             )
             .foregroundStyle(
                 notification.isRead
@@ -245,9 +363,7 @@ struct NotificationsView: View {
     ) -> some View {
 
         let color =
-            notificationColor(
-                for: notification.type
-            )
+            notification.type.color
 
         return ZStack {
 
@@ -264,9 +380,7 @@ struct NotificationsView: View {
 
             Image(
                 systemName:
-                    iconName(
-                        for: notification.type
-                    )
+                    notification.type.iconName
             )
             .font(
                 .system(size: 18)
@@ -276,58 +390,6 @@ struct NotificationsView: View {
                     ? KinColors.secondaryText
                     : color
             )
-        }
-    }
-    // MARK: - Notification Icon Name
-
-    private func iconName(
-        for type: KinNotificationType
-    ) -> String {
-
-        switch type {
-
-        case .gatheringInvitation:
-
-            return "envelope.fill"
-
-        case .invitationAccepted:
-
-            return "checkmark.circle.fill"
-
-        case .invitationDeclined:
-
-            return "xmark.circle.fill"
-
-        case .gatheringUpdated:
-
-            return "calendar.badge.clock"
-
-        case .dishUpdated:
-
-            return "fork.knife"
-
-        case .recipeShared:
-
-            return "book.closed.fill"
-        }
-    }
-    
-    // MARK: - Notification Color
-
-    private func notificationColor(
-        for type: KinNotificationType
-    ) -> Color {
-
-        switch type {
-
-        case .invitationAccepted:
-            return .green
-
-        case .invitationDeclined:
-            return KinColors.error
-
-        default:
-            return KinColors.primary
         }
     }
 
@@ -464,23 +526,86 @@ struct NotificationsView: View {
         )
     }
 
-// MARK: - Open Notification
+    // MARK: - Open Notification
 
-private func openNotification(
-    _ notification: KinNotification
-) {
+    private func openNotification(
+        _ notification: KinNotification
+    ) {
 
-    guard
-        notification.relatedType == "gathering",
-        let gatheringId =
-            notification.relatedId
-    else {
-        return
+        if !notification.isRead {
+
+            Task {
+                await markAsRead(
+                    notification
+                )
+            }
+        }
+
+        guard
+            let gatheringId =
+                notification.gatheringId
+        else {
+            return
+        }
+
+        selectedGatheringId =
+            gatheringId
     }
 
-    selectedGatheringId =
-        gatheringId
-}
+    // MARK: - Mark Read
+
+    @MainActor
+    private func markAsRead(
+        _ notification: KinNotification
+    ) async {
+
+        do {
+
+            try await NotificationService
+                .markAsRead(
+                    notificationId:
+                        notification.id
+                )
+
+            await refreshNotifications()
+
+        } catch is CancellationError {
+
+            return
+
+        } catch {
+
+            print(
+                "NOTIFICATION MARK READ ERROR:",
+                error.localizedDescription
+            )
+        }
+    }
+
+    // MARK: - Mark All Read
+
+    @MainActor
+    private func markAllAsRead() async {
+
+        do {
+
+            try await NotificationService
+                .markAllAsRead()
+
+            await refreshNotifications()
+
+        } catch is CancellationError {
+
+            return
+
+        } catch {
+
+            print(
+                "NOTIFICATION MARK ALL READ ERROR:",
+                error.localizedDescription
+            )
+        }
+    }
 
     // MARK: - Toggle Read State
 
@@ -508,9 +633,7 @@ private func openNotification(
                     )
             }
 
-            notifications =
-                try await NotificationService
-                    .fetchNotifications()
+            await refreshNotifications()
 
         } catch is CancellationError {
 
@@ -524,7 +647,33 @@ private func openNotification(
             )
         }
     }
-    
+
+    // MARK: - Refresh Notifications
+
+    /// Reloads without showing the loading state, used
+    /// after read-state changes.
+    @MainActor
+    private func refreshNotifications() async {
+
+        do {
+
+            notifications =
+                try await NotificationService
+                    .fetchNotifications()
+
+        } catch is CancellationError {
+
+            return
+
+        } catch {
+
+            print(
+                "NOTIFICATION REFRESH ERROR:",
+                error.localizedDescription
+            )
+        }
+    }
+
     // MARK: - Load Notifications
 
     @MainActor

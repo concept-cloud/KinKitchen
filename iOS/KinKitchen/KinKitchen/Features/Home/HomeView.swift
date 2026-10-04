@@ -22,7 +22,8 @@ struct HomeView: View {
     @State private var notifications:
     [KinNotification] = []
     @State private var selectedGatheringId: UUID?
-    
+    @State private var showingAllNotifications = false
+
     
     var body: some View {
         
@@ -73,11 +74,49 @@ struct HomeView: View {
                     
                     // MARK: - Alerts
                     
-                    if !unreadNotifications.isEmpty {
-                        KinSectionHeader(
-                            title: "Alerts"
-                        )
-                        
+                    KinSectionHeader(
+                        title: "Alerts",
+                        actionTitle: "View All"
+                    ) {
+                        showingAllNotifications = true
+                    }
+
+                    if unreadNotifications.isEmpty {
+
+                        KinCard {
+
+                            HStack(
+                                spacing: KinSpacing.medium
+                            ) {
+
+                                Image(
+                                    systemName: "bell"
+                                )
+                                .font(
+                                    .system(size: 20)
+                                )
+                                .foregroundStyle(
+                                    KinColors.secondaryText
+                                )
+
+                                Text(
+                                    "You're all caught up."
+                                )
+                                .font(
+                                    KinTypography.body
+                                )
+                                .foregroundStyle(
+                                    KinColors.secondaryText
+                                )
+                            }
+                            .frame(
+                                maxWidth: .infinity,
+                                alignment: .leading
+                            )
+                        }
+
+                    } else {
+
                         VStack(
                             spacing: KinSpacing.medium
                         ) {
@@ -224,6 +263,14 @@ struct HomeView: View {
                     gatheringId: gatheringId
                 )
             }
+            // MARK: - Notifications Destination
+
+            .navigationDestination(
+                isPresented: $showingAllNotifications
+            ) {
+
+                NotificationsView()
+            }
             // MARK: - Add Recipe Destination
             
             .navigationDestination(
@@ -252,16 +299,19 @@ struct HomeView: View {
     ) -> some View {
 
         let color =
-            homeNotificationColor(
-                for: notification.type
-            )
+            notification.type.color
 
         return Button {
 
+            Task {
+                await markAsRead(
+                    notification
+                )
+            }
+
             guard
-                notification.relatedType == "gathering",
                 let gatheringId =
-                    notification.relatedId
+                    notification.gatheringId
             else {
                 return
             }
@@ -291,9 +341,7 @@ struct HomeView: View {
 
                         Image(
                             systemName:
-                                homeNotificationIcon(
-                                    for: notification.type
-                                )
+                                notification.type.iconName
                         )
                         .foregroundStyle(
                             color
@@ -319,21 +367,15 @@ struct HomeView: View {
 
                             Spacer()
 
-                            Circle()
-                                .fill(
+                            Image(systemName: "bell.fill")
+                                .font(.system(size: 20, weight: .semibold))
+                                .foregroundStyle(
                                     KinColors.primary
-                                )
-                                .frame(
-                                    width: 8,
-                                    height: 8
                                 )
                         }
 
-                        if
-                            let message =
-                                notification.message,
-                            !message.isEmpty
-                        {
+                        if let message =
+                            notification.displayMessage {
 
                             Text(message)
                                 .font(
@@ -367,53 +409,6 @@ struct HomeView: View {
             }
         }
         .buttonStyle(.plain)
-    }
-    
-    // MARK: - Notification Color
-    
-    private func homeNotificationColor(
-        for type: KinNotificationType
-    ) -> Color {
-        
-        switch type {
-            
-        case .invitationAccepted:
-            return .green
-            
-        case .invitationDeclined:
-            return KinColors.error
-            
-        default:
-            return KinColors.primary
-        }
-    }
-    
-    // MARK: - Notification Icon
-    
-    private func homeNotificationIcon(
-        for type: KinNotificationType
-    ) -> String {
-        
-        switch type {
-            
-        case .gatheringInvitation:
-            return "envelope.fill"
-            
-        case .invitationAccepted:
-            return "checkmark.circle.fill"
-            
-        case .invitationDeclined:
-            return "xmark.circle.fill"
-            
-        case .gatheringUpdated:
-            return "calendar.badge.clock"
-            
-        case .dishUpdated:
-            return "fork.knife"
-            
-        case .recipeShared:
-            return "book.closed.fill"
-        }
     }
 }
 
@@ -505,7 +500,21 @@ private extension HomeView {
         let gathering =
             item.gathering
 
+        let unreadCount =
+            notifications.unreadCount(
+                forGathering: gathering.id
+            )
+
         return Button {
+
+            if unreadCount > 0 {
+
+                Task {
+                    await markGatheringNotificationsAsRead(
+                        gathering.id
+                    )
+                }
+            }
 
             selectedGatheringId =
                 gathering.id
@@ -605,6 +614,13 @@ private extension HomeView {
                         alignment: .trailing,
                         spacing: KinSpacing.small
                     ) {
+
+                        if unreadCount > 0 {
+
+                            KinUnreadIndicator(
+                                count: unreadCount
+                            )
+                        }
 
                         Text(
                             item.relationship
@@ -713,6 +729,60 @@ private extension HomeView {
         }
 
         isLoadingGatherings = false
+    }
+
+    // MARK: - Mark Read
+
+    @MainActor
+    func markAsRead(
+        _ notification: KinNotification
+    ) async {
+
+        do {
+            try await NotificationService
+                .markAsRead(
+                    notificationId:
+                        notification.id
+                )
+
+            notifications =
+                try await NotificationService
+                    .fetchNotifications()
+
+        } catch {
+            if !(error is CancellationError) {
+                print(
+                    "HOME NOTIFICATION MARK READ ERROR:",
+                    error.localizedDescription
+                )
+            }
+        }
+    }
+
+    @MainActor
+    func markGatheringNotificationsAsRead(
+        _ gatheringId: UUID
+    ) async {
+
+        do {
+            try await NotificationService
+                .markRelatedAsRead(
+                    relatedType: "gathering",
+                    relatedId: gatheringId
+                )
+
+            notifications =
+                try await NotificationService
+                    .fetchNotifications()
+
+        } catch {
+            if !(error is CancellationError) {
+                print(
+                    "HOME GATHERING NOTIFICATION READ ERROR:",
+                    error.localizedDescription
+                )
+            }
+        }
     }
 
 }

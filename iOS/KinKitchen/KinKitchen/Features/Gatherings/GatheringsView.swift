@@ -32,7 +32,9 @@ struct GatheringsView: View {
     @State private var showingAddGathering = false
     
     @State private var gatherings: [GatheringListItem] = []
-    
+
+    @State private var notifications: [KinNotification] = []
+
     @State private var navigationPath = NavigationPath()
     
     
@@ -272,9 +274,13 @@ private extension GatheringsView {
                     gatherings
                 ) { item in
 
-                    NavigationLink(
-                        value: item.gathering.id
-                    ) {
+                    Button {
+
+                        openGathering(
+                            item.gathering.id
+                        )
+
+                    } label: {
 
                         gatheringCard(
                             item
@@ -309,6 +315,11 @@ private extension GatheringsView {
 
         let gathering =
             item.gathering
+
+        let unreadCount =
+            notifications.unreadCount(
+                forGathering: gathering.id
+            )
 
         return HStack(
             spacing: KinSpacing.medium
@@ -380,6 +391,13 @@ private extension GatheringsView {
                 alignment: .center,
                 spacing: KinSpacing.xSmall
             ) {
+
+                if unreadCount > 0 {
+
+                    KinUnreadIndicator(
+                        count: unreadCount
+                    )
+                }
 
                 Image(
                     systemName:
@@ -884,6 +902,69 @@ private extension GatheringsView {
                 error.localizedDescription
             )
         }
+
+        // Notifications only drive the card indicators,
+        // so a failure here shouldn't block the list.
+
+        await loadNotifications()
+    }
+
+
+    @MainActor
+    func loadNotifications() async {
+
+        do {
+
+            notifications =
+                try await NotificationService
+                    .fetchNotifications()
+
+        } catch {
+
+            if !(error is CancellationError) {
+
+                print(
+                    "GATHERINGS NOTIFICATION LOAD ERROR:",
+                    error.localizedDescription
+                )
+            }
+        }
+    }
+
+
+    func openGathering(
+        _ gatheringId: UUID
+    ) {
+
+        if notifications.unreadCount(
+            forGathering: gatheringId
+        ) > 0 {
+
+            Task {
+
+                do {
+
+                    try await NotificationService
+                        .markRelatedAsRead(
+                            relatedType: "gathering",
+                            relatedId: gatheringId
+                        )
+
+                    await loadNotifications()
+
+                } catch {
+
+                    print(
+                        "GATHERING NOTIFICATION READ ERROR:",
+                        error.localizedDescription
+                    )
+                }
+            }
+        }
+
+        navigationPath.append(
+            gatheringId
+        )
     }
 }
 
