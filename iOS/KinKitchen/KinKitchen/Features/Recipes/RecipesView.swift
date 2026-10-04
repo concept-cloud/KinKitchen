@@ -5,6 +5,7 @@
 //  Created by Greg Hudler on 8/26/26.
 //
 import SwiftUI
+import Supabase
 struct RecipesView: View {
     enum RecipeFilter: String, CaseIterable {
         case all = "All"
@@ -20,8 +21,11 @@ struct RecipesView: View {
     @State private var receivedShares: [RecipeShare] = []
     /// Shared recipes whose original can no longer be loaded.
     @State private var unavailableSharedRecipeCount = 0
-    /// Profiles of users who shared recipes with the user.
-    @State private var senderProfiles: [UUID: Profile] = [:]
+    /// Profiles of senders and authors of shared recipes.
+    @State private var userProfiles: [UUID: Profile] = [:]
+    /// Shared recipe ID → user ID of its original author.
+    @State private var originalAuthorIds: [UUID: UUID] = [:]
+    @State private var currentUserId: UUID?
     @State private var isLoading = true
     @State private var errorMessage: String?
     @State private var showingAddRecipe = false
@@ -578,7 +582,7 @@ struct RecipesView: View {
                 .filter { $0.recipeId == recipe.id }
                 .filter { seen.insert($0.senderId).inserted }
                 .map {
-                    senderProfiles[$0.senderId]?
+                    userProfiles[$0.senderId]?
                         .bestDisplayName
                         ?? "a Kin Kitchen user"
                 }
@@ -593,6 +597,72 @@ struct RecipesView: View {
         default:
             return "\(names[0]) and \(names.count - 1) others"
         }
+    }
+
+    // MARK: - Original Author
+
+    /// e.g. "By Rose", "By Rose · version by Sam",
+    /// "Originally from Grandma Rose". Only for recipes shared
+    /// with the user.
+    private func authorLine(
+        for recipe: Recipe
+    ) -> String? {
+        guard
+            receivedShares.contains(where: {
+                $0.recipeId == recipe.id
+            })
+        else {
+            return nil
+        }
+
+        var parts: [String] = []
+
+        if let authorId =
+            originalAuthorIds[recipe.id] {
+            parts.append(
+                "By \(name(for: authorId))"
+            )
+
+            // Someone's version of the original.
+            if recipe.ownerId != authorId {
+                parts.append(
+                    "version by \(name(for: recipe.ownerId))"
+                )
+            }
+        }
+
+        // Story & Legacy contributor, kept as entered.
+        if let contributor =
+            recipe.originalContributor?
+                .trimmingCharacters(
+                    in: .whitespacesAndNewlines
+                ),
+           !contributor.isEmpty {
+            parts.append(
+                "originally from \(contributor)"
+            )
+        }
+
+        guard !parts.isEmpty else {
+            return nil
+        }
+
+        let line =
+            parts.joined(separator: " · ")
+
+        return line.prefix(1).uppercased()
+            + line.dropFirst()
+    }
+
+    private func name(
+        for userId: UUID
+    ) -> String {
+        if userId == currentUserId {
+            return "you"
+        }
+        return userProfiles[userId]?
+            .bestDisplayName
+            ?? "a Kin Kitchen user"
     }
 
     // MARK: - Unavailable Shared Note
@@ -724,6 +794,16 @@ struct RecipesView: View {
                         .font(KinTypography.caption)
                         .foregroundStyle(KinColors.primary)
                         .lineLimit(1)
+                    }
+                    if let author =
+                        authorLine(for: recipe) {
+                        Label(
+                            author,
+                            systemImage: "pencil.line"
+                        )
+                        .font(KinTypography.caption)
+                        .foregroundStyle(KinColors.secondaryText)
+                        .lineLimit(2)
                     }
                     restrictionLabels(
                         for: recipe
@@ -1118,18 +1198,60 @@ Spacer()
                     .subtracting(sharedRecipesById.keys)
                     .count
 
+            currentUserId =
+                try? await SupabaseManager.client
+                    .auth
+                    .session
+                    .user
+                    .id
+
+            // A shared recipe may be someone's version of another
+            // recipe. The original author is the owner of that
+            // original, not whoever owns this copy.
+            let originalIds =
+                sharedRecipes.compactMap(\.originalRecipeId)
+
+            let originals =
+                (try? await RecipeService
+                    .fetchRecipes(ids: originalIds)) ?? []
+
+            let originalOwners =
+                Dictionary(
+                    uniqueKeysWithValues:
+                        originals.map { ($0.id, $0.ownerId) }
+                )
+
+            originalAuthorIds =
+                Dictionary(
+                    uniqueKeysWithValues:
+                        sharedRecipes.compactMap { recipe in
+                            guard
+                                let originalId =
+                                    recipe.originalRecipeId
+                            else {
+                                return (recipe.id, recipe.ownerId)
+                            }
+                            // Original unavailable: author unknown,
+                            // rather than crediting the copy's owner.
+                            return originalOwners[originalId]
+                                .map { (recipe.id, $0) }
+                        }
+                )
+
             // Senders come from the share, not the recipe owner,
             // since the sender may not be the author. Missing
             // profiles fall back to a generic name.
-            let senderIds =
+            let userIds =
                 Set(shares.map(\.senderId))
+                    .union(originalAuthorIds.values)
+                    .union(sharedRecipes.map(\.ownerId))
 
             if let profiles =
                 try? await ProfileService
                     .fetchProfiles(
-                        userIds: Array(senderIds)
+                        userIds: Array(userIds)
                     ) {
-                senderProfiles =
+                userProfiles =
                     Dictionary(
                         uniqueKeysWithValues:
                             profiles.map { ($0.id, $0) }
