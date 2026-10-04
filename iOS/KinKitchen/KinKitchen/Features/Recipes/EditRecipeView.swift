@@ -37,6 +37,7 @@ struct EditRecipeView: View {
     @State private var recipeStory = ""
     @State private var originalContributor = ""
     @State private var category = ""
+    @State private var selectedRestrictionIds: Set<UUID> = []
 
     @State private var servings = ""
     @State private var prepTime = ""
@@ -372,6 +373,14 @@ struct EditRecipeView: View {
                     fieldLabel("Category")
 
                     categoryMenu
+
+                    Divider()
+
+                    fieldLabel("Dietary")
+
+                    RecipeDietaryTagPicker(
+                        selection: $selectedRestrictionIds
+                    )
                 }
             }
 
@@ -1332,6 +1341,16 @@ struct EditRecipeView: View {
             category =
                 recipe.category ?? ""
 
+            // Missing tags (or the tag table not being set up
+            // yet) shouldn't block editing the recipe.
+            selectedRestrictionIds =
+                (
+                    try? await RecipeService
+                        .fetchDietaryRestrictionTags(
+                            recipeIds: [recipeId]
+                        )
+                )?[recipeId] ?? []
+
             servings =
                 recipe.servings.map(
                     String.init
@@ -1550,6 +1569,13 @@ struct EditRecipeView: View {
             _ = try await IngredientAllergenService
                 .classifyAndStore(
                     ingredients: allergenInputs
+                )
+
+            try await RecipeService
+                .replaceDietaryRestrictionTags(
+                    recipeId: recipeId,
+                    restrictionIds:
+                        selectedRestrictionIds
                 )
 
             dismiss()

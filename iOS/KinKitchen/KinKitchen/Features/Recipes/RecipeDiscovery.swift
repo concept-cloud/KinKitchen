@@ -22,6 +22,10 @@ struct RecipeDiscoveryCriteria:
     /// to any of them.
     var categories: Set<RecipeCategory> = []
 
+    /// Selected dietary restriction IDs. A recipe is hidden
+    /// when it has a known conflict with any of them.
+    var restrictionIds: Set<UUID> = []
+
 
     var trimmedSearchText: String {
 
@@ -41,6 +45,18 @@ struct RecipeDiscoveryCriteria:
     var activeFilterCount: Int {
 
         categories.count
+            + restrictionIds.count
+    }
+
+
+    /// Selected restrictions in display order.
+    func selectedRestrictions(
+        from restrictions: [DietaryRestriction]
+    ) -> [DietaryRestriction] {
+
+        restrictions.filter {
+            restrictionIds.contains($0.id)
+        }
     }
 
 
@@ -60,7 +76,8 @@ struct RecipeDiscoveryCriteria:
 
 
     func matches(
-        _ recipe: Recipe
+        _ recipe: Recipe,
+        context: RecipeDiscoveryContext
     ) -> Bool {
 
         if isSearching,
@@ -84,16 +101,123 @@ struct RecipeDiscoveryCriteria:
             }
         }
 
+        // Only known conflicts hide a recipe. Unverified
+        // recipes stay visible with a label.
+        for restriction in selectedRestrictions(
+            from: context.restrictions
+        ) {
+
+            if case .conflict =
+                context.restrictionStatus(
+                    of: recipe,
+                    for: restriction
+                ) {
+                return false
+            }
+        }
+
         return true
     }
 
 
     func apply(
-        to recipes: [Recipe]
+        to recipes: [Recipe],
+        context: RecipeDiscoveryContext
     ) -> [Recipe] {
 
         recipes.filter {
-            matches($0)
+            matches(
+                $0,
+                context: context
+            )
         }
+    }
+}
+
+// MARK: - Recipe Dietary Insight
+
+/// Dietary information loaded for one recipe in the list.
+struct RecipeDietaryInsight {
+
+    var ingredientNames: [String] = []
+
+    /// Nil while the allergen check is running or if it failed.
+    var allergenResult: RecipeAllergenAssociationResult?
+
+    var allergenCheckFailed = false
+
+    /// Restrictions the owner marked the recipe with.
+    var taggedRestrictionIds: Set<UUID> = []
+
+
+    var isCheckingAllergens: Bool {
+
+        allergenResult == nil
+            && !allergenCheckFailed
+    }
+}
+
+// MARK: - Restriction Status
+
+enum RecipeRestrictionStatus:
+    Equatable {
+
+    /// A known ingredient or allergen conflicts.
+    case conflict
+
+    /// Still checking allergens; no conflict found yet.
+    case checking
+
+    /// No known conflict and the owner marked it.
+    case markedByOwner
+
+    /// No known conflict and no owner mark.
+    case notVerified
+}
+
+// MARK: - Discovery Context
+
+/// Loaded data the criteria are evaluated against.
+struct RecipeDiscoveryContext {
+
+    var restrictions: [DietaryRestriction] = []
+
+    var insights: [UUID: RecipeDietaryInsight] = [:]
+
+
+    func restrictionStatus(
+        of recipe: Recipe,
+        for restriction: DietaryRestriction
+    ) -> RecipeRestrictionStatus {
+
+        guard
+            let insight =
+                insights[recipe.id]
+        else {
+            return .notVerified
+        }
+
+        let conflicts =
+            RecipeDietaryCheckService
+                .restrictionConflicts(
+                    [restriction],
+                    ingredientNames:
+                        insight.ingredientNames,
+                    allergenResult:
+                        insight.allergenResult
+                )
+
+        if !conflicts.isEmpty {
+            return .conflict
+        }
+
+        if insight.isCheckingAllergens {
+            return .checking
+        }
+
+        return insight.taggedRestrictionIds
+            .contains(restriction.id)
+                ? .markedByOwner
+                : .notVerified
     }
 }

@@ -25,6 +25,7 @@ struct AddRecipeView: View {
     @State private var prepTime = ""
     @State private var cookTime = ""
     @State private var selectedCategory: RecipeCategory = .dinner
+    @State private var selectedRestrictionIds: Set<UUID> = []
 
     @State private var ingredients: [IngredientDraft] = [IngredientDraft()]
     @State private var instructions: [InstructionDraft] = [InstructionDraft()]
@@ -86,6 +87,7 @@ struct AddRecipeView: View {
                         servingsSection
                         timesSection
                         categorySection
+                        dietarySection
                         ingredientsSection
                         instructionsSection
                         
@@ -418,6 +420,18 @@ struct AddRecipeView: View {
                 .background(KinColors.surface)
                 .clipShape(RoundedRectangle(cornerRadius: KinRadius.medium))
             }
+        }
+    }
+
+    private var dietarySection: some View {
+        VStack(alignment: .leading, spacing: KinSpacing.small) {
+            Text("Dietary")
+                .font(KinTypography.title)
+                .foregroundStyle(KinColors.primaryText)
+
+            RecipeDietaryTagPicker(
+                selection: $selectedRestrictionIds
+            )
         }
     }
 
@@ -1134,6 +1148,24 @@ struct AddRecipeView: View {
                 .classifyAndStore(
                     ingredients: allergenInputs
                 )
+
+            // Dietary tags are supplemental. The recipe already
+            // exists, so a failure here shouldn't fail the save.
+            if !selectedRestrictionIds.isEmpty {
+                do {
+                    try await RecipeService
+                        .replaceDietaryRestrictionTags(
+                            recipeId: recipe.id,
+                            restrictionIds:
+                                selectedRestrictionIds
+                        )
+                } catch {
+                    print(
+                        "RECIPE DIETARY TAG SAVE ERROR:",
+                        error.localizedDescription
+                    )
+                }
+            }
 
             // 3. Upload photo if one was selected
             var finalRecipe = recipe

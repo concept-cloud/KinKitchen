@@ -54,6 +54,7 @@ struct RecipeDetailView: View {
     @State private var isLoadingRecipePhoto = false
     
     @State private var dietaryCheckResult: RecipeDietaryCheckResult?
+    @State private var dietaryTagNames: [String] = []
     @State private var showAllergenWarningDetail = false
     
     @State private var showingRecipientSelection = false
@@ -419,6 +420,19 @@ struct RecipeDetailView: View {
                         text: "\(servings)"
                     )
                 }
+            }
+
+            // Owner-marked dietary tags. Informational only;
+            // the allergen warning below still applies.
+            if !dietaryTagNames.isEmpty {
+                metadataChip(
+                    icon: "leaf",
+                    text:
+                        "Marked " +
+                        dietaryTagNames.joined(
+                            separator: ", "
+                        )
+                )
             }
 
             timeDetails(recipe)
@@ -1500,6 +1514,32 @@ struct RecipeDetailView: View {
     
     // MARK: - Load Recipe
 
+    /// Names of restrictions the owner marked this recipe with.
+    /// Failures just leave the tags hidden.
+    @MainActor
+    private func loadDietaryTags() async {
+        async let tagRequest =
+            RecipeService
+                .fetchDietaryRestrictionTags(
+                    recipeIds: [recipeId]
+                )
+
+        async let restrictionRequest =
+            DietaryService
+                .fetchDietaryRestrictions()
+
+        let tagIds =
+            (try? await tagRequest)?[recipeId] ?? []
+
+        let restrictions =
+            (try? await restrictionRequest) ?? []
+
+        dietaryTagNames =
+            restrictions
+                .filter { tagIds.contains($0.id) }
+                .map(\.name)
+    }
+
     @MainActor
     private func loadRecipe() async {
         isLoading = true
@@ -1526,6 +1566,8 @@ struct RecipeDetailView: View {
             )
 
             await loadDietaryCheck()
+
+            await loadDietaryTags()
 
             async let ratingResult =
                 RecipeService

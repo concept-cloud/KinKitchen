@@ -39,7 +39,7 @@ enum RecipeDietaryCheckService {
         return try await evaluateRecipe(
             recipeId: recipeId,
             allergens: selectedAllergens
-        )
+        ).result
     }
 
     static func checkRecipe(
@@ -52,16 +52,22 @@ enum RecipeDietaryCheckService {
                     for: recipientId
                 )
 
-        let allergenResult =
+        let evaluation =
             try await evaluateRecipe(
                 recipeId: recipeId,
                 allergens: dietaryInformation.allergens
             )
 
+        let allergenResult =
+            evaluation.result
+
         let restrictionConflicts =
-            evaluateRestrictions(
+            restrictionConflicts(
                 dietaryInformation.restrictions,
-                against: allergenResult
+                ingredientNames:
+                    evaluation.ingredientNames,
+                allergenResult:
+                    evaluation.allergenAssociations
             )
 
         let preferenceConflicts =
@@ -84,16 +90,87 @@ enum RecipeDietaryCheckService {
                     .knownIngredientsWithoutMappedAllergens
         )
     }
+
+
+    /// Evaluates all allergens in already-loaded ingredients.
+    /// Used by recipe lists, which load ingredients in bulk.
+    static func evaluateAllergens(
+        ingredients: [RecipeIngredient]
+    ) async throws -> RecipeAllergenAssociationResult {
+
+        // Refreshing stored classifications writes to the
+        // ingredients, which can fail for recipes shared with
+        // the user. Evaluation itself doesn't depend on it.
+        try? await IngredientAllergenService
+            .refreshRecipeClassificationsIfNeeded(
+                ingredients: ingredients
+            )
+
+        return try await IngredientAllergenService
+            .evaluateRecipe(
+                ingredients:
+                    ingredients.map {
+                        IngredientAllergenInput(
+                            id: $0.id,
+                            name: $0.name,
+                            offProductId: $0.offProductId
+                        )
+                    }
+            )
+    }
+
+
+    /// Known conflicts between a recipe and dietary restrictions.
+    ///
+    /// Pass `allergenResult` as nil when allergens haven't been
+    /// evaluated yet; only ingredient keywords are checked then.
+    static func restrictionConflicts(
+        _ restrictions: [DietaryRestriction],
+        ingredientNames: [String],
+        allergenResult: RecipeAllergenAssociationResult?
+    ) -> [RecipeDietaryRestrictionConflict] {
+
+        restrictions.compactMap {
+            restriction in
+
+            let ingredients =
+                DietaryRestrictionRules
+                    .conflictingIngredients(
+                        for: restriction,
+                        ingredientNames: ingredientNames,
+                        allergenAssociations:
+                            allergenResult?
+                                .allergenAssociations
+                                ?? []
+                    )
+
+            guard !ingredients.isEmpty else {
+                return nil
+            }
+
+            return RecipeDietaryRestrictionConflict(
+                restriction: restriction,
+                ingredientNames: ingredients
+            )
+        }
+    }
 }
 
 // MARK: - Recipe Evaluation
 
 private extension RecipeDietaryCheckService {
 
+    struct RecipeEvaluation {
+        let result: RecipeDietaryCheckResult
+        let allergenAssociations: RecipeAllergenAssociationResult
+        let ingredientNames: [String]
+    }
+
+
     static func evaluateRecipe(
         recipeId: UUID,
         allergens: [Allergen]
-    ) async throws -> RecipeDietaryCheckResult {
+    ) async throws -> RecipeEvaluation {
         let ingredients =
             try await RecipeService.fetchIngredients(
                 recipeId: recipeId
@@ -175,46 +252,24 @@ private extension RecipeDietaryCheckService {
             state = .noKnownConflict
         }
 
-        return RecipeDietaryCheckResult(
-            recipeId: recipeId,
-            state: state,
-            selectedAllergens: selectedAllergens,
-            conflicts: conflicts,
-            unknownIngredients:
-                recipeEvaluation.unknownIngredients,
-            knownIngredientsWithoutMappedAllergens:
-                recipeEvaluation
-                    .knownIngredientsWithoutMappedAllergens
-        )
-    }
-}
-
-// MARK: - Dietary Restrictions
-
-private extension RecipeDietaryCheckService {
-
-    static func evaluateRestrictions(
-        _ restrictions: [DietaryRestriction],
-        against result: RecipeDietaryCheckResult
-    ) -> [RecipeDietaryRestrictionConflict] {
-        restrictions.compactMap {
-            restriction in
-
-            let matchingIngredients =
-                matchingIngredients(
-                    forDietaryName: restriction.name,
-                    in: result
-                )
-
-            guard !matchingIngredients.isEmpty else {
-                return nil
-            }
-
-            return RecipeDietaryRestrictionConflict(
-                restriction: restriction,
-                ingredientNames: matchingIngredients
+        let result =
+            RecipeDietaryCheckResult(
+                recipeId: recipeId,
+                state: state,
+                selectedAllergens: selectedAllergens,
+                conflicts: conflicts,
+                unknownIngredients:
+                    recipeEvaluation.unknownIngredients,
+                knownIngredientsWithoutMappedAllergens:
+                    recipeEvaluation
+                        .knownIngredientsWithoutMappedAllergens
             )
-        }
+
+        return RecipeEvaluation(
+            result: result,
+            allergenAssociations: recipeEvaluation,
+            ingredientNames: ingredients.map(\.name)
+        )
     }
 }
 

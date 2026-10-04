@@ -23,6 +23,7 @@ struct RecipesView: View {
     @State private var recipePhotoData: [UUID: Data] = [:]
     @State private var showingFilters = false
     @State private var criteria = RecipeDiscoveryCriteria()
+    @State private var discoveryContext = RecipeDiscoveryContext()
 
     
     var body: some View {
@@ -102,12 +103,15 @@ struct RecipesView: View {
                 isPresented: $showingFilters
             ) {
                 RecipeFilterSheet(
-                    criteria: $criteria
+                    criteria: $criteria,
+                    restrictions:
+                        discoveryContext.restrictions
                 )
             }
             // MARK: - Load
             .task {
                 await loadRecipes()
+                await loadDietaryInsights()
             }
         }
     }
@@ -229,6 +233,19 @@ struct RecipesView: View {
                                 ) {
                                     criteria.categories.remove(
                                         category
+                                    )
+                                }
+                            }
+                            ForEach(
+                                criteria.selectedRestrictions(
+                                    from: discoveryContext.restrictions
+                                )
+                            ) { restriction in
+                                activeFilterChip(
+                                    title: restriction.name
+                                ) {
+                                    criteria.restrictionIds.remove(
+                                        restriction.id
                                     )
                                 }
                             }
@@ -448,7 +465,8 @@ struct RecipesView: View {
     /// The selected tab's recipes narrowed by search.
     private var displayedRecipes: [Recipe] {
         criteria.apply(
-            to: filteredRecipes
+            to: filteredRecipes,
+            context: discoveryContext
         )
     }
 
@@ -555,6 +573,9 @@ struct RecipesView: View {
                     .foregroundStyle(
                         KinColors.secondaryText
                     )
+                    restrictionLabels(
+                        for: recipe
+                    )
                 }
                 Spacer()
                 // MARK: - Favorite Placeholder
@@ -566,6 +587,67 @@ struct RecipesView: View {
                     KinColors.primary
                 )
             }
+        }
+    }
+    // MARK: - Restriction Labels
+    /// Shows how each selected restriction was evaluated.
+    /// Conflicting recipes are already filtered out.
+    @ViewBuilder
+    private func restrictionLabels(
+        for recipe: Recipe
+    ) -> some View {
+        let restrictions =
+            criteria.selectedRestrictions(
+                from: discoveryContext.restrictions
+            )
+        if !restrictions.isEmpty {
+            VStack(
+                alignment: .leading,
+                spacing: KinSpacing.xxSmall
+            ) {
+                ForEach(restrictions) { restriction in
+                    restrictionLabel(
+                        restriction,
+                        status:
+                            discoveryContext.restrictionStatus(
+                                of: recipe,
+                                for: restriction
+                            )
+                    )
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func restrictionLabel(
+        _ restriction: DietaryRestriction,
+        status: RecipeRestrictionStatus
+    ) -> some View {
+        switch status {
+        case .markedByOwner:
+            Label(
+                "Marked \(restriction.name) by owner",
+                systemImage: "checkmark.seal"
+            )
+            .font(KinTypography.caption)
+            .foregroundStyle(KinColors.success)
+        case .notVerified:
+            Label(
+                "Not verified for \(restriction.name)",
+                systemImage: "questionmark.circle"
+            )
+            .font(KinTypography.caption)
+            .foregroundStyle(KinColors.secondaryText)
+        case .checking:
+            Label(
+                "Checking \(restriction.name)…",
+                systemImage: "hourglass"
+            )
+            .font(KinTypography.caption)
+            .foregroundStyle(KinColors.secondaryText)
+        case .conflict:
+            EmptyView()
         }
     }
     // MARK: - Metadata
@@ -707,6 +789,7 @@ Spacer()
             Button {
                 Task {
                     await loadRecipes()
+                    await loadDietaryInsights()
                 }
             } label: {
                 Text("Try Again")
@@ -807,6 +890,116 @@ Spacer()
     }
     
     
+    // MARK: - Load Dietary Insights
+
+    /// Loads what the dietary filters need. Ingredient keywords
+    /// and owner tags are available right away; the slower
+    /// allergen check then runs in the background per recipe.
+    /// Failures leave recipes unverified rather than breaking
+    /// the list.
+    @MainActor
+    private func loadDietaryInsights() async {
+        let recipeIds =
+            combinedRecipes.map(\.id)
+
+        async let restrictionRequest =
+            DietaryService
+                .fetchDietaryRestrictions()
+
+        async let ingredientRequest =
+            RecipeService
+                .fetchIngredients(
+                    recipeIds: recipeIds
+                )
+
+        async let tagRequest =
+            RecipeService
+                .fetchDietaryRestrictionTags(
+                    recipeIds: recipeIds
+                )
+
+        discoveryContext.restrictions =
+            (try? await restrictionRequest) ?? []
+
+        let tags =
+            (try? await tagRequest) ?? [:]
+
+        guard
+            let ingredients =
+                try? await ingredientRequest
+        else {
+            print(
+                "RECIPE DIETARY INSIGHT LOAD ERROR: ingredients unavailable"
+            )
+            return
+        }
+
+        let ingredientsByRecipe =
+            Dictionary(
+                grouping: ingredients,
+                by: \.recipeId
+            )
+
+        var insights:
+            [UUID: RecipeDietaryInsight] = [:]
+
+        for recipeId in recipeIds {
+            let recipeIngredients =
+                ingredientsByRecipe[recipeId] ?? []
+
+            insights[recipeId] =
+                RecipeDietaryInsight(
+                    ingredientNames:
+                        recipeIngredients.map(\.name),
+                    // Nothing to check without ingredients.
+                    allergenResult:
+                        recipeIngredients.isEmpty
+                            ? RecipeAllergenAssociationResult(
+                                ingredientResults: [],
+                                allergenAssociations: [],
+                                unknownIngredients: [],
+                                knownIngredientsWithoutMappedAllergens: []
+                            )
+                            : nil,
+                    taggedRestrictionIds:
+                        tags[recipeId] ?? []
+                )
+        }
+
+        discoveryContext.insights =
+            insights
+
+        await withTaskGroup(
+            of: (UUID, RecipeAllergenAssociationResult?).self
+        ) { group in
+            for (recipeId, recipeIngredients)
+                in ingredientsByRecipe {
+                group.addTask {
+                    let result =
+                        try? await RecipeDietaryCheckService
+                            .evaluateAllergens(
+                                ingredients:
+                                    recipeIngredients
+                            )
+                    return (recipeId, result)
+                }
+            }
+
+            for await (recipeId, result) in group {
+                if let result {
+                    discoveryContext
+                        .insights[recipeId]?
+                        .allergenResult = result
+                } else {
+                    discoveryContext
+                        .insights[recipeId]?
+                        .allergenCheckFailed = true
+                }
+            }
+        }
+    }
+
+
     @MainActor
     private func loadRecipePhoto(
         for recipe: Recipe

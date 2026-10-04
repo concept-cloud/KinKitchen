@@ -15,6 +15,8 @@ struct RecipeFilterSheet: View {
 
     @Binding var criteria: RecipeDiscoveryCriteria
 
+    let restrictions: [DietaryRestriction]
+
 
     var body: some View {
 
@@ -28,6 +30,8 @@ struct RecipeFilterSheet: View {
                 ) {
 
                     categorySection
+
+                    restrictionSection
                 }
                 .padding(
                     KinSpacing.large
@@ -122,6 +126,97 @@ private extension RecipeFilterSheet {
     }
 }
 
+// MARK: - Dietary Restrictions
+
+private extension RecipeFilterSheet {
+
+    var restrictionSection: some View {
+
+        VStack(
+            alignment: .leading,
+            spacing: KinSpacing.medium
+        ) {
+
+            Text("Dietary Restrictions")
+                .font(
+                    KinTypography.headline
+                )
+                .foregroundStyle(
+                    KinColors.primaryText
+                )
+
+            if restrictions.isEmpty {
+
+                Text(
+                    "Dietary restrictions couldn't be loaded."
+                )
+                .font(
+                    KinTypography.caption
+                )
+                .foregroundStyle(
+                    KinColors.secondaryText
+                )
+
+            } else {
+
+                LazyVGrid(
+                    columns: [
+                        GridItem(
+                            .adaptive(
+                                minimum: 100
+                            ),
+                            spacing: KinSpacing.small
+                        )
+                    ],
+                    alignment: .leading,
+                    spacing: KinSpacing.small
+                ) {
+
+                    ForEach(
+                        restrictions
+                    ) { restriction in
+
+                        filterChip(
+                            title: restriction.name,
+                            isSelected:
+                                criteria.restrictionIds
+                                    .contains(
+                                        restriction.id
+                                    )
+                        ) {
+
+                            if criteria.restrictionIds
+                                .contains(
+                                    restriction.id
+                                ) {
+                                criteria.restrictionIds
+                                    .remove(
+                                        restriction.id
+                                    )
+                            } else {
+                                criteria.restrictionIds
+                                    .insert(
+                                        restriction.id
+                                    )
+                            }
+                        }
+                    }
+                }
+
+                Text(
+                    "Recipes with a known conflict are hidden. Others are labeled as marked by the owner or not verified."
+                )
+                .font(
+                    KinTypography.caption
+                )
+                .foregroundStyle(
+                    KinColors.secondaryText
+                )
+            }
+        }
+    }
+}
+
 // MARK: - Chip
 
 private extension RecipeFilterSheet {
@@ -173,6 +268,7 @@ private extension RecipeFilterSheet {
     RecipeFilterSheet(
         criteria: .constant(
             RecipeDiscoveryCriteria()
-        )
+        ),
+        restrictions: []
     )
 }

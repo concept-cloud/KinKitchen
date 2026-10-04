@@ -720,6 +720,117 @@ enum RecipeService {
     }
 
 
+    // MARK: - Fetch Ingredients For Recipes
+
+    /// Loads ingredients for many recipes in one request.
+    static func fetchIngredients(
+        recipeIds: [UUID]
+    ) async throws -> [RecipeIngredient] {
+
+        guard !recipeIds.isEmpty else {
+            return []
+        }
+
+        let ingredients:
+            [RecipeIngredient] =
+                try await SupabaseManager.client
+                    .from(
+                        "recipe_ingredients"
+                    )
+                    .select()
+                    .in(
+                        "recipe_id",
+                        values: recipeIds
+                    )
+                    .order(
+                        "sort_order",
+                        ascending: true
+                    )
+                    .execute()
+                    .value
+
+        return ingredients
+    }
+
+
+    // MARK: - Fetch Dietary Restriction Tags
+
+    /// Restriction IDs each recipe's owner has tagged it with.
+    static func fetchDietaryRestrictionTags(
+        recipeIds: [UUID]
+    ) async throws -> [UUID: Set<UUID>] {
+
+        guard !recipeIds.isEmpty else {
+            return [:]
+        }
+
+        let tags:
+            [RecipeDietaryRestrictionTag] =
+                try await SupabaseManager.client
+                    .from(
+                        "recipe_dietary_restrictions"
+                    )
+                    .select(
+                        "recipe_id, restriction_id"
+                    )
+                    .in(
+                        "recipe_id",
+                        values: recipeIds
+                    )
+                    .execute()
+                    .value
+
+        return Dictionary(
+            grouping: tags,
+            by: \.recipeId
+        )
+        .mapValues {
+            Set($0.map(\.restrictionId))
+        }
+    }
+
+
+    // MARK: - Replace Dietary Restriction Tags
+
+    static func replaceDietaryRestrictionTags(
+        recipeId: UUID,
+        restrictionIds: Set<UUID>
+    ) async throws {
+
+        try await SupabaseManager.client
+            .from(
+                "recipe_dietary_restrictions"
+            )
+            .delete()
+            .eq(
+                "recipe_id",
+                value: recipeId
+            )
+            .execute()
+
+        guard !restrictionIds.isEmpty else {
+            return
+        }
+
+        let tags =
+            restrictionIds.map {
+                RecipeDietaryRestrictionTag(
+                    recipeId: recipeId,
+                    restrictionId: $0
+                )
+            }
+
+        try await SupabaseManager.client
+            .from(
+                "recipe_dietary_restrictions"
+            )
+            .insert(
+                tags
+            )
+            .execute()
+    }
+
+
     // MARK: - Replace Ingredients
 
     static func replaceIngredients(

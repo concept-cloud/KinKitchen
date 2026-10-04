@@ -234,6 +234,22 @@ extension Recipe {
 }
 
 
+// MARK: - Recipe Dietary Restriction Tag
+
+/// A dietary restriction the recipe's owner marked the recipe
+/// with. Row in `recipe_dietary_restrictions`.
+struct RecipeDietaryRestrictionTag: Codable, Hashable {
+
+    let recipeId: UUID
+    let restrictionId: UUID
+
+    enum CodingKeys: String, CodingKey {
+        case recipeId = "recipe_id"
+        case restrictionId = "restriction_id"
+    }
+}
+
+
 // MARK: - Recipe With Ingredients
 
 struct RecipeWithIngredients {
