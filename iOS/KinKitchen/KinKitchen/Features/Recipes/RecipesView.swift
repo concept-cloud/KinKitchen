@@ -306,6 +306,20 @@ struct RecipesView: View {
                         .buttonStyle(.plain)
                     }
                 }
+                // MARK: - Result Count
+                if !filteredRecipes.isEmpty,
+                   criteria.isSearching ||
+                   criteria.hasActiveFilters {
+                    Text(
+                        "Showing \(displayedRecipes.count) of \(filteredRecipes.count) recipes"
+                    )
+                    .font(
+                        KinTypography.caption
+                    )
+                    .foregroundStyle(
+                        KinColors.secondaryText
+                    )
+                }
                 // MARK: - Cards
                 if filteredRecipes.isEmpty {
                     filteredEmptyState
@@ -411,6 +425,22 @@ struct RecipesView: View {
             .multilineTextAlignment(
                 .center
             )
+            if criteria.activeFilterCount > 1 ||
+                (criteria.isSearching &&
+                 criteria.hasActiveFilters) {
+                Text(
+                    "Try removing a filter to see more recipes."
+                )
+                .font(
+                    KinTypography.caption
+                )
+                .foregroundStyle(
+                    KinColors.secondaryText
+                )
+                .multilineTextAlignment(
+                    .center
+                )
+            }
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, KinSpacing.xLarge)
