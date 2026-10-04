@@ -28,6 +28,8 @@ struct RecipesView: View {
     @State private var currentUserId: UUID?
     /// The user's saved links to shared recipes.
     @State private var savedRecipes: [SavedRecipe] = []
+    @State private var savingRecipeIds: Set<UUID> = []
+    @State private var saveErrorMessage: String?
     @State private var isLoading = true
     @State private var errorMessage: String?
     @State private var showingAddRecipe = false
@@ -337,6 +339,14 @@ struct RecipesView: View {
                     }
                 }
                 unavailableSharedNote
+                if let saveErrorMessage {
+                    Label(
+                        saveErrorMessage,
+                        systemImage: "exclamationmark.triangle"
+                    )
+                    .font(KinTypography.caption)
+                    .foregroundStyle(KinColors.error)
+                }
                 // MARK: - Cards
                 if filteredRecipes.isEmpty {
                     filteredEmptyState
@@ -347,14 +357,22 @@ struct RecipesView: View {
                         spacing: KinSpacing.medium
                     ) {
                         ForEach(displayedRecipes) { recipe in
-                            Button {
-                                selectedRecipeId = recipe.id
-                            } label: {
-                                recipeCard(
-                                    recipe
+                            ZStack(
+                                alignment: .topTrailing
+                            ) {
+                                Button {
+                                    selectedRecipeId = recipe.id
+                                } label: {
+                                    recipeCard(
+                                        recipe
+                                    )
+                                }
+                                .buttonStyle(.plain)
+                                savedStatusButton(
+                                    for: recipe
                                 )
+                                .padding(KinSpacing.medium)
                             }
-                            .buttonStyle(.plain)
                         }
                     }
                 }
@@ -785,15 +803,130 @@ struct RecipesView: View {
                     )
                 }
                 Spacer()
-                // MARK: - Favorite Placeholder
-                Image(
-                    systemName: "star"
-                )
-                .font(.title2)
-                .foregroundStyle(
-                    KinColors.primary
-                )
+                // Room for the saved-status button, which sits
+                // over the card so it can be tapped on its own.
+                if isShared(recipe) {
+                    Color.clear
+                        .frame(width: 44)
+                }
             }
+        }
+    }
+    // MARK: - Saved / Shared Status
+    /// Status comes from the user's own sharing and saved
+    /// relationships, never from the recipe itself.
+    private func isShared(
+        _ recipe: Recipe
+    ) -> Bool {
+        receivedShares.contains {
+            $0.recipeId == recipe.id
+        }
+    }
+
+    private func isSaved(
+        _ recipe: Recipe
+    ) -> Bool {
+        savedRecipes.contains {
+            $0.recipeId == recipe.id
+        }
+    }
+
+    /// Bookmark shown on recipes shared with the user. Own
+    /// recipes don't get one since there's nothing to save.
+    @ViewBuilder
+    private func savedStatusButton(
+        for recipe: Recipe
+    ) -> some View {
+        if isShared(recipe) {
+            let saved = isSaved(recipe)
+            Button {
+                Task {
+                    await toggleSaved(recipe)
+                }
+            } label: {
+                VStack(spacing: KinSpacing.xxSmall) {
+                    if savingRecipeIds.contains(recipe.id) {
+                        ProgressView()
+                            .tint(KinColors.primary)
+                            .frame(height: 24)
+                    } else {
+                        Image(
+                            systemName:
+                                saved
+                                    ? "bookmark.fill"
+                                    : "bookmark"
+                        )
+                        .font(.title2)
+                        .frame(height: 24)
+                    }
+                    Text(saved ? "Saved" : "Save")
+                        .font(KinTypography.caption2)
+                }
+                .foregroundStyle(KinColors.primary)
+                .frame(width: 44, height: 50)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .disabled(savingRecipeIds.contains(recipe.id))
+            .accessibilityLabel(
+                saved
+                    ? "Saved. Remove from Saved"
+                    : "Shared with you. Save recipe"
+            )
+        }
+    }
+
+    @MainActor
+    private func toggleSaved(
+        _ recipe: Recipe
+    ) async {
+        guard
+            !savingRecipeIds.contains(recipe.id)
+        else {
+            return
+        }
+
+        let wasSaved = isSaved(recipe)
+        savingRecipeIds.insert(recipe.id)
+        saveErrorMessage = nil
+
+        defer {
+            savingRecipeIds.remove(recipe.id)
+        }
+
+        do {
+            if wasSaved {
+                try await SavedRecipeService
+                    .unsaveRecipe(
+                        recipeId: recipe.id
+                    )
+            } else {
+                try await SavedRecipeService
+                    .saveRecipe(
+                        recipeId: recipe.id,
+                        shareId:
+                            receivedShares.first {
+                                $0.recipeId == recipe.id
+                            }?.id
+                    )
+            }
+
+            // Show the state Supabase confirms, not the one
+            // we hoped for.
+            savedRecipes =
+                try await SavedRecipeService
+                    .fetchSavedRecipes()
+
+        } catch {
+            saveErrorMessage =
+                wasSaved
+                    ? "\(recipe.name) couldn't be removed from Saved. Please try again."
+                    : "\(recipe.name) couldn't be saved. Please try again."
+
+            print(
+                "RECIPE CARD SAVE ERROR:",
+                error.localizedDescription
+            )
         }
     }
     // MARK: - Restriction Labels
