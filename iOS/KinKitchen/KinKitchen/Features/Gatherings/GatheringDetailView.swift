@@ -45,6 +45,8 @@ struct GatheringDetailView: View {
     @State private var isRespondingToInvitation = false
     @State private var invitationResponseError: String?
 
+    @State private var selectedDishRecipeId: UUID?
+
     @State private var showingCompleteConfirmation = false
     @State private var isCompleting = false
     @State private var completeErrorMessage: String?
@@ -82,6 +84,17 @@ struct GatheringDetailView: View {
             }
         }
         .navigationBarHidden(true)
+        .navigationDestination(
+            item: $selectedDishRecipeId
+        ) { recipeId in
+
+            RecipeDetailView(
+                recipeId: recipeId,
+                onBack: {
+                    selectedDishRecipeId = nil
+                }
+            )
+        }
         .task {
 
             await loadGathering()
@@ -1657,15 +1670,28 @@ private extension GatheringDetailView {
                     spacing: KinSpacing.medium
                 ) {
                     ForEach(dishGatheringNeeds) { need in
-                        NavigationLink {
-                            GatheringNeedDetailView(
-                                need: need,
-                                isHost: isHost
-                            )
-                        } label: {
-                            gatheringNeedCard(need)
+                        ZStack(
+                            alignment: .bottomTrailing
+                        ) {
+                            NavigationLink {
+                                GatheringNeedDetailView(
+                                    need: need,
+                                    isHost: isHost
+                                )
+                            } label: {
+                                gatheringNeedCard(need)
+                            }
+                            .buttonStyle(.plain)
+
+                            // Separate from the card so it opens
+                            // the recipe, not the dish.
+                            if let recipeId = need.recipeId {
+                                dishRecipeButton(
+                                    recipeId
+                                )
+                                .padding(KinSpacing.medium)
+                            }
                         }
-                        .buttonStyle(.plain)
                     }
                 }
             }
@@ -1711,6 +1737,31 @@ private extension GatheringDetailView {
         )
     }
     
+    /// Opens the original recipe a dish was linked to. No copy is
+    /// made; Recipe Detail handles a recipe that's gone.
+    func dishRecipeButton(
+        _ recipeId: UUID
+    ) -> some View {
+        Button {
+            selectedDishRecipeId = recipeId
+        } label: {
+            Label(
+                "Recipe",
+                systemImage: "book.fill"
+            )
+            .font(KinTypography.caption)
+            .foregroundStyle(KinColors.primary)
+            .padding(.horizontal, KinSpacing.medium)
+            .padding(.vertical, KinSpacing.xSmall)
+            .background(
+                KinColors.primary.opacity(0.12)
+            )
+            .clipShape(Capsule())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("View recipe")
+    }
+
     func requirements(
         for need: GatheringNeed
     ) -> [GatheringNeedRequirement] {

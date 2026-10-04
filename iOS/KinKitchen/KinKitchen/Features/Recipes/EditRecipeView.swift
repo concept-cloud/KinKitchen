@@ -1628,8 +1628,14 @@ struct EditRecipeView: View {
             dismiss()
 
         } catch {
+            // Raised by the recipe delete guard in Supabase
+            // (supabase/KINKIT-158) for recipes served at a past
+            // gathering, so attendees never lose them.
             errorMessage =
-                "The recipe could not be deleted."
+                String(describing: error)
+                    .contains("RECIPE_IN_PAST_GATHERING")
+                    ? "This recipe was part of a past gathering, so it's being kept for the people who attended. It can't be deleted."
+                    : "The recipe could not be deleted."
 
             print(
                 "EDIT RECIPE DELETE ERROR:",
