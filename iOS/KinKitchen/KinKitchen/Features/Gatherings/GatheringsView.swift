@@ -19,7 +19,7 @@ struct GatheringsView: View {
         
         case upcoming = "Upcoming"
         case hosting = "Hosting"
-        case past = "Past"
+        case history = "History"
     }
     
     
@@ -353,9 +353,14 @@ private extension GatheringsView {
                 .layoutPriority(1)
 
                 Text(
-                    formattedDateTime(
-                        gathering.startsAt
-                    )
+                    gathering.isHistorical()
+                        ? gathering.startsAt.formatted(
+                            date: .abbreviated,
+                            time: .shortened
+                        )
+                        : formattedDateTime(
+                            gathering.startsAt
+                        )
                 )
                 .font(
                     KinTypography.caption
@@ -363,6 +368,12 @@ private extension GatheringsView {
                 .foregroundStyle(
                     KinColors.secondaryText
                 )
+
+                if gathering.isHistorical() {
+                    historyStatusBadge(
+                        gathering
+                    )
+                }
 
                 if let location =
                     cleaned(
@@ -425,7 +436,9 @@ private extension GatheringsView {
                 )
 
                 Text(
-                    item.relationship.displayName
+                    relationshipLabel(
+                        for: item
+                    )
                 )
                 .font(
                     KinTypography.caption
@@ -480,6 +493,51 @@ private extension GatheringsView {
                 cornerRadius:
                     KinRadius.large
             )
+        )
+    }
+
+
+    /// Past tense once the gathering is in history.
+    func relationshipLabel(
+        for item: GatheringListItem
+    ) -> String {
+
+        guard item.gathering.isHistorical() else {
+            return item.relationship.displayName
+        }
+
+        switch item.relationship {
+        case .hosting:
+            return "Hosted"
+        case .going:
+            return "Attended"
+        case .invited:
+            return "Invited"
+        }
+    }
+
+
+    func historyStatusBadge(
+        _ gathering: Gathering
+    ) -> some View {
+
+        let isCancelled =
+            gathering.status == .cancelled
+
+        return Label(
+            isCancelled ? "Cancelled" : "Completed",
+            systemImage:
+                isCancelled
+                    ? "xmark.circle"
+                    : "checkmark.circle"
+        )
+        .font(
+            KinTypography.caption
+        )
+        .foregroundStyle(
+            isCancelled
+                ? KinColors.error
+                : KinColors.success
         )
     }
 
@@ -737,8 +795,8 @@ private extension GatheringsView {
         case .hosting:
             return "Nothing You're Hosting"
 
-        case .past:
-            return "No Past Gatherings"
+        case .history:
+            return "No Gathering History Yet"
         }
     }
 
@@ -753,8 +811,8 @@ private extension GatheringsView {
         case .hosting:
             return "Gatherings you host will appear here."
 
-        case .past:
-            return "Past gatherings will appear here."
+        case .history:
+            return "Completed gatherings you hosted or attended will appear here, with their guests and dishes."
         }
     }
 }
@@ -889,7 +947,7 @@ private extension GatheringsView {
                         .fetchHostedGatheringItems()
 
 
-            case .past:
+            case .history:
 
                 gatherings =
                     try await GatheringService
