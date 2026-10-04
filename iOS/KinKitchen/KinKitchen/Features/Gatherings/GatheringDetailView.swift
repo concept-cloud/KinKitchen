@@ -979,7 +979,11 @@ private extension GatheringDetailView {
             alignment: .leading,
             spacing: KinSpacing.medium
         ) {
-            Text("Who's Coming")
+            Text(
+                isHistoricalGathering
+                    ? "Who Came"
+                    : "Who's Coming"
+            )
                 .font(
                     KinTypography.headline
                 )
@@ -1062,6 +1066,12 @@ private extension GatheringDetailView {
                     KinRadius.large
             )
         )
+    }
+
+    /// Completed (by the host or by date) or a past cancelled
+    /// gathering.
+    var isHistoricalGathering: Bool {
+        gathering?.isHistorical() ?? false
     }
 
     var visibleGatheringParticipants:
@@ -1209,15 +1219,21 @@ private extension GatheringDetailView {
     func participantAttendanceBadge(
         _ status: InvitationStatus
     ) -> some View {
-        let title =
-            status == .accepted
-                ? "Going"
-                : "Invited"
+        // Past tense once the gathering is over.
+        let title: String =
+            switch (status == .accepted, isHistoricalGathering) {
+            case (true, false): "Going"
+            case (false, false): "Invited"
+            case (true, true): "Attended"
+            case (false, true): "No Response"
+            }
 
         let color =
             status == .accepted
                 ? KinColors.success
-                : KinColors.warning
+                : isHistoricalGathering
+                    ? KinColors.secondaryText
+                    : KinColors.warning
 
         return Text(title)
             .font(
