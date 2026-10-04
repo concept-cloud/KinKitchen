@@ -61,6 +61,11 @@ struct RecipeDetailView: View {
     @State private var isSaved = false
     @State private var isUpdatingSaved = false
     @State private var saveErrorMessage: String?
+
+    @State private var isLegacyExpanded = false
+
+    @State private var authorLineText: String?
+    @State private var sharedByText: String?
     @State private var showAllergenWarningDetail = false
     
     @State private var showingRecipientSelection = false
@@ -446,6 +451,24 @@ struct RecipeDetailView: View {
                     .foregroundStyle(KinColors.error)
             }
 
+            if let authorLineText {
+                Label(
+                    authorLineText,
+                    systemImage: "pencil.line"
+                )
+                .font(KinTypography.caption)
+                .foregroundStyle(KinColors.secondaryText)
+            }
+
+            if let sharedByText {
+                Label(
+                    sharedByText,
+                    systemImage: "person.fill"
+                )
+                .font(KinTypography.caption)
+                .foregroundStyle(KinColors.primary)
+            }
+
             HStack(spacing: KinSpacing.medium) {
                 if let category = cleaned(recipe.category) {
                     metadataChip(
@@ -508,23 +531,66 @@ struct RecipeDetailView: View {
                 alignment: .leading,
                 spacing: KinSpacing.medium
             ) {
-                HStack(
-                    spacing: KinSpacing.small
-                ) {
-                    Image(
-                        systemName: "book.closed.fill"
-                    )
-                    .foregroundStyle(
-                        KinColors.primary
-                    )
-
-                    Text("Story & Legacy")
-                        .font(KinTypography.title3)
-                        .foregroundStyle(
-                            KinColors.primaryText
+                // Collapsed by default to save space.
+                Button {
+                    withAnimation(.easeInOut(duration: 0.2)) {
+                        isLegacyExpanded.toggle()
+                    }
+                } label: {
+                    HStack(
+                        spacing: KinSpacing.small
+                    ) {
+                        Image(
+                            systemName: "book.closed.fill"
                         )
-                }
+                        .foregroundStyle(
+                            KinColors.primary
+                        )
 
+                        VStack(
+                            alignment: .leading,
+                            spacing: KinSpacing.xxSmall
+                        ) {
+                            Text("Story & Legacy")
+                                .font(KinTypography.title3)
+                                .foregroundStyle(
+                                    KinColors.primaryText
+                                )
+
+                            if !isLegacyExpanded,
+                               let contributor {
+                                Text("From \(contributor)")
+                                    .font(KinTypography.caption)
+                                    .foregroundStyle(
+                                        KinColors.secondaryText
+                                    )
+                                    .lineLimit(1)
+                            }
+                        }
+
+                        Spacer()
+
+                        Image(systemName: "chevron.down")
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(KinColors.primary)
+                            .rotationEffect(
+                                .degrees(isLegacyExpanded ? 180 : 0)
+                            )
+                    }
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Story & Legacy")
+                .accessibilityValue(
+                    isLegacyExpanded ? "Expanded" : "Collapsed"
+                )
+                .accessibilityHint(
+                    isLegacyExpanded
+                        ? "Hides the story"
+                        : "Shows the story"
+                )
+
+                if isLegacyExpanded {
                 KinCard {
                     VStack(
                         alignment: .leading,
@@ -599,6 +665,8 @@ struct RecipeDetailView: View {
                             }
                         }
                     }
+                }
+                .transition(.opacity)
                 }
             }
         }
@@ -1561,6 +1629,54 @@ struct RecipeDetailView: View {
     
     // MARK: - Load Recipe
 
+    // MARK: - Attribution
+
+    /// Author line and sender, using the same rules as the
+    /// recipe cards. Missing profiles fall back to a generic name.
+    @MainActor
+    private func loadAttribution(
+        for recipe: Recipe
+    ) async {
+        let authorId =
+            RecipeAttribution.originalAuthorId(
+                of: recipe,
+                originalOwners:
+                    originalRecipe.map {
+                        [$0.id: $0.ownerId]
+                    } ?? [:]
+            )
+
+        let userIds =
+            [authorId, recipe.ownerId, receivedShare?.senderId]
+                .compactMap { $0 }
+
+        let profiles =
+            (try? await ProfileService
+                .fetchProfiles(userIds: userIds)) ?? []
+
+        func name(_ userId: UUID) -> String {
+            if userId == currentUserId {
+                return "you"
+            }
+            return profiles
+                .first { $0.id == userId }?
+                .bestDisplayName
+                ?? "a Kin Kitchen user"
+        }
+
+        authorLineText =
+            RecipeAttribution.authorLine(
+                for: recipe,
+                authorId: authorId,
+                name: name
+            )
+
+        sharedByText =
+            receivedShare.map {
+                "Shared with you by \(name($0.senderId))"
+            }
+    }
+
     // MARK: - Saved State
 
     /// Saving is only offered for recipes shared with the user
@@ -1726,9 +1842,11 @@ struct RecipeDetailView: View {
                     .user
                     .id
 
+            // A deleted original shouldn't stop this version
+            // from opening.
             if recipe.originalRecipeId != nil {
                 originalRecipe =
-                    try await RecipeService
+                    try? await RecipeService
                         .fetchOriginalRecipe(
                             for: recipe
                         )
@@ -1740,9 +1858,17 @@ struct RecipeDetailView: View {
                 for: recipe
             )
 
+            await loadAttribution(
+                for: recipe
+            )
+
         } catch {
+            // PGRST116: no row came back, so the recipe was
+            // deleted or is no longer shared with this user.
             errorMessage =
-                "Please check your connection and try again."
+                (error as? PostgrestError)?.code == "PGRST116"
+                    ? "This recipe is no longer available. It may have been deleted or is no longer shared with you."
+                    : "Please check your connection and try again."
 
             print(
                 "RECIPE DETAIL LOAD ERROR:",
