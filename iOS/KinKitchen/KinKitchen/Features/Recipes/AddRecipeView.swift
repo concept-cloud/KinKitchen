@@ -24,7 +24,7 @@ struct AddRecipeView: View {
     @State private var servings = 4
     @State private var prepTime = ""
     @State private var cookTime = ""
-    @State private var selectedCategory = "Dinner"
+    @State private var selectedCategory: RecipeCategory = .dinner
 
     @State private var ingredients: [IngredientDraft] = [IngredientDraft()]
     @State private var instructions: [InstructionDraft] = [InstructionDraft()]
@@ -44,17 +44,6 @@ struct AddRecipeView: View {
     @State private var isSaving = false
     @State private var errorMessage: String?
     @State private var showingError = false
-
-    private let categories = [
-        "Breakfast",
-        "Lunch",
-        "Dinner",
-        "Side Dish",
-        "Dessert",
-        "Snack",
-        "Drink",
-        "Other"
-    ]
 
     init(
         onRecipeCreated: ((Recipe) -> Void)? = nil,
@@ -411,12 +400,12 @@ struct AddRecipeView: View {
                 .foregroundStyle(KinColors.primaryText)
 
             Menu {
-                ForEach(categories, id: \.self) { category in
-                    Button(category) { selectedCategory = category }
+                ForEach(RecipeCategory.allCases) { category in
+                    Button(category.rawValue) { selectedCategory = category }
                 }
             } label: {
                 HStack {
-                    Text(selectedCategory)
+                    Text(selectedCategory.rawValue)
                         .font(KinTypography.body)
                         .foregroundStyle(KinColors.primaryText)
 
@@ -1104,7 +1093,7 @@ struct AddRecipeView: View {
                 prepTimeMinutes: Int(prepTime),
                 cookTimeMinutes: Int(cookTime),
                 photoPath: nil,
-                category: selectedCategory
+                category: selectedCategory.rawValue
             )
 
             createdRecipe = recipe

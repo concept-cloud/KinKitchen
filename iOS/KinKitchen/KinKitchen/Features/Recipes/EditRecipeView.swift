@@ -371,14 +371,7 @@ struct EditRecipeView: View {
 
                     fieldLabel("Category")
 
-                    TextField(
-                        "Category",
-                        text: $category
-                    )
-                    .textInputAutocapitalization(
-                        .words
-                    )
-                    .submitLabel(.next)
+                    categoryMenu
                 }
             }
 
@@ -1639,6 +1632,40 @@ struct EditRecipeView: View {
 
 
     // MARK: - Field Components
+
+    /// Category picker. A recipe saved with older free-text
+    /// that isn't a standard category keeps that value until
+    /// the user picks a new one.
+    private var categoryMenu: some View {
+        Menu {
+            ForEach(RecipeCategory.allCases) { option in
+                Button(option.rawValue) {
+                    category = option.rawValue
+                }
+            }
+        } label: {
+            HStack {
+                Text(
+                    category.isEmpty
+                        ? "Choose a category"
+                        : category
+                )
+                .font(KinTypography.body)
+                .foregroundStyle(
+                    category.isEmpty
+                        ? KinColors.secondaryText
+                        : KinColors.primaryText
+                )
+
+                Spacer()
+
+                Image(systemName: "chevron.down")
+                    .foregroundStyle(KinColors.primary)
+            }
+            .contentShape(Rectangle())
+        }
+    }
+
 
     private func fieldLabel(
         _ title: String
