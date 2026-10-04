@@ -18,6 +18,10 @@ struct RecipeDiscoveryCriteria:
 
     var searchText = ""
 
+    /// Selected categories. A recipe matches when it belongs
+    /// to any of them.
+    var categories: Set<RecipeCategory> = []
+
 
     var trimmedSearchText: String {
 
@@ -33,18 +37,54 @@ struct RecipeDiscoveryCriteria:
     }
 
 
+    /// Number of active filters, not counting search.
+    var activeFilterCount: Int {
+
+        categories.count
+    }
+
+
+    /// Selected categories in display order.
+    var sortedCategories: [RecipeCategory] {
+
+        RecipeCategory.allCases.filter {
+            categories.contains($0)
+        }
+    }
+
+
+    var hasActiveFilters: Bool {
+
+        activeFilterCount > 0
+    }
+
+
     func matches(
         _ recipe: Recipe
     ) -> Bool {
 
-        guard isSearching else {
-            return true
-        }
-
-        return recipe.name
+        if isSearching,
+           !recipe.name
             .localizedCaseInsensitiveContains(
                 trimmedSearchText
-            )
+            ) {
+            return false
+        }
+
+        if !categories.isEmpty {
+
+            guard
+                let recipeCategory =
+                    recipe.recipeCategory,
+                categories.contains(
+                    recipeCategory
+                )
+            else {
+                return false
+            }
+        }
+
+        return true
     }
 
 

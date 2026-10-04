@@ -21,7 +21,7 @@ struct RecipesView: View {
     @State private var showingAddRecipe = false
     @State private var selectedRecipeId: UUID?
     @State private var recipePhotoData: [UUID: Data] = [:]
-    @State private var showingFilterMessage = false
+    @State private var showingFilters = false
     @State private var criteria = RecipeDiscoveryCriteria()
 
     
@@ -97,6 +97,14 @@ struct RecipesView: View {
                     }
                 )
             }
+            // MARK: - Filters
+            .sheet(
+                isPresented: $showingFilters
+            ) {
+                RecipeFilterSheet(
+                    criteria: $criteria
+                )
+            }
             // MARK: - Load
             .task {
                 await loadRecipes()
@@ -143,9 +151,7 @@ struct RecipesView: View {
                         )
                     Spacer()
                     Button {
-                        withAnimation {
-                            showingFilterMessage.toggle()
-                        }
+                        showingFilters = true
                     } label: {
                         Image(
                             systemName:
@@ -153,34 +159,52 @@ struct RecipesView: View {
                         )
                         .font(.title2)
                         .foregroundStyle(
-                            KinColors.primary
+                            criteria.hasActiveFilters
+                                ? .white
+                                : KinColors.primary
                         )
                         .frame(
                             width: 46,
                             height: 46
                         )
                         .background(
-                            KinColors.surface
+                            criteria.hasActiveFilters
+                                ? KinColors.primary
+                                : KinColors.surface
                         )
                         .clipShape(Circle())
+                        .overlay(
+                            alignment: .topTrailing
+                        ) {
+                            if criteria.hasActiveFilters {
+                                Text(
+                                    "\(criteria.activeFilterCount)"
+                                )
+                                .font(
+                                    .system(
+                                        size: 11,
+                                        weight: .bold
+                                    )
+                                )
+                                .foregroundStyle(
+                                    KinColors.primary
+                                )
+                                .frame(
+                                    width: 18,
+                                    height: 18
+                                )
+                                .background(.white)
+                                .clipShape(Circle())
+                                .offset(x: 2, y: -2)
+                            }
+                        }
                     }
                     .buttonStyle(.plain)
-                }
-                if showingFilterMessage {
-                    Text(
-                        "Advanced filtering is coming in Milestone B1."
-                    )
-                    .font(KinTypography.caption)
-                    .foregroundStyle(
-                        KinColors.secondaryText
-                    )
-                    .frame(
-                        maxWidth: .infinity,
-                        alignment: .center
-                    )
-                    .padding(
-                        .vertical,
-                        KinSpacing.small
+                    .accessibilityLabel("Filters")
+                    .accessibilityValue(
+                        criteria.hasActiveFilters
+                            ? "\(criteria.activeFilterCount) active"
+                            : "None active"
                     )
                 }
                 // MARK: - Search
@@ -188,6 +212,29 @@ struct RecipesView: View {
                     text: $criteria.searchText,
                     placeholder: "Search recipes"
                 )
+                // MARK: - Active Filters
+                if criteria.hasActiveFilters {
+                    ScrollView(
+                        .horizontal,
+                        showsIndicators: false
+                    ) {
+                        HStack(
+                            spacing: KinSpacing.small
+                        ) {
+                            ForEach(
+                                criteria.sortedCategories
+                            ) { category in
+                                activeFilterChip(
+                                    title: category.rawValue
+                                ) {
+                                    criteria.categories.remove(
+                                        category
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
                 // MARK: - Filters
                 HStack(
                     spacing: KinSpacing.small
@@ -321,7 +368,7 @@ struct RecipesView: View {
                 KinColors.primaryText
             )
             Text(
-                "No recipes match \"\(criteria.trimmedSearchText)\"."
+                noResultsMessage
             )
             .font(
                 KinTypography.body
@@ -335,6 +382,65 @@ struct RecipesView: View {
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, KinSpacing.xLarge)
+    }
+
+    private var noResultsMessage: String {
+        if criteria.isSearching,
+           criteria.hasActiveFilters {
+            return "No recipes match \"\(criteria.trimmedSearchText)\" with the selected filters."
+        }
+        if criteria.isSearching {
+            return "No recipes match \"\(criteria.trimmedSearchText)\"."
+        }
+        return "No recipes match the selected filters."
+    }
+
+    // MARK: - Active Filter Chip
+    private func activeFilterChip(
+        title: String,
+        onRemove: @escaping () -> Void
+    ) -> some View {
+        Button(action: onRemove) {
+            HStack(
+                spacing: KinSpacing.xSmall
+            ) {
+                Text(title)
+                    .font(
+                        KinTypography.caption
+                    )
+                Image(
+                    systemName: "xmark"
+                )
+                .font(
+                    .system(
+                        size: 10,
+                        weight: .bold
+                    )
+                )
+            }
+            .foregroundStyle(
+                KinColors.primary
+            )
+            .padding(
+                .horizontal,
+                KinSpacing.medium
+            )
+            .padding(
+                .vertical,
+                KinSpacing.xSmall
+            )
+            .background(
+                KinColors.primary
+                    .opacity(0.12)
+            )
+            .clipShape(
+                Capsule()
+            )
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(
+            "Remove \(title) filter"
+        )
     }
 
     // MARK: - Displayed Recipes
