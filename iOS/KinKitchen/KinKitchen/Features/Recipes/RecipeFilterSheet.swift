@@ -49,6 +49,25 @@ struct RecipeFilterSheet: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
 
+                // Clears filters only; search is left alone here
+                // since the search bar isn't in this sheet.
+                ToolbarItem(
+                    placement: .cancellationAction
+                ) {
+
+                    Button("Clear") {
+                        criteria.categories = []
+                        criteria.restrictionIds = []
+                        criteria.allergenIds = []
+                    }
+                    .foregroundStyle(
+                        KinColors.primary
+                    )
+                    .disabled(
+                        !criteria.hasActiveFilters
+                    )
+                }
+
                 ToolbarItem(
                     placement: .confirmationAction
                 ) {

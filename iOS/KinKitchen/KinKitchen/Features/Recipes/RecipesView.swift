@@ -306,19 +306,23 @@ struct RecipesView: View {
                         .buttonStyle(.plain)
                     }
                 }
-                // MARK: - Result Count
-                if !filteredRecipes.isEmpty,
-                   criteria.isSearching ||
-                   criteria.hasActiveFilters {
-                    Text(
-                        "Showing \(displayedRecipes.count) of \(filteredRecipes.count) recipes"
-                    )
-                    .font(
-                        KinTypography.caption
-                    )
-                    .foregroundStyle(
-                        KinColors.secondaryText
-                    )
+                // MARK: - Result Count / Clear
+                if criteria.isActive {
+                    HStack {
+                        if !filteredRecipes.isEmpty {
+                            Text(
+                                "Showing \(displayedRecipes.count) of \(filteredRecipes.count) recipes"
+                            )
+                            .font(
+                                KinTypography.caption
+                            )
+                            .foregroundStyle(
+                                KinColors.secondaryText
+                            )
+                        }
+                        Spacer()
+                        clearFiltersButton
+                    }
                 }
                 // MARK: - Cards
                 if filteredRecipes.isEmpty {
@@ -455,6 +459,32 @@ struct RecipesView: View {
             return "No recipes match \"\(criteria.trimmedSearchText)\"."
         }
         return "No recipes match the selected filters."
+    }
+
+    // MARK: - Clear Filters
+    private var clearFiltersButton: some View {
+        Button {
+            clearDiscovery()
+        } label: {
+            Label(
+                "Clear Filters",
+                systemImage: "xmark.circle"
+            )
+            .font(
+                KinTypography.subheadline
+            )
+            .foregroundStyle(
+                KinColors.primary
+            )
+        }
+        .buttonStyle(.plain)
+    }
+
+    /// Resets search and filters. Interface state only.
+    private func clearDiscovery() {
+        withAnimation {
+            criteria.reset()
+        }
     }
 
     // MARK: - Active Filter Chip

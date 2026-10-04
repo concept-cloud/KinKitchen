@@ -91,6 +91,21 @@ struct RecipeDiscoveryCriteria:
     }
 
 
+    /// True when search or any filter is narrowing the results.
+    var isActive: Bool {
+
+        isSearching || hasActiveFilters
+    }
+
+
+    /// Clears search and every filter. Only interface state
+    /// changes; nothing stored is touched.
+    mutating func reset() {
+
+        self = RecipeDiscoveryCriteria()
+    }
+
+
     func matches(
         _ recipe: Recipe,
         context: RecipeDiscoveryContext

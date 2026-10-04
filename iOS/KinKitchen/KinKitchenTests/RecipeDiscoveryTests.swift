@@ -284,6 +284,50 @@ extension RecipeDiscoveryTests {
     }
 }
 
+// MARK: - Clear Filters (KINKIT-143)
+
+extension RecipeDiscoveryTests {
+
+    @Test func clearingResetsEverythingAndRestoresResults() {
+        var criteria = RecipeDiscoveryCriteria()
+        criteria.searchText = "fruit"
+        criteria.categories = [.breakfast]
+        criteria.restrictionIds = [Self.vegan.id]
+        criteria.allergenIds = [Self.peanut.id]
+
+        #expect(criteria.isActive)
+        #expect(results(criteria) == ["Fruit Salad"])
+
+        criteria.reset()
+
+        #expect(!criteria.isActive)
+        #expect(criteria.activeFilterCount == 0)
+        #expect(criteria.searchText.isEmpty)
+        #expect(results(criteria).count == Self.recipes.count)
+    }
+
+    @Test func canFilterAgainAfterClearing() {
+        var criteria = RecipeDiscoveryCriteria()
+        criteria.categories = [.dinner]
+        criteria.reset()
+
+        criteria.categories = [.lunch]
+
+        #expect(results(criteria) == ["Peanut Noodles"])
+    }
+
+    @Test func clearingDoesNotChangeLoadedData() {
+        var criteria = RecipeDiscoveryCriteria()
+        criteria.allergenIds = [Self.milk.id]
+        _ = results(criteria)
+
+        criteria.reset()
+
+        #expect(Self.context.insights.count == Self.recipes.count)
+        #expect(Self.context.profileAllergenIds.isEmpty)
+    }
+}
+
 // MARK: - Fixture Builders
 
 private extension RecipeDiscoveryTests {
