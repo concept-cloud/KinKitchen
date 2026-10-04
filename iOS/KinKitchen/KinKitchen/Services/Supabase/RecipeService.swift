@@ -1110,13 +1110,11 @@ enum RecipeServiceError:
             
         case .recipeNotOwnedByCurrentUser:
             
-            return
-            "The current user does not own this recipe."
-            
+            return "The current user does not own this recipe."
+
         case .invalidRating:
-            
-            return
-            "Recipe ratings must be between 1 and 5."
+
+            return "Recipe ratings must be between 1 and 5."
         }
     }
 }

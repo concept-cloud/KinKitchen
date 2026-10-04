@@ -121,7 +121,7 @@ enum GatheringService {
                 )
                 .gte(
                     "starts_at",
-                    value: now
+                    value: now.addingTimeInterval(-Gathering.activeWindowAfterStart)
                 )
                 .order(
                     "starts_at",
@@ -178,7 +178,7 @@ enum GatheringService {
                 )
                 .gte(
                     "starts_at",
-                    value: now
+                    value: now.addingTimeInterval(-Gathering.activeWindowAfterStart)
                 )
                 .order(
                     "starts_at",
@@ -579,7 +579,7 @@ enum GatheringService {
                 )
                 .gte(
                     "starts_at",
-                    value: now
+                    value: now.addingTimeInterval(-Gathering.activeWindowAfterStart)
                 )
                 .order(
                     "starts_at",
@@ -683,7 +683,7 @@ enum GatheringService {
                 .gte(
                     "starts_at",
                     value:
-                        now
+                        now.addingTimeInterval(-Gathering.activeWindowAfterStart)
                 )
                 .order(
                     "starts_at",
@@ -809,7 +809,7 @@ enum GatheringService {
                 .gte(
                     "starts_at",
                     value:
-                        now
+                        now.addingTimeInterval(-Gathering.activeWindowAfterStart)
                 )
                 .order(
                     "starts_at",

@@ -85,9 +85,25 @@ enum GatheringStatus:
 
 extension Gathering {
 
+    /// How long a gathering stays active after it starts, so guests
+    /// can still claim dishes and the host can still edit while it's
+    /// happening. After this it moves to History automatically.
+    static let activeWindowAfterStart: TimeInterval =
+        12 * 60 * 60
+
+
+    /// When the gathering automatically moves to History.
+    var autoCompletesAt: Date {
+
+        startsAt.addingTimeInterval(
+            Self.activeWindowAfterStart
+        )
+    }
+
+
     /// Completed when the host marked it, or automatically once
-    /// its start time has passed. Cancelled gatherings are never
-    /// completed.
+    /// the active window after its start has passed. Cancelled
+    /// gatherings are never completed.
     func isCompleted(
         asOf now: Date = Date()
     ) -> Bool {
@@ -96,21 +112,21 @@ extension Gathering {
         case .completed:
             return true
         case .upcoming:
-            return startsAt < now
+            return autoCompletesAt < now
         case .cancelled:
             return false
         }
     }
 
 
-    /// Still upcoming: not completed (by the host or by date)
-    /// and not cancelled.
+    /// Still active: upcoming or happening now, not completed
+    /// (by the host or by time) and not cancelled.
     func isActive(
         asOf now: Date = Date()
     ) -> Bool {
 
         status == .upcoming
-            && startsAt >= now
+            && autoCompletesAt >= now
     }
 
 

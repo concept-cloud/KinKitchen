@@ -62,6 +62,27 @@ struct GatheringHistoryTests {
         #expect(gathering.displayStatus(asOf: Self.now) == .upcoming)
     }
 
+    @Test func gatheringInProgressStaysActive() {
+        // Started an hour ago: still happening, still editable.
+        let gathering =
+            Self.gathering(status: .upcoming, daysFromNow: -1.0 / 24)
+
+        #expect(gathering.isActive(asOf: Self.now))
+        #expect(!gathering.isCompleted(asOf: Self.now))
+        #expect(!gathering.isHistorical(asOf: Self.now))
+    }
+
+    @Test func gatheringMovesToHistoryTwelveHoursAfterStart() {
+        let elevenHoursIn =
+            Self.gathering(status: .upcoming, daysFromNow: -11.0 / 24)
+        let thirteenHoursIn =
+            Self.gathering(status: .upcoming, daysFromNow: -13.0 / 24)
+
+        #expect(elevenHoursIn.isActive(asOf: Self.now))
+        #expect(thirteenHoursIn.isCompleted(asOf: Self.now))
+        #expect(thirteenHoursIn.isHistorical(asOf: Self.now))
+    }
+
     @Test func cancelledIsNeverCompleted() {
         let past =
             Self.gathering(status: .cancelled, daysFromNow: -5)
