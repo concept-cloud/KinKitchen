@@ -16,6 +16,10 @@ struct RecipesView: View {
         RecipeFilter = .all
     @State private var recipes: [Recipe] = []
     @State private var sharedRecipes: [Recipe] = []
+    /// Sharing relationships where the user is the recipient.
+    @State private var receivedShares: [RecipeShare] = []
+    /// Shared recipes whose original can no longer be loaded.
+    @State private var unavailableSharedRecipeCount = 0
     @State private var isLoading = true
     @State private var errorMessage: String?
     @State private var showingAddRecipe = false
@@ -324,6 +328,7 @@ struct RecipesView: View {
                         clearFiltersButton
                     }
                 }
+                unavailableSharedNote
                 // MARK: - Cards
                 if filteredRecipes.isEmpty {
                     filteredEmptyState
@@ -377,9 +382,7 @@ struct RecipesView: View {
                 KinColors.primaryText
             )
             Text(
-                selectedFilter == .shared
-                ? "Recipes shared with you will appear here."
-                : "This feature is coming in Milestone B1."
+                filteredEmptyMessage
             )
             .font(
                 KinTypography.body
@@ -543,6 +546,36 @@ struct RecipesView: View {
             to: filteredRecipes,
             context: discoveryContext
         )
+    }
+
+    private var filteredEmptyMessage: String {
+        switch selectedFilter {
+        case .shared:
+            return unavailableSharedRecipeCount > 0
+                ? "Recipes shared with you are no longer available."
+                : "Recipes other Kin Kitchen users share with you will appear here."
+        case .mine:
+            return "Recipes you add will appear here."
+        case .all, .favorites:
+            return "This feature is coming soon."
+        }
+    }
+
+    // MARK: - Unavailable Shared Note
+    @ViewBuilder
+    private var unavailableSharedNote: some View {
+        if selectedFilter == .shared,
+           unavailableSharedRecipeCount > 0,
+           !sharedRecipes.isEmpty {
+            Label(
+                unavailableSharedRecipeCount == 1
+                    ? "1 shared recipe is no longer available."
+                    : "\(unavailableSharedRecipeCount) shared recipes are no longer available.",
+                systemImage: "exclamationmark.circle"
+            )
+            .font(KinTypography.caption)
+            .foregroundStyle(KinColors.secondaryText)
+        }
     }
 
     // MARK: - Filtered Recipes
@@ -1002,38 +1035,44 @@ Spacer()
             let ownedRecipes =
                 try await ownedRecipeRequest
 
-            let receivedShares =
+            let shares =
                 try await receivedShareRequest
 
-            var receivedRecipes: [Recipe] = []
-
-            for share in receivedShares {
-                do {
-                    let recipe =
+            // Shares resolve to the original recipes, loaded in one
+            // request. A recipe that was deleted or is no longer
+            // visible is simply missing from the result.
+            let sharedRecipesById =
+                Dictionary(
+                    uniqueKeysWithValues:
                         try await RecipeService
-                            .fetchRecipe(
-                                id: share.recipeId
+                            .fetchRecipes(
+                                ids: shares.map(\.recipeId)
                             )
-
-                    receivedRecipes.append(
-                        recipe
-                    )
-                } catch {
-                    print(
-                        "SHARED RECIPE LOAD ERROR:",
-                        error.localizedDescription
-                    )
-                }
-            }
+                            .map { ($0.id, $0) }
+                )
 
             recipes = ownedRecipes
 
+            receivedShares = shares
+
+            // Newest share first, one entry per recipe even if
+            // several people shared it.
             var seen: Set<UUID> = []
 
             sharedRecipes =
-                receivedRecipes.filter {
-                    seen.insert($0.id).inserted
+                shares.compactMap {
+                    guard
+                        seen.insert($0.recipeId).inserted
+                    else {
+                        return nil
+                    }
+                    return sharedRecipesById[$0.recipeId]
                 }
+
+            unavailableSharedRecipeCount =
+                Set(shares.map(\.recipeId))
+                    .subtracting(sharedRecipesById.keys)
+                    .count
         } catch {
             errorMessage =
                 "Please check your connection and try again."

@@ -720,6 +720,33 @@ enum RecipeService {
     }
 
 
+    // MARK: - Fetch Recipes By ID
+
+    /// Loads many recipes in one request. Recipes that no longer
+    /// exist or aren't visible to the user are simply missing.
+    static func fetchRecipes(
+        ids: [UUID]
+    ) async throws -> [Recipe] {
+
+        guard !ids.isEmpty else {
+            return []
+        }
+
+        let recipes: [Recipe] =
+            try await SupabaseManager.client
+                .from("recipes")
+                .select()
+                .in(
+                    "id",
+                    values: Array(Set(ids))
+                )
+                .execute()
+                .value
+
+        return recipes
+    }
+
+
     // MARK: - Fetch Ingredients For Recipes
 
     /// Loads ingredients for many recipes in one request.
