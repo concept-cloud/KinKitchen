@@ -235,6 +235,11 @@ struct RecipeDiscoveryContext {
 
     var allergens: [Allergen] = []
 
+    /// The signed-in user's Dietary Profile selections.
+    var profileAllergenIds: Set<UUID> = []
+
+    var profileRestrictionIds: Set<UUID> = []
+
     var insights: [UUID: RecipeDietaryInsight] = [:]
 
 
@@ -313,5 +318,90 @@ struct RecipeDiscoveryContext {
         }
 
         return .noKnownAllergen
+    }
+
+
+    /// Compares a recipe against the user's Dietary Profile using
+    /// the same allergen and restriction checks as the filters.
+    func profileConflict(
+        of recipe: Recipe
+    ) -> RecipeProfileConflict {
+
+        let profileAllergens =
+            allergens.filter {
+                profileAllergenIds.contains($0.id)
+            }
+
+        let profileRestrictions =
+            restrictions.filter {
+                profileRestrictionIds.contains($0.id)
+            }
+
+        guard
+            !profileAllergens.isEmpty
+                || !profileRestrictions.isEmpty
+        else {
+            return RecipeProfileConflict()
+        }
+
+        let allergenStatuses =
+            profileAllergens.map {
+                ($0, allergenStatus(of: recipe, for: $0))
+            }
+
+        let restrictionStatuses =
+            profileRestrictions.map {
+                ($0, restrictionStatus(of: recipe, for: $0))
+            }
+
+        return RecipeProfileConflict(
+            allergens:
+                allergenStatuses
+                    .filter { $0.1 == .contains }
+                    .map(\.0),
+            restrictions:
+                restrictionStatuses
+                    .filter { $0.1 == .conflict }
+                    .map(\.0),
+            isChecking:
+                allergenStatuses.contains { $0.1 == .checking }
+                || restrictionStatuses.contains { $0.1 == .checking },
+            isIncomplete:
+                allergenStatuses.contains { $0.1 == .incomplete }
+        )
+    }
+}
+
+// MARK: - Profile Conflict
+
+/// Known conflicts between a recipe and the user's Dietary Profile.
+/// An empty result is never a confirmation of safety.
+struct RecipeProfileConflict:
+    Equatable {
+
+    var allergens: [Allergen] = []
+
+    var restrictions: [DietaryRestriction] = []
+
+    /// Still checking; more conflicts may appear.
+    var isChecking = false
+
+    /// Some ingredients couldn't be checked against the
+    /// user's allergies.
+    var isIncomplete = false
+
+
+    var hasConflict: Bool {
+
+        !allergens.isEmpty
+            || !restrictions.isEmpty
+    }
+
+
+    /// e.g. "Milk, Egg, Vegan"
+    var summary: String {
+
+        (allergens.map(\.name) + restrictions.map(\.name))
+            .joined(separator: ", ")
     }
 }

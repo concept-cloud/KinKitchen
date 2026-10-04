@@ -213,6 +213,77 @@ struct RecipeDiscoveryTests {
     }
 }
 
+// MARK: - Profile Conflicts (KINKIT-142)
+
+extension RecipeDiscoveryTests {
+
+    func profileContext(
+        allergens: Set<UUID> = [],
+        restrictions: Set<UUID> = []
+    ) -> RecipeDiscoveryContext {
+        var context = Self.context
+        context.profileAllergenIds = allergens
+        context.profileRestrictionIds = restrictions
+        return context
+    }
+
+    @Test func knownAllergenConflictIsWarned() {
+        let context = profileContext(
+            allergens: [Self.milk.id]
+        )
+
+        let conflict = context.profileConflict(of: Self.pancakes)
+
+        #expect(conflict.hasConflict)
+        #expect(conflict.allergens == [Self.milk])
+    }
+
+    @Test func restrictionConflictIsWarned() {
+        let context = profileContext(
+            restrictions: [Self.vegan.id]
+        )
+
+        let conflict = context.profileConflict(of: Self.chickenParm)
+
+        #expect(conflict.restrictions == [Self.vegan])
+    }
+
+    @Test func warningStaysWithTheRightRecipe() {
+        let context = profileContext(
+            allergens: [Self.peanut.id]
+        )
+
+        #expect(context.profileConflict(of: Self.peanutNoodles).hasConflict)
+        #expect(!context.profileConflict(of: Self.fruitSalad).hasConflict)
+        #expect(!context.profileConflict(of: Self.pancakes).hasConflict)
+    }
+
+    @Test func noProfileMeansNoWarning() {
+        let conflict =
+            profileContext()
+                .profileConflict(of: Self.pancakes)
+
+        #expect(conflict == RecipeProfileConflict())
+    }
+
+    @Test func unknownInformationIsFlaggedNotSafe() {
+        let mystery = Self.recipe("Mystery Stew", .dinner)
+
+        var context = profileContext(
+            allergens: [Self.peanut.id]
+        )
+        context.insights[mystery.id] = Self.insight(
+            ["grandma's secret sauce"],
+            unknown: ["grandma's secret sauce"]
+        )
+
+        let conflict = context.profileConflict(of: mystery)
+
+        #expect(!conflict.hasConflict)
+        #expect(conflict.isIncomplete)
+    }
+}
+
 // MARK: - Fixture Builders
 
 private extension RecipeDiscoveryTests {

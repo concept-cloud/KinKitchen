@@ -624,6 +624,9 @@ struct RecipesView: View {
                     allergenLabel(
                         for: recipe
                     )
+                    profileConflictLabel(
+                        for: recipe
+                    )
                 }
                 Spacer()
                 // MARK: - Favorite Placeholder
@@ -707,15 +710,9 @@ struct RecipesView: View {
         for recipe: Recipe
     ) -> some View {
         let statuses =
-            criteria.selectedAllergens(
-                from: discoveryContext.allergens
+            allergenFilterStatuses(
+                for: recipe
             )
-            .map {
-                discoveryContext.allergenStatus(
-                    of: recipe,
-                    for: $0
-                )
-            }
         if statuses.contains(.checking) {
             Label(
                 "Checking allergens…",
@@ -732,6 +729,53 @@ struct RecipesView: View {
             .foregroundStyle(KinColors.warning)
         }
     }
+
+    private func allergenFilterStatuses(
+        for recipe: Recipe
+    ) -> [RecipeAllergenStatus] {
+        criteria.selectedAllergens(
+            from: discoveryContext.allergens
+        )
+        .map {
+            discoveryContext.allergenStatus(
+                of: recipe,
+                for: $0
+            )
+        }
+    }
+    // MARK: - Profile Conflict Label
+    /// Informational warning against the user's Dietary Profile.
+    /// It never blocks opening the recipe and never says "safe".
+    @ViewBuilder
+    private func profileConflictLabel(
+        for recipe: Recipe
+    ) -> some View {
+        let conflict =
+            discoveryContext.profileConflict(
+                of: recipe
+            )
+        if conflict.hasConflict {
+            Label(
+                "May conflict with your profile: \(conflict.summary)",
+                systemImage: "exclamationmark.triangle.fill"
+            )
+            .font(KinTypography.caption)
+            .foregroundStyle(KinColors.error)
+            .lineLimit(2)
+        } else if conflict.isIncomplete,
+                  // The allergen filter label already says this.
+                  !allergenFilterStatuses(
+                    for: recipe
+                  ).contains(.incomplete) {
+            Label(
+                "Couldn't fully check against your allergies",
+                systemImage: "questionmark.circle"
+            )
+            .font(KinTypography.caption)
+            .foregroundStyle(KinColors.warning)
+        }
+    }
+
     // MARK: - Metadata
     private func recipeMetadata(
         _ recipe: Recipe
@@ -1004,8 +1048,23 @@ Spacer()
             DietaryService
                 .fetchAllergens()
 
+        // The user's own Dietary Profile, for conflict warnings.
+        async let profileAllergenRequest =
+            DietaryService
+                .fetchSelectedAllergens()
+
+        async let profileRestrictionRequest =
+            DietaryService
+                .fetchSelectedDietaryRestrictions()
+
         discoveryContext.restrictions =
             (try? await restrictionRequest) ?? []
+
+        discoveryContext.profileAllergenIds =
+            Set((try? await profileAllergenRequest) ?? [])
+
+        discoveryContext.profileRestrictionIds =
+            Set((try? await profileRestrictionRequest) ?? [])
 
         discoveryContext.allergens =
             ((try? await allergenRequest) ?? [])
