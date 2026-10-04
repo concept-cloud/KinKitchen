@@ -22,7 +22,8 @@ struct RecipesView: View {
     @State private var selectedRecipeId: UUID?
     @State private var recipePhotoData: [UUID: Data] = [:]
     @State private var showingFilterMessage = false
-    
+    @State private var criteria = RecipeDiscoveryCriteria()
+
     
     var body: some View {
         NavigationStack {
@@ -182,6 +183,11 @@ struct RecipesView: View {
                         KinSpacing.small
                     )
                 }
+                // MARK: - Search
+                KinSearchBar(
+                    text: $criteria.searchText,
+                    placeholder: "Search recipes"
+                )
                 // MARK: - Filters
                 HStack(
                     spacing: KinSpacing.small
@@ -224,11 +230,13 @@ struct RecipesView: View {
                 // MARK: - Cards
                 if filteredRecipes.isEmpty {
                     filteredEmptyState
+                } else if displayedRecipes.isEmpty {
+                    noResultsState
                 } else {
                     LazyVStack(
                         spacing: KinSpacing.medium
                     ) {
-                        ForEach(filteredRecipes) { recipe in
+                        ForEach(displayedRecipes) { recipe in
                             Button {
                                 selectedRecipeId = recipe.id
                             } label: {
@@ -289,6 +297,55 @@ struct RecipesView: View {
         .frame(maxWidth: .infinity)
         .padding(.vertical, KinSpacing.xLarge)
     }
+    // MARK: - No Results State
+    private var noResultsState: some View {
+        VStack(
+            spacing: KinSpacing.medium
+        ) {
+            Image(
+                systemName: "magnifyingglass"
+            )
+            .font(
+                .system(size: 36)
+            )
+            .foregroundStyle(
+                KinColors.secondaryText
+            )
+            Text(
+                "No Matching Recipes"
+            )
+            .font(
+                KinTypography.title3
+            )
+            .foregroundStyle(
+                KinColors.primaryText
+            )
+            Text(
+                "No recipes match \"\(criteria.trimmedSearchText)\"."
+            )
+            .font(
+                KinTypography.body
+            )
+            .foregroundStyle(
+                KinColors.secondaryText
+            )
+            .multilineTextAlignment(
+                .center
+            )
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, KinSpacing.xLarge)
+    }
+
+    // MARK: - Displayed Recipes
+
+    /// The selected tab's recipes narrowed by search.
+    private var displayedRecipes: [Recipe] {
+        criteria.apply(
+            to: filteredRecipes
+        )
+    }
+
     // MARK: - Filtered Recipes
 
     private var filteredRecipes: [Recipe] {

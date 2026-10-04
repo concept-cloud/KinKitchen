@@ -874,77 +874,90 @@ private extension AddDishView {
     @MainActor
     func addDish() async {
         errorMessage = nil
-        
+
         let cleanName =
-        dishName.trimmingCharacters(
-            in: .whitespacesAndNewlines
-        )
-        
+            dishName.trimmingCharacters(
+                in: .whitespacesAndNewlines
+            )
+
+        let cleanOtherNeedDescription =
+            otherNeedDescription.trimmingCharacters(
+                in: .whitespacesAndNewlines
+            )
+
         guard !cleanName.isEmpty else {
             errorMessage =
-            "Please enter a dish name."
+                "Please enter a dish name."
             return
         }
-        
+
         guard servings > 0 else {
             errorMessage =
-            "Servings must be at least 1."
+                "Servings must be at least 1."
             return
         }
-        
+
+        if selectedNeeds.contains(.other) {
+            guard !cleanOtherNeedDescription.isEmpty else {
+                errorMessage =
+                    "Please describe the other equipment needed."
+                return
+            }
+        }
+
         isSaving = true
-        
+
         let duplicate =
-        await GatheringDishService
-            .findPotentialDuplicateNeed(
-                gatheringId:
-                    gatheringId,
-                proposedName:
-                    cleanName
-            )
-        
+            await GatheringDishService
+                .findPotentialDuplicateNeed(
+                    gatheringId:
+                        gatheringId,
+                    proposedName:
+                        cleanName
+                )
+
         if let duplicate {
             potentialDuplicate =
-            duplicate
-            
+                duplicate
+
             isShowingDuplicateWarning =
-            true
-            
+                true
+
             isSaving = false
             return
         }
-        
+
         do {
             _ =
-            try await GatheringDishService
-                .createNeed(
-                    gatheringId:
-                        gatheringId,
-                    name:
-                        cleanName,
-                    category:
-                        selectedCategory,
-                    quantityNeeded:
-                        servings,
-                    recipeId:
-                        selectedRecipe?.id,
-                    notes:
-                        notes,
-                    needs:
-                        selectedNeeds,
-                    otherNeedDescription:
-                        otherNeedDescription,
-                    supplies:
-                        selectedSupplies
-                )
-            
+                try await GatheringDishService
+                    .createNeed(
+                        gatheringId:
+                            gatheringId,
+                        name:
+                            cleanName,
+                        category:
+                            selectedCategory,
+                        quantityNeeded:
+                            servings,
+                        recipeId:
+                            selectedRecipe?.id,
+                        notes:
+                            notes,
+                        needs:
+                            selectedNeeds,
+                        otherNeedDescription:
+                            cleanOtherNeedDescription,
+                        supplies:
+                            selectedSupplies
+                    )
+
             dismiss()
-            
+
         } catch {
             errorMessage =
-            error.localizedDescription
+                error.localizedDescription
         }
-        
+
         isSaving = false
     }
     
@@ -954,6 +967,11 @@ private extension AddDishView {
 
         let cleanName =
             dishName.trimmingCharacters(
+                in: .whitespacesAndNewlines
+            )
+
+        let cleanOtherNeedDescription =
+            otherNeedDescription.trimmingCharacters(
                 in: .whitespacesAndNewlines
             )
 
@@ -969,6 +987,15 @@ private extension AddDishView {
             errorMessage =
                 "Servings must be at least 1."
             return
+        }
+
+        if selectedNeeds.contains(.other) {
+            guard !cleanOtherNeedDescription.isEmpty else {
+                isShowingDuplicateWarning = false
+                errorMessage =
+                    "Please describe the other equipment needed."
+                return
+            }
         }
 
         isSaving = true
@@ -992,7 +1019,7 @@ private extension AddDishView {
                         needs:
                             selectedNeeds,
                         otherNeedDescription:
-                            otherNeedDescription,
+                            cleanOtherNeedDescription,
                         supplies:
                             selectedSupplies
                     )
