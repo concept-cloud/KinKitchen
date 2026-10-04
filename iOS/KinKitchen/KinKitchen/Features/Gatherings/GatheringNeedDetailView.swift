@@ -13,6 +13,10 @@ struct GatheringNeedDetailView: View {
 
     let need: GatheringNeed
     let isHost: Bool
+
+    /// The gathering is over: show what was claimed, but allow
+    /// no claiming, releasing or editing.
+    let isReadOnly: Bool
     
     @State private var currentNeed: GatheringNeed
     @State private var requirements: [GatheringNeedRequirement] = []
@@ -35,10 +39,12 @@ struct GatheringNeedDetailView: View {
 
     init(
         need: GatheringNeed,
-        isHost: Bool
+        isHost: Bool,
+        isReadOnly: Bool = false
     ) {
         self.need = need
         self.isHost = isHost
+        self.isReadOnly = isReadOnly
         _currentNeed = State(
             initialValue: need
         )
@@ -72,8 +78,12 @@ struct GatheringNeedDetailView: View {
                         }
 
                         dishesNeededSection
-                        
-                        claimSection
+
+                        if isReadOnly {
+                            readOnlyClaimSummary
+                        } else {
+                            claimSection
+                        }
 
                         if !requirements.isEmpty {
                             requirementsSection
@@ -749,6 +759,59 @@ private extension GatheringNeedDetailView {
             RoundedRectangle(
                 cornerRadius:
                     KinRadius.large
+            )
+        )
+    }
+
+    /// What was brought, without any claim controls.
+    var readOnlyClaimSummary: some View {
+        let claimed =
+            claims.reduce(0) {
+                $0 + $1.quantity
+            }
+
+        let summary =
+            claimed == 0
+                ? "Nobody brought this"
+                : claimed >= currentNeed.quantityNeeded
+                    ? "Brought"
+                    : "\(claimed) of \(currentNeed.quantityNeeded) brought"
+
+        return VStack(
+            alignment: .leading,
+            spacing: KinSpacing.small
+        ) {
+            Text("What Was Brought")
+                .font(KinTypography.title3)
+                .foregroundStyle(KinColors.primaryText)
+
+            Label(
+                summary,
+                systemImage:
+                    claimed == 0
+                        ? "minus.circle"
+                        : "checkmark.circle"
+            )
+            .font(KinTypography.body)
+            .foregroundStyle(
+                claimed == 0
+                    ? KinColors.secondaryText
+                    : KinColors.success
+            )
+
+            Text("This gathering is completed, so claims can't be changed.")
+                .font(KinTypography.caption)
+                .foregroundStyle(KinColors.secondaryText)
+        }
+        .frame(
+            maxWidth: .infinity,
+            alignment: .leading
+        )
+        .padding(KinSpacing.large)
+        .background(KinColors.surface)
+        .clipShape(
+            RoundedRectangle(
+                cornerRadius: KinRadius.large
             )
         )
     }

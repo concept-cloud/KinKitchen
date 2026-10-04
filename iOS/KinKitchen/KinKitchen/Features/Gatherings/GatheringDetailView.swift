@@ -47,6 +47,12 @@ struct GatheringDetailView: View {
 
     @State private var selectedDishRecipeId: UUID?
 
+    @State private var hostNotes = ""
+    @State private var hostNotesDraft = ""
+    @State private var isEditingHostNotes = false
+    @State private var isSavingHostNotes = false
+    @State private var hostNotesError: String?
+
     @State private var showingCompleteConfirmation = false
     @State private var isCompleting = false
     @State private var completeErrorMessage: String?
@@ -198,12 +204,22 @@ private extension GatheringDetailView {
                         gathering
                     )
 
-                    if isHost,
+                    if isHistoricalGathering {
+                        archivedBanner(gathering)
+                    }
+
+                    if isHistoricalGathering,
+                       isHost {
+                        hostNotesSection
+                    }
+
+                    if canEditGathering,
                        gathering.status == .upcoming {
                         markCompletedSection
                     }
 
-                    if currentParticipant?.status == .pending {
+                    if currentParticipant?.status == .pending,
+                       !isHistoricalGathering {
                         invitationResponseSection(
                             gathering
                         )
@@ -340,7 +356,7 @@ private extension GatheringDetailView {
                         KinSpacing.medium
                 )
 
-                if isHost {
+                if canEditGathering {
 
                     NavigationLink {
 
@@ -565,6 +581,250 @@ private extension GatheringDetailView {
             )
 
         return "\(dateText) • \(timeText)"
+    }
+}
+
+
+// MARK: - Archived
+
+private extension GatheringDetailView {
+
+    /// Makes it clear this is a past gathering kept for reference.
+    func archivedBanner(
+        _ gathering: Gathering
+    ) -> some View {
+
+        let isCancelled =
+            gathering.status == .cancelled
+
+        return HStack(
+            alignment: .top,
+            spacing: KinSpacing.medium
+        ) {
+
+            Image(
+                systemName:
+                    isCancelled
+                        ? "xmark.circle.fill"
+                        : "archivebox.fill"
+            )
+            .font(.title3)
+            .foregroundStyle(
+                isCancelled
+                    ? KinColors.error
+                    : KinColors.success
+            )
+
+            VStack(
+                alignment: .leading,
+                spacing: KinSpacing.xxSmall
+            ) {
+                Text(
+                    isCancelled
+                        ? "Cancelled Gathering"
+                        : "Completed Gathering"
+                )
+                .font(KinTypography.headline)
+                .foregroundStyle(KinColors.primaryText)
+
+                Text(
+                    "Kept in History for reference. Guests, dishes and recipes can be viewed but not changed."
+                )
+                .font(KinTypography.caption)
+                .foregroundStyle(KinColors.secondaryText)
+            }
+        }
+        .frame(
+            maxWidth: .infinity,
+            alignment: .leading
+        )
+        .padding(KinSpacing.large)
+        .background(
+            (isCancelled ? KinColors.error : KinColors.success)
+                .opacity(0.08)
+        )
+        .clipShape(
+            RoundedRectangle(
+                cornerRadius: KinRadius.large
+            )
+        )
+    }
+}
+
+
+// MARK: - Host Notes
+
+private extension GatheringDetailView {
+
+    /// Private notes the host keeps for planning the next gathering.
+    /// Editable even though the gathering itself is archived.
+    var hostNotesSection: some View {
+
+        VStack(
+            alignment: .leading,
+            spacing: KinSpacing.small
+        ) {
+
+            HStack {
+                Label(
+                    "Notes for Next Time",
+                    systemImage: "note.text"
+                )
+                .font(KinTypography.headline)
+                .foregroundStyle(KinColors.primaryText)
+
+                Spacer()
+
+                if !isEditingHostNotes {
+                    Button(
+                        hostNotes.isEmpty ? "Add" : "Edit"
+                    ) {
+                        hostNotesDraft = hostNotes
+                        hostNotesError = nil
+                        isEditingHostNotes = true
+                    }
+                    .font(KinTypography.callout)
+                    .foregroundStyle(KinColors.primary)
+                }
+            }
+
+            Text("Only you can see these.")
+                .font(KinTypography.caption)
+                .foregroundStyle(KinColors.secondaryText)
+
+            if isEditingHostNotes {
+
+                TextField(
+                    "What was missing? What would you change?",
+                    text: $hostNotesDraft,
+                    axis: .vertical
+                )
+                .lineLimit(3...8)
+                .font(KinTypography.body)
+                .padding(KinSpacing.medium)
+                .background(KinColors.background)
+                .clipShape(
+                    RoundedRectangle(
+                        cornerRadius: KinRadius.medium
+                    )
+                )
+
+                HStack {
+                    Button("Cancel") {
+                        isEditingHostNotes = false
+                        hostNotesError = nil
+                    }
+                    .foregroundStyle(KinColors.secondaryText)
+
+                    Spacer()
+
+                    Button {
+                        Task {
+                            await saveHostNotes()
+                        }
+                    } label: {
+                        if isSavingHostNotes {
+                            ProgressView()
+                                .tint(KinColors.primary)
+                        } else {
+                            Text("Save")
+                                .font(KinTypography.button)
+                        }
+                    }
+                    .foregroundStyle(KinColors.primary)
+                    .disabled(isSavingHostNotes)
+                }
+                .font(KinTypography.callout)
+
+            } else if hostNotes.isEmpty {
+
+                Text(
+                    "Jot down what this gathering was missing so the next one goes even better."
+                )
+                .font(KinTypography.body)
+                .foregroundStyle(KinColors.secondaryText)
+
+            } else {
+
+                Text(hostNotes)
+                    .font(KinTypography.body)
+                    .foregroundStyle(KinColors.primaryText)
+                    .fixedSize(
+                        horizontal: false,
+                        vertical: true
+                    )
+            }
+
+            if let hostNotesError {
+                Text(hostNotesError)
+                    .font(KinTypography.caption)
+                    .foregroundStyle(KinColors.error)
+            }
+        }
+        .frame(
+            maxWidth: .infinity,
+            alignment: .leading
+        )
+        .padding(KinSpacing.large)
+        .background(KinColors.surface)
+        .clipShape(
+            RoundedRectangle(
+                cornerRadius: KinRadius.large
+            )
+        )
+    }
+
+
+    @MainActor
+    func loadHostNotes() async {
+
+        // Missing table or no notes yet just shows the empty state.
+        hostNotes =
+            (try? await GatheringNotesService
+                .fetchNotes(
+                    gatheringId: gatheringId
+                )) ?? ""
+    }
+
+
+    @MainActor
+    func saveHostNotes() async {
+
+        guard !isSavingHostNotes else {
+            return
+        }
+
+        isSavingHostNotes = true
+        hostNotesError = nil
+
+        defer {
+            isSavingHostNotes = false
+        }
+
+        let cleaned =
+            hostNotesDraft.trimmingCharacters(
+                in: .whitespacesAndNewlines
+            )
+
+        do {
+            try await GatheringNotesService
+                .saveNotes(
+                    gatheringId: gatheringId,
+                    notes: cleaned
+                )
+
+            hostNotes = cleaned
+            isEditingHostNotes = false
+
+        } catch {
+            hostNotesError =
+                "Your notes couldn't be saved. Please try again."
+
+            print(
+                "GATHERING NOTES SAVE ERROR:",
+                error.localizedDescription
+            )
+        }
     }
 }
 
@@ -952,7 +1212,7 @@ private extension GatheringDetailView {
 
                 Spacer()
 
-                if isHost {
+                if canEditGathering {
                     NavigationLink {
                         GatheringInviteUserView(
                             gatheringId:
@@ -973,7 +1233,10 @@ private extension GatheringDetailView {
 
             participantSection
 
-            if isHost {
+            // Invitations can't change once the gathering is over.
+            if isHistoricalGathering {
+                EmptyView()
+            } else if isHost {
                 invitationManagementSection
             } else if let currentParticipant {
                 currentInvitationSection(
@@ -1085,6 +1348,12 @@ private extension GatheringDetailView {
     /// gathering.
     var isHistoricalGathering: Bool {
         gathering?.isHistorical() ?? false
+    }
+
+    /// Host controls only apply while the gathering is active.
+    /// Historical gatherings are view-only.
+    var canEditGathering: Bool {
+        isHost && !isHistoricalGathering
     }
 
     var visibleGatheringParticipants:
@@ -1649,7 +1918,7 @@ private extension GatheringDetailView {
 
                 Spacer()
 
-                if isHost {
+                if canEditGathering {
                     NavigationLink {
                         AddDishView(
                             gatheringId: gatheringId
@@ -1676,7 +1945,8 @@ private extension GatheringDetailView {
                             NavigationLink {
                                 GatheringNeedDetailView(
                                     need: need,
-                                    isHost: isHost
+                                    isHost: canEditGathering,
+                                    isReadOnly: isHistoricalGathering
                                 )
                             } label: {
                                 gatheringNeedCard(need)
@@ -2093,7 +2363,7 @@ private extension GatheringDetailView {
 
                 Spacer()
 
-                if isHost {
+                if canEditGathering {
                     NavigationLink {
                         AddGatheringSuppliesView(
                             gatheringId:
@@ -2124,7 +2394,8 @@ private extension GatheringDetailView {
                         NavigationLink {
                             GatheringNeedDetailView(
                                 need: need,
-                                isHost: isHost
+                                isHost: canEditGathering,
+                                isReadOnly: isHistoricalGathering
                             )
                         } label: {
                             supplyNeedCard(need)
@@ -2696,6 +2967,14 @@ private extension GatheringDetailView {
             isHost =
                 loadedGathering.hostId ==
                 currentUser.id
+
+            // Don't overwrite notes the host is in the middle of
+            // editing when the view reloads.
+            if isHost,
+               loadedGathering.isHistorical(),
+               !isEditingHostNotes {
+                await loadHostNotes()
+            }
 
             isLoading = false
 
