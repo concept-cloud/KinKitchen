@@ -87,19 +87,180 @@ extension KinNotification {
     }
 }
 
+// MARK: - Gathering Change Fields
+
+enum GatheringChangeField:
+    CaseIterable,
+    Hashable {
+
+    case name
+    case startsAt
+    case location
+    case theme
+    case guestLimit
+    case description
+    case coverPhoto
+}
+
+extension KinNotification {
+
+    /// Fields a gathering-update notification says changed.
+    ///
+    /// Parsed from the message text written by the Supabase
+    /// function `update_gathering_with_notifications`
+    /// (supabase/KINKIT-170). Keep these phrases in sync
+    /// with that function if its wording changes.
+    var changedGatheringFields: Set<GatheringChangeField> {
+
+        guard
+            type == .gatheringUpdated,
+            let message =
+                message?.lowercased()
+        else {
+            return []
+        }
+
+        let phrases: [(String, GatheringChangeField)] = [
+            ("renamed to", .name),
+            ("date and time changed", .startsAt),
+            ("location changed", .location),
+            ("location removed", .location),
+            ("theme changed", .theme),
+            ("theme removed", .theme),
+            ("guest limit", .guestLimit),
+            ("description updated", .description),
+            ("cover photo updated", .coverPhoto)
+        ]
+
+        return Set(
+            phrases
+                .filter { message.contains($0.0) }
+                .map(\.1)
+        )
+    }
+}
+
 // MARK: - Unread Lookup
 
 extension Array where Element == KinNotification {
 
-    func unreadCount(
+    /// Unread notifications for a gathering, newest first
+    /// (fetchNotifications returns them in that order).
+    func unread(
         forGathering gatheringId: UUID
-    ) -> Int {
+    ) -> [KinNotification] {
 
         filter {
             !$0.isRead
                 && $0.gatheringId == gatheringId
         }
+    }
+
+    func unreadCount(
+        forGathering gatheringId: UUID
+    ) -> Int {
+
+        unread(
+            forGathering: gatheringId
+        )
         .count
+    }
+}
+
+// MARK: - Change Highlight
+
+extension View {
+
+    /// Highlights a piece of gathering information with a
+    /// tinted background and bell when it has just changed.
+    @ViewBuilder
+    func kinChangeHighlight(
+        _ isChanged: Bool
+    ) -> some View {
+
+        if isChanged {
+
+            HStack(
+                alignment: .firstTextBaseline,
+                spacing: KinSpacing.small
+            ) {
+
+                self
+
+                Image(
+                    systemName: "bell.fill"
+                )
+                .font(
+                    .system(
+                        size: 13,
+                        weight: .semibold
+                    )
+                )
+                .foregroundStyle(
+                    KinColors.primary
+                )
+                .accessibilityLabel(
+                    "Updated"
+                )
+            }
+            .padding(
+                .horizontal,
+                KinSpacing.small
+            )
+            .padding(
+                .vertical,
+                KinSpacing.xSmall
+            )
+            .background(
+                KinColors.primary
+                    .opacity(0.12)
+            )
+            .clipShape(
+                RoundedRectangle(
+                    cornerRadius:
+                        KinRadius.medium
+                )
+            )
+
+        } else {
+
+            self
+        }
+    }
+}
+
+// MARK: - Card Notification Line
+
+/// Newest unread notification message, shown on gathering cards.
+struct KinCardNotificationLine: View {
+
+    let notification: KinNotification
+
+    var body: some View {
+
+        Label {
+
+            Text(
+                notification.displayMessage
+                    ?? notification.title
+            )
+            .lineLimit(2)
+            .multilineTextAlignment(
+                .leading
+            )
+
+        } icon: {
+
+            Image(
+                systemName: "bell.fill"
+            )
+        }
+        .font(
+            KinTypography.caption
+        )
+        .foregroundStyle(
+            KinColors.primary
+        )
     }
 }
 

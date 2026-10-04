@@ -274,13 +274,9 @@ private extension GatheringsView {
                     gatherings
                 ) { item in
 
-                    Button {
-
-                        openGathering(
-                            item.gathering.id
-                        )
-
-                    } label: {
+                    NavigationLink(
+                        value: item.gathering.id
+                    ) {
 
                         gatheringCard(
                             item
@@ -316,10 +312,13 @@ private extension GatheringsView {
         let gathering =
             item.gathering
 
-        let unreadCount =
-            notifications.unreadCount(
+        let unread =
+            notifications.unread(
                 forGathering: gathering.id
             )
+
+        let unreadCount =
+            unread.count
 
         return HStack(
             spacing: KinSpacing.medium
@@ -380,6 +379,14 @@ private extension GatheringsView {
                         KinColors.secondaryText
                     )
                     .lineLimit(1)
+                }
+
+                if let latest =
+                    unread.first {
+
+                    KinCardNotificationLine(
+                        notification: latest
+                    )
                 }
             }
             .frame(
@@ -929,42 +936,6 @@ private extension GatheringsView {
                 )
             }
         }
-    }
-
-
-    func openGathering(
-        _ gatheringId: UUID
-    ) {
-
-        if notifications.unreadCount(
-            forGathering: gatheringId
-        ) > 0 {
-
-            Task {
-
-                do {
-
-                    try await NotificationService
-                        .markRelatedAsRead(
-                            relatedType: "gathering",
-                            relatedId: gatheringId
-                        )
-
-                    await loadNotifications()
-
-                } catch {
-
-                    print(
-                        "GATHERING NOTIFICATION READ ERROR:",
-                        error.localizedDescription
-                    )
-                }
-            }
-        }
-
-        navigationPath.append(
-            gatheringId
-        )
     }
 }
 

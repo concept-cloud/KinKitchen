@@ -22,6 +22,7 @@ struct HomeView: View {
     @State private var notifications:
     [KinNotification] = []
     @State private var selectedGatheringId: UUID?
+    @State private var selectedNotification: KinNotification?
     @State private var showingAllNotifications = false
 
     
@@ -263,6 +264,20 @@ struct HomeView: View {
                     gatheringId: gatheringId
                 )
             }
+
+            .navigationDestination(
+                item: $selectedNotification
+            ) { notification in
+
+                if let gatheringId =
+                    notification.gatheringId {
+
+                    GatheringDetailView(
+                        gatheringId: gatheringId,
+                        openedNotification: notification
+                    )
+                }
+            }
             // MARK: - Notifications Destination
 
             .navigationDestination(
@@ -310,14 +325,13 @@ struct HomeView: View {
             }
 
             guard
-                let gatheringId =
-                    notification.gatheringId
+                notification.gatheringId != nil
             else {
                 return
             }
 
-            selectedGatheringId =
-                gatheringId
+            selectedNotification =
+                notification
 
         } label: {
 
@@ -500,21 +514,15 @@ private extension HomeView {
         let gathering =
             item.gathering
 
-        let unreadCount =
-            notifications.unreadCount(
+        let unread =
+            notifications.unread(
                 forGathering: gathering.id
             )
 
+        let unreadCount =
+            unread.count
+
         return Button {
-
-            if unreadCount > 0 {
-
-                Task {
-                    await markGatheringNotificationsAsRead(
-                        gathering.id
-                    )
-                }
-            }
 
             selectedGatheringId =
                 gathering.id
@@ -603,6 +611,14 @@ private extension HomeView {
                                 KinColors.secondaryText
                             )
                             .lineLimit(1)
+                        }
+
+                        if let latest =
+                            unread.first {
+
+                            KinCardNotificationLine(
+                                notification: latest
+                            )
                         }
                     }
                     .frame(
@@ -753,32 +769,6 @@ private extension HomeView {
             if !(error is CancellationError) {
                 print(
                     "HOME NOTIFICATION MARK READ ERROR:",
-                    error.localizedDescription
-                )
-            }
-        }
-    }
-
-    @MainActor
-    func markGatheringNotificationsAsRead(
-        _ gatheringId: UUID
-    ) async {
-
-        do {
-            try await NotificationService
-                .markRelatedAsRead(
-                    relatedType: "gathering",
-                    relatedId: gatheringId
-                )
-
-            notifications =
-                try await NotificationService
-                    .fetchNotifications()
-
-        } catch {
-            if !(error is CancellationError) {
-                print(
-                    "HOME GATHERING NOTIFICATION READ ERROR:",
                     error.localizedDescription
                 )
             }

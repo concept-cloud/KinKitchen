@@ -16,7 +16,7 @@ struct NotificationsView: View {
 
     @State private var isLoading = true
     @State private var errorMessage: String?
-    @State private var selectedGatheringId: UUID?
+    @State private var selectedNotification: KinNotification?
 
     // MARK: - Body
 
@@ -74,12 +74,17 @@ struct NotificationsView: View {
         // MARK: - Gathering Destination
 
         .navigationDestination(
-            item: $selectedGatheringId
-        ) { gatheringId in
+            item: $selectedNotification
+        ) { notification in
 
-            GatheringDetailView(
-                gatheringId: gatheringId
-            )
+            if let gatheringId =
+                notification.gatheringId {
+
+                GatheringDetailView(
+                    gatheringId: gatheringId,
+                    openedNotification: notification
+                )
+            }
         }
         .task {
             await loadNotifications()
@@ -542,14 +547,13 @@ struct NotificationsView: View {
         }
 
         guard
-            let gatheringId =
-                notification.gatheringId
+            notification.gatheringId != nil
         else {
             return
         }
 
-        selectedGatheringId =
-            gatheringId
+        selectedNotification =
+            notification
     }
 
     // MARK: - Mark Read

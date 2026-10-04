@@ -15,7 +15,16 @@ struct GatheringDetailView: View {
 
     let gatheringId: UUID
 
+    /// Notification the user tapped to get here, if any. It may
+    /// already be marked read by the time this view loads, so
+    /// its changes are highlighted directly.
+    var openedNotification: KinNotification? = nil
+
     @State private var gathering: Gathering?
+
+    @State private var highlightedFields:
+        Set<GatheringChangeField> = []
+    @State private var hasLoadedChangeHighlights = false
     @State private var isLoading = true
     @State private var errorMessage: String?
     @State private var isHost = false
@@ -126,6 +135,43 @@ private extension GatheringDetailView {
                             gathering
                                 .coverImagePath
                     )
+                    .overlay(
+                        alignment: .topLeading
+                    ) {
+
+                        if highlightedFields.contains(
+                            .coverPhoto
+                        ) {
+
+                            Label(
+                                "Photo updated",
+                                systemImage: "bell.fill"
+                            )
+                            .font(
+                                KinTypography.caption
+                            )
+                            .foregroundStyle(
+                                .white
+                            )
+                            .padding(
+                                .horizontal,
+                                KinSpacing.medium
+                            )
+                            .padding(
+                                .vertical,
+                                KinSpacing.xSmall
+                            )
+                            .background(
+                                KinColors.primary
+                            )
+                            .clipShape(
+                                Capsule()
+                            )
+                            .padding(
+                                KinSpacing.medium
+                            )
+                        }
+                    }
 
                     titleSection(
                         gathering
@@ -261,6 +307,11 @@ private extension GatheringDetailView {
                     horizontal: false,
                     vertical: true
                 )
+                .kinChangeHighlight(
+                    highlightedFields.contains(
+                        .name
+                    )
+                )
 
                 Spacer(
                     minLength:
@@ -311,6 +362,11 @@ private extension GatheringDetailView {
                     )
                     .foregroundStyle(
                         KinColors.secondaryText
+                    )
+                    .kinChangeHighlight(
+                        highlightedFields.contains(
+                            .theme
+                        )
                     )
                 }
             }
@@ -431,6 +487,11 @@ private extension GatheringDetailView {
             .foregroundStyle(
                 KinColors.secondaryText
             )
+            .kinChangeHighlight(
+                highlightedFields.contains(
+                    .startsAt
+                )
+            )
 
             if let location =
                 gathering.location,
@@ -454,6 +515,11 @@ private extension GatheringDetailView {
                 )
                 .foregroundStyle(
                     KinColors.secondaryText
+                )
+                .kinChangeHighlight(
+                    highlightedFields.contains(
+                        .location
+                    )
                 )
             }
         }
@@ -1352,6 +1418,11 @@ private extension GatheringDetailView {
             )
             .foregroundStyle(
                 KinColors.primaryText
+            )
+            .kinChangeHighlight(
+                highlightedFields.contains(
+                    .description
+                )
             )
 
             if let description =
@@ -2420,7 +2491,9 @@ private extension GatheringDetailView {
                 currentUser.id
 
             isLoading = false
-            
+
+            await loadChangeHighlights()
+
             
         } catch {
 
@@ -2444,5 +2517,67 @@ private extension GatheringDetailView {
                 error.localizedDescription
             )
         }
+    }
+
+
+    // MARK: - Change Highlights
+
+    /// Highlights what changed the first time the gathering is
+    /// opened, then marks its notifications read so the
+    /// highlights don't come back on later visits.
+    @MainActor
+    func loadChangeHighlights() async {
+
+        // loadGathering runs from .task, .onAppear and refresh;
+        // only the first call should capture highlights.
+        guard !hasLoadedChangeHighlights else {
+            return
+        }
+
+        hasLoadedChangeHighlights = true
+
+        var changedNotifications =
+            openedNotification.map { [$0] } ?? []
+
+        do {
+
+            let unread =
+                try await NotificationService
+                    .fetchNotifications()
+                    .unread(
+                        forGathering: gatheringId
+                    )
+
+            changedNotifications +=
+                unread
+
+            if !unread.isEmpty {
+
+                try await NotificationService
+                    .markRelatedAsRead(
+                        relatedType: "gathering",
+                        relatedId: gatheringId
+                    )
+            }
+
+        } catch {
+
+            if !(error is CancellationError) {
+
+                print(
+                    "GATHERING CHANGE HIGHLIGHT ERROR:",
+                    error.localizedDescription
+                )
+            }
+        }
+
+        highlightedFields =
+            changedNotifications.reduce(
+                into: []
+            ) {
+                $0.formUnion(
+                    $1.changedGatheringFields
+                )
+            }
     }
 }
