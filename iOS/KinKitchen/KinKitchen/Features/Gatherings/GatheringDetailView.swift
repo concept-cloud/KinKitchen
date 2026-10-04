@@ -1626,7 +1626,11 @@ private extension GatheringDetailView {
             spacing: KinSpacing.medium
         ) {
             HStack {
-                Text("Dishes Needed")
+                Text(
+                    isHistoricalGathering
+                        ? "Dishes"
+                        : "Dishes Needed"
+                )
                     .font(KinTypography.sectionTitle)
                     .foregroundStyle(KinColors.primaryText)
 
@@ -1681,11 +1685,19 @@ private extension GatheringDetailView {
                 )
                 .foregroundStyle(KinColors.primary)
 
-            Text("No dishes yet")
+            Text(
+                isHistoricalGathering
+                    ? "No dishes were added"
+                    : "No dishes yet"
+            )
                 .font(KinTypography.headline)
                 .foregroundStyle(KinColors.primaryText)
 
-            Text("Dish sign-ups will appear here.")
+            Text(
+                isHistoricalGathering
+                    ? "This gathering didn't have any dish sign-ups."
+                    : "Dish sign-ups will appear here."
+            )
                 .font(KinTypography.footnote)
                 .foregroundStyle(KinColors.secondaryText)
         }
@@ -1864,6 +1876,16 @@ private extension GatheringDetailView {
         let remaining =
             remainingQuantity(for: need)
 
+        if isHistoricalGathering {
+            if remaining == 0 {
+                return "Brought"
+            }
+            if claimed == 0 {
+                return "Not brought"
+            }
+            return "\(claimed) of \(claimed + remaining) brought"
+        }
+
         if remaining == 0 {
             return "Claimed"
         }
@@ -1950,11 +1972,12 @@ private extension GatheringDetailView {
                 return "Contributor"
             }
 
-        if names.count == 1 {
-            return "Bringing: \(names[0])"
-        }
+        let prefix =
+            isHistoricalGathering
+                ? "Brought by"
+                : "Bringing:"
 
-        return "Bringing: \(names.joined(separator: ", "))"
+        return "\(prefix) \(names.joined(separator: ", "))"
     }
     
     func dishIcon(
@@ -2005,7 +2028,11 @@ private extension GatheringDetailView {
             spacing: KinSpacing.medium
         ) {
             HStack {
-                Text("Supplies Needed")
+                Text(
+                    isHistoricalGathering
+                        ? "Supplies"
+                        : "Supplies Needed"
+                )
                     .font(
                         KinTypography.sectionTitle
                     )
