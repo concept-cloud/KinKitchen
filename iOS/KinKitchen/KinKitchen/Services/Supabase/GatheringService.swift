@@ -849,7 +849,10 @@ enum GatheringService {
 
         // MARK: Hosted History
 
-        let hostedGatherings:
+        // History is decided by Gathering.isHistorical, not the
+        // date alone, so a gathering the host completed early
+        // moves here too.
+        let allHostedGatherings:
             [Gathering] =
             try await SupabaseManager.client
                 .from("gatherings")
@@ -859,11 +862,6 @@ enum GatheringService {
                     value:
                         user.id
                 )
-                .lt(
-                    "starts_at",
-                    value:
-                        now
-                )
                 .order(
                     "starts_at",
                     ascending:
@@ -871,6 +869,11 @@ enum GatheringService {
                 )
                 .execute()
                 .value
+
+        let hostedGatherings =
+            allHostedGatherings.filter {
+                $0.isHistorical(asOf: now)
+            }
 
 
         var itemsById:
@@ -942,7 +945,7 @@ enum GatheringService {
             )
 
 
-        let participantGatherings:
+        let allParticipantGatherings:
             [Gathering] =
             try await SupabaseManager.client
                 .from("gatherings")
@@ -952,11 +955,6 @@ enum GatheringService {
                     values:
                         gatheringIds
                 )
-                .lt(
-                    "starts_at",
-                    value:
-                        now
-                )
                 .order(
                     "starts_at",
                     ascending:
@@ -964,6 +962,11 @@ enum GatheringService {
                 )
                 .execute()
                 .value
+
+        let participantGatherings =
+            allParticipantGatherings.filter {
+                $0.isHistorical(asOf: now)
+            }
 
 
         for gathering in participantGatherings {

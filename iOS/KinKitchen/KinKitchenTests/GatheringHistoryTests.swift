@@ -71,6 +71,53 @@ struct GatheringHistoryTests {
         #expect(past.displayStatus(asOf: Self.now) == .cancelled)
     }
 
+    // MARK: - KINKIT-154 Upcoming vs History
+
+    @Test func eachGatheringLandsInExactlyOneList() {
+        let future = Self.gathering(status: .upcoming, daysFromNow: 3)
+        let past = Self.gathering(status: .upcoming, daysFromNow: -3)
+        let completedEarly = Self.gathering(status: .completed, daysFromNow: 3)
+        let completedPast = Self.gathering(status: .completed, daysFromNow: -3)
+        let cancelledFuture = Self.gathering(status: .cancelled, daysFromNow: 3)
+        let cancelledPast = Self.gathering(status: .cancelled, daysFromNow: -3)
+
+        let all = [
+            future, past, completedEarly,
+            completedPast, cancelledFuture, cancelledPast
+        ]
+
+        let upcoming = all.filter { $0.isActive(asOf: Self.now) }
+        let history = all.filter { $0.isHistorical(asOf: Self.now) }
+
+        #expect(upcoming.map(\.id) == [future.id])
+        #expect(
+            Set(history.map(\.id)) == [
+                past.id, completedEarly.id,
+                completedPast.id, cancelledPast.id
+            ]
+        )
+
+        // Nothing appears in both.
+        #expect(
+            Set(upcoming.map(\.id))
+                .isDisjoint(with: history.map(\.id))
+        )
+    }
+
+    @Test func completingMovesTheSameGatheringToHistory() {
+        var gathering =
+            Self.gathering(status: .upcoming, daysFromNow: 2)
+        let originalId = gathering.id
+
+        #expect(gathering.isActive(asOf: Self.now))
+
+        gathering.status = .completed
+
+        #expect(gathering.id == originalId)
+        #expect(!gathering.isActive(asOf: Self.now))
+        #expect(gathering.isHistorical(asOf: Self.now))
+    }
+
     @Test func completedStatusDecodesFromSupabase() throws {
         let json = """
         {

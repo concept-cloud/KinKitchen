@@ -114,6 +114,17 @@ extension Gathering {
     }
 
 
+    /// Belongs in Gathering History: completed (by the host or by
+    /// date), or cancelled once its date has passed.
+    func isHistorical(
+        asOf now: Date = Date()
+    ) -> Bool {
+
+        isCompleted(asOf: now)
+            || (status == .cancelled && startsAt < now)
+    }
+
+
     /// Status to show, with past gatherings shown as completed.
     func displayStatus(
         asOf now: Date = Date()
