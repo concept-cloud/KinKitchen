@@ -22,6 +22,15 @@ struct CookbookDetailView: View {
     
     
     @State private var recipes: [Recipe] = []
+    @State private var relationships: [CookbookRecipe] = []
+    @State private var sections: [CookbookSection] = []
+
+    @State private var isShowingNewSection = false
+    @State private var sectionNameDraft = ""
+    @State private var sectionToRename: CookbookSection?
+    @State private var sectionToDelete: CookbookSection?
+    @State private var isSavingSection = false
+    @State private var sectionErrorMessage: String?
     @State private var selectedRecipeId: UUID?
     @State private var recipeToRemove: Recipe?
 
@@ -151,6 +160,75 @@ struct CookbookDetailView: View {
         } message: {
             Text(
                 "This removes the recipe from this cookbook. The original recipe will not be deleted."
+            )
+        }
+        // MARK: - Section Dialogs
+        .alert(
+            "New Section",
+            isPresented: $isShowingNewSection
+        ) {
+            TextField(
+                "e.g. Desserts",
+                text: $sectionNameDraft
+            )
+            .textInputAutocapitalization(.words)
+
+            Button("Add") {
+                Task {
+                    await createSection()
+                }
+            }
+
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("Group recipes in this cookbook, like Appetizers or Family Favorites.")
+        }
+        .alert(
+            "Rename Section",
+            isPresented: Binding(
+                get: { sectionToRename != nil },
+                set: { if !$0 { sectionToRename = nil } }
+            )
+        ) {
+            TextField(
+                "Section name",
+                text: $sectionNameDraft
+            )
+            .textInputAutocapitalization(.words)
+
+            Button("Save") {
+                if let section = sectionToRename {
+                    Task {
+                        await renameSection(section)
+                    }
+                }
+            }
+
+            Button("Cancel", role: .cancel) {}
+        }
+        .confirmationDialog(
+            "Delete Section?",
+            isPresented: Binding(
+                get: { sectionToDelete != nil },
+                set: { if !$0 { sectionToDelete = nil } }
+            ),
+            titleVisibility: .visible
+        ) {
+            if let section = sectionToDelete {
+                Button(
+                    "Delete \(section.name)",
+                    role: .destructive
+                ) {
+                    Task {
+                        await deleteSection(section)
+                    }
+                }
+            }
+
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text(
+                "Its recipes move to Unsorted. No recipes are deleted."
             )
         }
         .navigationDestination(
@@ -486,17 +564,290 @@ private extension CookbookDetailView {
                 )
             }
 
-            if recipes.isEmpty {
+            if let sectionErrorMessage {
+                Text(sectionErrorMessage)
+                    .font(KinTypography.caption)
+                    .foregroundStyle(KinColors.error)
+            }
+
+            if recipes.isEmpty && sections.isEmpty {
                 emptyRecipesState
             } else {
                 LazyVStack(
-                    spacing: KinSpacing.medium
+                    alignment: .leading,
+                    spacing: KinSpacing.large
                 ) {
-                    ForEach(recipes) { recipe in
-                        recipeRow(recipe)
+                    ForEach(sections) { section in
+                        sectionBlock(section)
+                    }
+
+                    // Recipes not in any section. Only labeled once
+                    // there are sections to tell them apart from.
+                    let unsorted = unsortedRecipes
+                    if !unsorted.isEmpty || sections.isEmpty {
+                        VStack(
+                            alignment: .leading,
+                            spacing: KinSpacing.medium
+                        ) {
+                            if !sections.isEmpty {
+                                sectionHeading(
+                                    "Unsorted",
+                                    count: unsorted.count
+                                )
+                            }
+
+                            ForEach(unsorted) { recipe in
+                                recipeRow(recipe)
+                            }
+                        }
                     }
                 }
             }
+
+            Button {
+                sectionNameDraft = ""
+                isShowingNewSection = true
+            } label: {
+                Label(
+                    "New Section",
+                    systemImage: "folder.badge.plus"
+                )
+                .font(KinTypography.headline)
+                .foregroundStyle(KinColors.primary)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, KinSpacing.medium)
+                .background(
+                    KinColors.primary.opacity(0.10)
+                )
+                .clipShape(
+                    RoundedRectangle(
+                        cornerRadius: KinRadius.medium
+                    )
+                )
+            }
+            .buttonStyle(.plain)
+            .disabled(isSavingSection)
+        }
+    }
+
+    // MARK: - Sections
+
+    /// Recipes in a section, in saved order.
+    func recipes(
+        in section: CookbookSection
+    ) -> [Recipe] {
+        let recipeIds =
+            relationships
+                .filter { $0.sectionId == section.id }
+                .map(\.recipeId)
+
+        return recipes.filter {
+            recipeIds.contains($0.id)
+        }
+        .sorted { first, second in
+            (recipeIds.firstIndex(of: first.id) ?? 0)
+                < (recipeIds.firstIndex(of: second.id) ?? 0)
+        }
+    }
+
+    /// Recipes without a section, or whose section no longer exists.
+    var unsortedRecipes: [Recipe] {
+        let sectionIds =
+            Set(sections.map(\.id))
+
+        let sectionedRecipeIds =
+            Set(
+                relationships
+                    .filter {
+                        guard let sectionId = $0.sectionId else {
+                            return false
+                        }
+                        return sectionIds.contains(sectionId)
+                    }
+                    .map(\.recipeId)
+            )
+
+        return recipes.filter {
+            !sectionedRecipeIds.contains($0.id)
+        }
+    }
+
+    func sectionBlock(
+        _ section: CookbookSection
+    ) -> some View {
+        let sectionRecipes =
+            recipes(in: section)
+
+        return VStack(
+            alignment: .leading,
+            spacing: KinSpacing.medium
+        ) {
+            HStack(
+                alignment: .firstTextBaseline
+            ) {
+                sectionHeading(
+                    section.name,
+                    count: sectionRecipes.count
+                )
+
+                Menu {
+                    Button {
+                        sectionNameDraft = section.name
+                        sectionToRename = section
+                    } label: {
+                        Label("Rename Section", systemImage: "pencil")
+                    }
+
+                    Button(role: .destructive) {
+                        sectionToDelete = section
+                    } label: {
+                        Label("Delete Section", systemImage: "trash")
+                    }
+                } label: {
+                    Image(systemName: "ellipsis.circle")
+                        .font(.title3)
+                        .foregroundStyle(KinColors.secondaryText)
+                        .frame(width: 44, height: 32)
+                }
+                .accessibilityLabel("\(section.name) options")
+            }
+
+            if sectionRecipes.isEmpty {
+                Text("No recipes in this section yet.")
+                    .font(KinTypography.footnote)
+                    .foregroundStyle(KinColors.secondaryText)
+                    .frame(
+                        maxWidth: .infinity,
+                        alignment: .leading
+                    )
+                    .padding(KinSpacing.medium)
+                    .background(KinColors.surface.opacity(0.6))
+                    .clipShape(
+                        RoundedRectangle(
+                            cornerRadius: KinRadius.medium
+                        )
+                    )
+            } else {
+                ForEach(sectionRecipes) { recipe in
+                    recipeRow(recipe)
+                }
+            }
+        }
+    }
+
+    func sectionHeading(
+        _ title: String,
+        count: Int
+    ) -> some View {
+        HStack(
+            alignment: .firstTextBaseline,
+            spacing: KinSpacing.small
+        ) {
+            Text(title)
+                .font(KinTypography.title3)
+                .foregroundStyle(KinColors.primaryText)
+                .lineLimit(2)
+
+            Text("\(count)")
+                .font(KinTypography.caption)
+                .foregroundStyle(KinColors.secondaryText)
+
+            Spacer(minLength: 0)
+        }
+    }
+
+    @MainActor
+    func createSection() async {
+        guard !isSavingSection else {
+            return
+        }
+
+        isSavingSection = true
+        sectionErrorMessage = nil
+
+        defer {
+            isSavingSection = false
+        }
+
+        do {
+            let section =
+                try await CookbookService.createSection(
+                    name: sectionNameDraft,
+                    in: cookbookId,
+                    after: sections
+                )
+
+            sections.append(section)
+
+        } catch {
+            sectionErrorMessage =
+                error.localizedDescription
+        }
+    }
+
+    @MainActor
+    func renameSection(
+        _ section: CookbookSection
+    ) async {
+        guard !isSavingSection else {
+            return
+        }
+
+        isSavingSection = true
+        sectionErrorMessage = nil
+
+        defer {
+            isSavingSection = false
+        }
+
+        do {
+            let updated =
+                try await CookbookService.renameSection(
+                    section,
+                    to: sectionNameDraft
+                )
+
+            if let index =
+                sections.firstIndex(where: {
+                    $0.id == section.id
+                }) {
+                sections[index] = updated
+            }
+
+        } catch {
+            sectionErrorMessage =
+                error.localizedDescription
+        }
+    }
+
+    @MainActor
+    func deleteSection(
+        _ section: CookbookSection
+    ) async {
+        guard !isSavingSection else {
+            return
+        }
+
+        isSavingSection = true
+        sectionErrorMessage = nil
+
+        defer {
+            isSavingSection = false
+        }
+
+        do {
+            try await CookbookService.deleteSection(
+                section
+            )
+
+            // Reload so its recipes show under Unsorted, as stored.
+            await loadCookbook(
+                showLoadingState: false
+            )
+
+        } catch {
+            sectionErrorMessage =
+                error.localizedDescription
         }
     }
 
@@ -833,21 +1184,36 @@ private extension CookbookDetailView {
                     id: cookbookId
                 )
 
-            async let recipesRequest =
-                CookbookService.fetchRecipes(
+            async let contentsRequest =
+                CookbookService.fetchContents(
                     cookbookId: cookbookId
                 )
 
             let (
                 loadedCookbook,
-                loadedRecipes
+                contents
             ) = try await (
                 cookbookRequest,
-                recipesRequest
+                contentsRequest
             )
 
             cookbook = loadedCookbook
-            recipes = loadedRecipes
+            relationships = contents.relationships
+
+            // Saved order; recipes that no longer exist are skipped.
+            recipes =
+                contents.relationships.compactMap {
+                    contents.recipesById[$0.recipeId]
+                }
+
+            // Sections are supplemental: if they can't load, the
+            // cookbook still shows every recipe as Unsorted.
+            sections =
+                (try? await CookbookService
+                    .fetchSections(
+                        cookbookId: cookbookId
+                    )) ?? []
+
             await loadCookbookCover(
                 path: loadedCookbook.coverPath
             )

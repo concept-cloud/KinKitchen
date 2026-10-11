@@ -326,6 +326,167 @@ enum CookbookService {
         return recipes
     }
 
+    // MARK: - Fetch Cookbook Contents
+
+    /// Recipe relationships in saved order plus the recipes they point
+    /// at, loaded in one request. Recipes that no longer exist are
+    /// simply missing from `recipesById`.
+    static func fetchContents(
+        cookbookId: UUID
+    ) async throws -> (
+        relationships: [CookbookRecipe],
+        recipesById: [UUID: Recipe]
+    ) {
+
+        let relationships =
+            try await fetchRecipeRelationships(
+                cookbookId: cookbookId
+            )
+
+        let recipes =
+            try await RecipeService.fetchRecipes(
+                ids: relationships.map(\.recipeId)
+            )
+
+        return (
+            relationships,
+            Dictionary(
+                uniqueKeysWithValues:
+                    recipes.map { ($0.id, $0) }
+            )
+        )
+    }
+
+    // MARK: - Sections
+
+    static func fetchSections(
+        cookbookId: UUID
+    ) async throws -> [CookbookSection] {
+
+        _ =
+            try await fetchCookbook(
+                id: cookbookId
+            )
+
+        let sections: [CookbookSection] =
+            try await SupabaseManager.client
+                .from("cookbook_sections")
+                .select()
+                .eq(
+                    "cookbook_id",
+                    value: cookbookId
+                )
+                .order(
+                    "sort_order",
+                    ascending: true
+                )
+                .execute()
+                .value
+
+        return sections
+    }
+
+    /// Adds a section at the end of the cookbook's sections.
+    static func createSection(
+        name: String,
+        in cookbookId: UUID,
+        after existingSections: [CookbookSection]
+    ) async throws -> CookbookSection {
+
+        let cleanName =
+            try validatedSectionName(name)
+
+        _ =
+            try await fetchCookbook(
+                id: cookbookId
+            )
+
+        let section: CookbookSection =
+            try await SupabaseManager.client
+                .from("cookbook_sections")
+                .insert(
+                    CookbookSectionCreate(
+                        cookbookId: cookbookId,
+                        name: cleanName,
+                        sortOrder:
+                            (existingSections
+                                .map(\.sortOrder)
+                                .max() ?? -1) + 1
+                    )
+                )
+                .select()
+                .single()
+                .execute()
+                .value
+
+        return section
+    }
+
+    static func renameSection(
+        _ section: CookbookSection,
+        to name: String
+    ) async throws -> CookbookSection {
+
+        let cleanName =
+            try validatedSectionName(name)
+
+        let updated: CookbookSection =
+            try await SupabaseManager.client
+                .from("cookbook_sections")
+                .update(
+                    ["name": cleanName]
+                )
+                .eq(
+                    "id",
+                    value: section.id
+                )
+                .select()
+                .single()
+                .execute()
+                .value
+
+        return updated
+    }
+
+    /// Deletes the section only. Its recipes stay in the cookbook as
+    /// Unsorted (the database clears their section_id).
+    static func deleteSection(
+        _ section: CookbookSection
+    ) async throws {
+
+        try await SupabaseManager.client
+            .from("cookbook_sections")
+            .delete()
+            .eq(
+                "id",
+                value: section.id
+            )
+            .execute()
+    }
+
+    /// Trimmed name, or throws if it's empty or too long.
+    static func validatedSectionName(
+        _ name: String
+    ) throws -> String {
+
+        let cleanName =
+            name.trimmingCharacters(
+                in: .whitespacesAndNewlines
+            )
+
+        guard !cleanName.isEmpty else {
+            throw CookbookServiceError.invalidSectionName
+        }
+
+        guard
+            cleanName.count <= CookbookSection.maxNameLength
+        else {
+            throw CookbookServiceError.sectionNameTooLong
+        }
+
+        return cleanName
+    }
+
     // MARK: - Cookbook Cover
 
     static func uploadCookbookCover(
@@ -417,6 +578,8 @@ enum CookbookService {
 enum CookbookServiceError: LocalizedError {
     case invalidName
     case cookbookNotFound
+    case invalidSectionName
+    case sectionNameTooLong
 
     var errorDescription: String? {
         switch self {
@@ -425,6 +588,12 @@ enum CookbookServiceError: LocalizedError {
 
         case .cookbookNotFound:
             return "Cookbook could not be found."
+
+        case .invalidSectionName:
+            return "Please enter a section name."
+
+        case .sectionNameTooLong:
+            return "Section names can be up to \(CookbookSection.maxNameLength) characters."
         }
     }
 }

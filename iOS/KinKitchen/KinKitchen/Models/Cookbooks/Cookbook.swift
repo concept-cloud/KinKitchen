@@ -86,6 +86,41 @@ struct CookbookRecipe: Codable, Hashable {
     }
 }
 
+// MARK: - Cookbook Section
+
+/// A named group of recipes inside one cookbook, e.g. "Desserts".
+/// Row in `cookbook_sections`.
+struct CookbookSection: Codable, Identifiable, Hashable {
+    let id: UUID
+    let cookbookId: UUID
+    var name: String
+    var sortOrder: Int
+
+    /// Longest allowed section name (matches the database check).
+    static let maxNameLength = 60
+
+    enum CodingKeys: String, CodingKey {
+        case id
+        case cookbookId = "cookbook_id"
+        case name
+        case sortOrder = "sort_order"
+    }
+}
+
+// MARK: - Cookbook Section Create
+
+struct CookbookSectionCreate: Encodable {
+    let cookbookId: UUID
+    let name: String
+    let sortOrder: Int
+
+    enum CodingKeys: String, CodingKey {
+        case cookbookId = "cookbook_id"
+        case name
+        case sortOrder = "sort_order"
+    }
+}
+
 // MARK: - Cookbook Recipe Create
 
 struct CookbookRecipeCreate: Encodable {
