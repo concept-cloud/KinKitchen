@@ -108,6 +108,76 @@ struct CookbookCustomizationTests {
         )
     }
 
+    // MARK: - KINKIT-175 Recipe Reordering
+
+    static let a = UUID()
+    static let b = UUID()
+    static let c = UUID()
+    static let d = UUID()
+
+    @Test func draggingDownMovesItemAfterTarget() {
+        // Drag A onto the slot after C (SwiftUI destination 3).
+        #expect(
+            CookbookService.reordered(
+                [Self.a, Self.b, Self.c, Self.d],
+                moving: [0],
+                to: 3
+            ) == [Self.b, Self.c, Self.a, Self.d]
+        )
+    }
+
+    @Test func draggingUpMovesItemBeforeTarget() {
+        #expect(
+            CookbookService.reordered(
+                [Self.a, Self.b, Self.c, Self.d],
+                moving: [3],
+                to: 1
+            ) == [Self.a, Self.d, Self.b, Self.c]
+        )
+    }
+
+    @Test func draggingToTheEndAndStart() {
+        let ids = [Self.a, Self.b, Self.c]
+
+        #expect(
+            CookbookService.reordered(ids, moving: [0], to: 3)
+                == [Self.b, Self.c, Self.a]
+        )
+        #expect(
+            CookbookService.reordered(ids, moving: [2], to: 0)
+                == [Self.c, Self.a, Self.b]
+        )
+    }
+
+    @Test func reorderingKeepsEveryRecipeOnce() {
+        let ids = [Self.a, Self.b, Self.c, Self.d]
+        let result =
+            CookbookService.reordered(ids, moving: [1], to: 4)
+
+        #expect(result.count == ids.count)
+        #expect(Set(result) == Set(ids))
+    }
+
+    @Test func savedOrderWinsThenTiesStayStable() {
+        let first =
+            CookbookRecipe(
+                cookbookId: Self.cookbookId,
+                recipeId: Self.b,
+                sectionId: nil,
+                sortOrder: 0
+            )
+        let second =
+            CookbookRecipe(
+                cookbookId: Self.cookbookId,
+                recipeId: Self.a,
+                sectionId: nil,
+                sortOrder: 1
+            )
+
+        #expect(CookbookRecipe.displayOrder(first, second))
+        #expect(!CookbookRecipe.displayOrder(second, first))
+    }
+
     @Test func maxLengthSectionNameIsAllowed() throws {
         let name =
             String(

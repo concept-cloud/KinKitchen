@@ -86,6 +86,25 @@ struct CookbookRecipe: Codable, Hashable {
     }
 }
 
+// MARK: - Cookbook Recipe Order
+
+extension CookbookRecipe {
+
+    /// Saved position first. Recipes added before ordering existed
+    /// all share position 0, so ties fall back to the recipe ID to
+    /// keep the order stable between loads.
+    static func displayOrder(
+        _ first: CookbookRecipe,
+        _ second: CookbookRecipe
+    ) -> Bool {
+        if first.sortOrder != second.sortOrder {
+            return first.sortOrder < second.sortOrder
+        }
+        return first.recipeId.uuidString
+            < second.recipeId.uuidString
+    }
+}
+
 // MARK: - Cookbook Section
 
 /// A named group of recipes inside one cookbook, e.g. "Desserts".

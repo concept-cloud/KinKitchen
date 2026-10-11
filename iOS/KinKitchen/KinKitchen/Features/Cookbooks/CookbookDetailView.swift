@@ -23,7 +23,12 @@ struct CookbookDetailView: View {
     
     @State private var recipes: [Recipe] = []
     @State private var relationships: [CookbookRecipe] = []
+    @State private var recipesById: [UUID: Recipe] = [:]
     @State private var sections: [CookbookSection] = []
+
+    @State private var selectedPage: CookbookPage?
+    /// The page currently in drag-to-reorder mode, if any.
+    @State private var editingPage: CookbookPage?
 
     @State private var isShowingNewSection = false
     @State private var sectionNameDraft = ""
@@ -256,6 +261,14 @@ struct CookbookDetailView: View {
     }
 }
 
+// MARK: - Cookbook Page
+
+/// A swipeable page in Cookbook Detail: one section, or Unsorted.
+enum CookbookPage: Hashable {
+    case section(UUID)
+    case unsorted
+}
+
 // MARK: - Content
 
 private extension CookbookDetailView {
@@ -276,28 +289,29 @@ private extension CookbookDetailView {
 
 private extension CookbookDetailView {
 
+    /// Cover and title stay put at the top; below them, each section
+    /// is its own page that scrolls on its own.
     func cookbookContent(
         _ cookbook: Cookbook
     ) -> some View {
-        ScrollView {
+        VStack(
+            alignment: .leading,
+            spacing: KinSpacing.medium
+        ) {
             VStack(
                 alignment: .leading,
-                spacing: KinSpacing.xLarge
+                spacing: KinSpacing.medium
             ) {
                 header(cookbook)
 
                 cookbookInformation(cookbook)
-
-                recipesSection
             }
             .padding(
                 .horizontal,
                 KinSpacing.large
             )
-            .padding(
-                .bottom,
-                KinSpacing.xxLarge
-            )
+
+            recipesSection
         }
     }
 }
@@ -478,7 +492,7 @@ private extension CookbookDetailView {
             maxWidth: .infinity
         )
         .frame(
-            height: 190
+            height: 150
         )
         .clipShape(
             RoundedRectangle(
@@ -513,6 +527,8 @@ private extension CookbookDetailView {
 
 private extension CookbookDetailView {
 
+    /// Recipes count and add button, then section tabs over pages you
+    /// swipe between. Each page is one section's recipes.
     var recipesSection: some View {
         VStack(
             alignment: .leading,
@@ -521,13 +537,11 @@ private extension CookbookDetailView {
             HStack {
                 Text("Recipes")
                     .font(
-                        KinTypography.title
+                        KinTypography.title2
                     )
                     .foregroundStyle(
                         KinColors.primaryText
                     )
-
-                Spacer()
 
                 Text("\(recipes.count)")
                     .font(
@@ -536,6 +550,8 @@ private extension CookbookDetailView {
                     .foregroundStyle(
                         KinColors.secondaryText
                     )
+
+                Spacer()
 
                 Button {
                     isShowingRecipePicker = true
@@ -564,82 +580,423 @@ private extension CookbookDetailView {
                     "Add Recipes"
                 )
             }
+            .padding(.horizontal, KinSpacing.large)
 
             if let sectionErrorMessage {
                 Text(sectionErrorMessage)
                     .font(KinTypography.caption)
                     .foregroundStyle(KinColors.error)
+                    .padding(.horizontal, KinSpacing.large)
             }
 
             if recipes.isEmpty && sections.isEmpty {
-                emptyRecipesState
-            } else {
-                LazyVStack(
-                    alignment: .leading,
-                    spacing: KinSpacing.large
-                ) {
-                    ForEach(sections) { section in
-                        sectionBlock(section)
+                ScrollView {
+                    VStack(spacing: KinSpacing.medium) {
+                        emptyRecipesState
+                        newSectionButton
                     }
+                    .padding(.horizontal, KinSpacing.large)
+                }
+            } else {
+                sectionTabs
 
-                    // Recipes not in any section. Only labeled once
-                    // there are sections to tell them apart from.
-                    let unsorted = unsortedRecipes
-                    if !unsorted.isEmpty || sections.isEmpty {
-                        VStack(
-                            alignment: .leading,
-                            spacing: KinSpacing.medium
-                        ) {
-                            if !sections.isEmpty {
-                                sectionHeading(
-                                    "Unsorted",
-                                    count: unsorted.count
-                                )
-                            }
-
-                            ForEach(unsorted) { recipe in
-                                recipeRow(recipe)
-                            }
-                        }
+                TabView(
+                    selection: pageSelection
+                ) {
+                    ForEach(pages, id: \.self) { page in
+                        pageView(page)
+                            .tag(page)
                     }
                 }
+                .tabViewStyle(
+                    .page(indexDisplayMode: .never)
+                )
+            }
+        }
+    }
+
+    var newSectionButton: some View {
+        Button {
+            sectionNameDraft = ""
+            isShowingNewSection = true
+        } label: {
+            Label(
+                "New Section",
+                systemImage: "folder.badge.plus"
+            )
+            .font(KinTypography.headline)
+            .foregroundStyle(KinColors.primary)
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, KinSpacing.medium)
+            .background(
+                KinColors.primary.opacity(0.10)
+            )
+            .clipShape(
+                RoundedRectangle(
+                    cornerRadius: KinRadius.medium
+                )
+            )
+        }
+        .buttonStyle(.plain)
+        .disabled(isSavingSection)
+    }
+
+    // MARK: - Pages
+
+    /// One page per section in saved order, then Unsorted when it
+    /// has recipes (or when there are no sections at all).
+    var pages: [CookbookPage] {
+        let sectionPages =
+            sections.map {
+                CookbookPage.section($0.id)
             }
 
-            Button {
-                sectionNameDraft = ""
-                isShowingNewSection = true
-            } label: {
-                Label(
-                    "New Section",
-                    systemImage: "folder.badge.plus"
+        let showUnsorted =
+            sections.isEmpty || !unsortedRecipes.isEmpty
+
+        return sectionPages
+            + (showUnsorted ? [.unsorted] : [])
+    }
+
+    /// The selected page, falling back to the first one if the
+    /// selected section was deleted.
+    var pageSelection: Binding<CookbookPage> {
+        Binding(
+            get: {
+                if let selectedPage,
+                   pages.contains(selectedPage) {
+                    return selectedPage
+                }
+                return pages.first ?? .unsorted
+            },
+            set: { newPage in
+                withAnimation(.easeInOut(duration: 0.2)) {
+                    selectedPage = newPage
+                }
+                // Leaving a page ends its reordering.
+                if editingPage != newPage {
+                    editingPage = nil
+                }
+            }
+        )
+    }
+
+    func title(
+        for page: CookbookPage
+    ) -> String {
+        switch page {
+        case .section(let id):
+            return sections.first { $0.id == id }?.name
+                ?? "Section"
+        case .unsorted:
+            return sections.isEmpty ? "All Recipes" : "Unsorted"
+        }
+    }
+
+    func recipes(
+        on page: CookbookPage
+    ) -> [Recipe] {
+        switch page {
+        case .section(let id):
+            return recipes(inSection: id)
+        case .unsorted:
+            return unsortedRecipes
+        }
+    }
+
+    // MARK: - Section Tabs
+
+    var sectionTabs: some View {
+        ScrollViewReader { proxy in
+            ScrollView(
+                .horizontal,
+                showsIndicators: false
+            ) {
+                HStack(spacing: KinSpacing.small) {
+                    ForEach(pages, id: \.self) { page in
+                        let isSelected =
+                            pageSelection.wrappedValue == page
+
+                        Button {
+                            pageSelection.wrappedValue = page
+                        } label: {
+                            HStack(spacing: KinSpacing.xSmall) {
+                                Text(title(for: page))
+                                    .lineLimit(1)
+
+                                Text("\(recipes(on: page).count)")
+                                    .opacity(0.7)
+                            }
+                            .font(KinTypography.subheadline)
+                            .foregroundStyle(
+                                isSelected
+                                    ? .white
+                                    : KinColors.primaryText
+                            )
+                            .padding(.horizontal, KinSpacing.medium)
+                            .padding(.vertical, KinSpacing.small)
+                            .background(
+                                isSelected
+                                    ? KinColors.primary
+                                    : KinColors.surface
+                            )
+                            .clipShape(Capsule())
+                        }
+                        .buttonStyle(.plain)
+                        .id(page)
+                        .accessibilityAddTraits(
+                            isSelected ? .isSelected : []
+                        )
+                    }
+
+                    Button {
+                        sectionNameDraft = ""
+                        isShowingNewSection = true
+                    } label: {
+                        Image(systemName: "plus")
+                            .font(.system(size: 14, weight: .bold))
+                            .foregroundStyle(KinColors.primary)
+                            .frame(width: 36, height: 36)
+                            .background(
+                                KinColors.primary.opacity(0.12)
+                            )
+                            .clipShape(Circle())
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(isSavingSection)
+                    .accessibilityLabel("New Section")
+                }
+                .padding(.horizontal, KinSpacing.large)
+            }
+            // Keep the selected tab in view while swiping pages.
+            .onChange(of: pageSelection.wrappedValue) { _, page in
+                withAnimation {
+                    proxy.scrollTo(page, anchor: .center)
+                }
+            }
+        }
+    }
+
+    // MARK: - Page
+
+    func pageView(
+        _ page: CookbookPage
+    ) -> some View {
+        let pageRecipes =
+            recipes(on: page)
+
+        let isEditing =
+            editingPage == page
+
+        let section: CookbookSection? = {
+            if case .section(let id) = page {
+                return sections.first { $0.id == id }
+            }
+            return nil
+        }()
+
+        return VStack(
+            alignment: .leading,
+            spacing: KinSpacing.small
+        ) {
+            HStack(
+                alignment: .firstTextBaseline
+            ) {
+                sectionHeading(
+                    title(for: page),
+                    count: pageRecipes.count
                 )
-                .font(KinTypography.headline)
-                .foregroundStyle(KinColors.primary)
+
+                if pageRecipes.count > 1 {
+                    Button(isEditing ? "Done" : "Reorder") {
+                        withAnimation {
+                            editingPage =
+                                isEditing ? nil : page
+                        }
+                    }
+                    .font(KinTypography.callout)
+                    .foregroundStyle(KinColors.primary)
+                }
+
+                if let section {
+                    Menu {
+                        Button {
+                            sectionNameDraft = section.name
+                            sectionToRename = section
+                        } label: {
+                            Label("Rename Section", systemImage: "pencil")
+                        }
+
+                        Button(role: .destructive) {
+                            sectionToDelete = section
+                        } label: {
+                            Label("Delete Section", systemImage: "trash")
+                        }
+                    } label: {
+                        Image(systemName: "ellipsis.circle")
+                            .font(.title3)
+                            .foregroundStyle(KinColors.secondaryText)
+                            .frame(width: 44, height: 32)
+                    }
+                    .accessibilityLabel("\(section.name) options")
+                }
+            }
+            .padding(.horizontal, KinSpacing.large)
+
+            if pageRecipes.isEmpty {
+                VStack(spacing: KinSpacing.small) {
+                    Text("No recipes in this section yet.")
+                        .font(KinTypography.footnote)
+                        .foregroundStyle(KinColors.secondaryText)
+
+                    Text("Use ⋯ on a recipe and choose Move to Section.")
+                        .font(KinTypography.caption)
+                        .foregroundStyle(KinColors.secondaryText)
+                }
                 .frame(maxWidth: .infinity)
-                .padding(.vertical, KinSpacing.medium)
-                .background(
-                    KinColors.primary.opacity(0.10)
-                )
+                .padding(KinSpacing.large)
+                .background(KinColors.surface.opacity(0.6))
                 .clipShape(
                     RoundedRectangle(
                         cornerRadius: KinRadius.medium
                     )
                 )
+                .padding(.horizontal, KinSpacing.large)
+
+                Spacer()
+            } else {
+                List {
+                    ForEach(pageRecipes) { recipe in
+                        recipeRow(recipe)
+                            .listRowInsets(
+                                EdgeInsets(
+                                    top: KinSpacing.small / 2,
+                                    leading: KinSpacing.large,
+                                    bottom: KinSpacing.small / 2,
+                                    trailing: KinSpacing.large
+                                )
+                            )
+                            .listRowSeparator(.hidden)
+                            .listRowBackground(Color.clear)
+                    }
+                    .onMove(
+                        perform: isEditing
+                            ? { offsets, destination in
+                                moveRecipes(
+                                    on: page,
+                                    from: offsets,
+                                    to: destination
+                                )
+                            }
+                            : nil
+                    )
+                }
+                .listStyle(.plain)
+                .scrollContentBackground(.hidden)
+                .environment(
+                    \.editMode,
+                    .constant(isEditing ? .active : .inactive)
+                )
+                .refreshable {
+                    await loadCookbook(
+                        showLoadingState: false
+                    )
+                }
             }
-            .buttonStyle(.plain)
-            .disabled(isSavingSection)
         }
+    }
+
+    // MARK: - Reorder Recipes
+
+    /// Shows the new order right away, then saves it. If saving
+    /// fails, reloads the stored order and says so.
+    func moveRecipes(
+        on page: CookbookPage,
+        from offsets: IndexSet,
+        to destination: Int
+    ) {
+        let newOrder =
+            CookbookService.reordered(
+                recipes(on: page).map(\.id),
+                moving: offsets,
+                to: destination
+            )
+
+        let sectionId: UUID? = {
+            if case .section(let id) = page {
+                return id
+            }
+            return nil
+        }()
+
+        applyLocalOrder(
+            newOrder,
+            in: sectionId
+        )
+
+        Task {
+            do {
+                try await CookbookService.reorderRecipes(
+                    newOrder,
+                    in: sectionId,
+                    cookbookId: cookbookId
+                )
+            } catch {
+                sectionErrorMessage =
+                    "The new order couldn't be saved. Please try again."
+
+                print(
+                    "COOKBOOK REORDER ERROR:",
+                    error.localizedDescription
+                )
+
+                await loadCookbook(
+                    showLoadingState: false
+                )
+            }
+        }
+    }
+
+    func applyLocalOrder(
+        _ orderedRecipeIds: [UUID],
+        in sectionId: UUID?
+    ) {
+        relationships =
+            relationships
+                .map { relationship in
+                    guard
+                        let position =
+                            orderedRecipeIds.firstIndex(
+                                of: relationship.recipeId
+                            )
+                    else {
+                        return relationship
+                    }
+
+                    return CookbookRecipe(
+                        cookbookId: relationship.cookbookId,
+                        recipeId: relationship.recipeId,
+                        sectionId: sectionId,
+                        sortOrder: position
+                    )
+                }
+                .sorted(by: CookbookRecipe.displayOrder)
+
+        recipes =
+            relationships.compactMap {
+                recipesById[$0.recipeId]
+            }
     }
 
     // MARK: - Sections
 
     /// Recipes in a section, in saved order.
     func recipes(
-        in section: CookbookSection
+        inSection sectionId: UUID
     ) -> [Recipe] {
         let recipeIds =
             relationships
-                .filter { $0.sectionId == section.id }
+                .filter { $0.sectionId == sectionId }
                 .map(\.recipeId)
 
         return recipes.filter {
@@ -670,69 +1027,6 @@ private extension CookbookDetailView {
 
         return recipes.filter {
             !sectionedRecipeIds.contains($0.id)
-        }
-    }
-
-    func sectionBlock(
-        _ section: CookbookSection
-    ) -> some View {
-        let sectionRecipes =
-            recipes(in: section)
-
-        return VStack(
-            alignment: .leading,
-            spacing: KinSpacing.medium
-        ) {
-            HStack(
-                alignment: .firstTextBaseline
-            ) {
-                sectionHeading(
-                    section.name,
-                    count: sectionRecipes.count
-                )
-
-                Menu {
-                    Button {
-                        sectionNameDraft = section.name
-                        sectionToRename = section
-                    } label: {
-                        Label("Rename Section", systemImage: "pencil")
-                    }
-
-                    Button(role: .destructive) {
-                        sectionToDelete = section
-                    } label: {
-                        Label("Delete Section", systemImage: "trash")
-                    }
-                } label: {
-                    Image(systemName: "ellipsis.circle")
-                        .font(.title3)
-                        .foregroundStyle(KinColors.secondaryText)
-                        .frame(width: 44, height: 32)
-                }
-                .accessibilityLabel("\(section.name) options")
-            }
-
-            if sectionRecipes.isEmpty {
-                Text("No recipes in this section yet.")
-                    .font(KinTypography.footnote)
-                    .foregroundStyle(KinColors.secondaryText)
-                    .frame(
-                        maxWidth: .infinity,
-                        alignment: .leading
-                    )
-                    .padding(KinSpacing.medium)
-                    .background(KinColors.surface.opacity(0.6))
-                    .clipShape(
-                        RoundedRectangle(
-                            cornerRadius: KinRadius.medium
-                        )
-                    )
-            } else {
-                ForEach(sectionRecipes) { recipe in
-                    recipeRow(recipe)
-                }
-            }
         }
     }
 
@@ -1311,11 +1605,15 @@ private extension CookbookDetailView {
             )
 
             cookbook = loadedCookbook
-            relationships = contents.relationships
+            recipesById = contents.recipesById
+            relationships =
+                contents.relationships.sorted(
+                    by: CookbookRecipe.displayOrder
+                )
 
             // Saved order; recipes that no longer exist are skipped.
             recipes =
-                contents.relationships.compactMap {
+                relationships.compactMap {
                     contents.recipesById[$0.recipeId]
                 }
 

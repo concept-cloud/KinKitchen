@@ -222,16 +222,21 @@ enum CookbookService {
         to cookbookId: UUID
     ) async throws -> CookbookRecipe {
 
-        _ =
-            try await fetchCookbook(
-                id: cookbookId
+        // New recipes go to the end of Unsorted.
+        let existing =
+            try await fetchRecipeRelationships(
+                cookbookId: cookbookId
             )
 
         let payload =
             CookbookRecipeCreate(
                 cookbookId: cookbookId,
                 recipeId: recipeId,
-                sortOrder: 0
+                sortOrder:
+                    nextSortOrder(
+                        in: nil,
+                        relationships: existing
+                    )
             )
 
         let relationship: CookbookRecipe =
@@ -507,6 +512,75 @@ enum CookbookService {
                 value: recipeId
             )
             .execute()
+    }
+
+    // MARK: - Reorder Recipes
+
+    /// Saves the order of recipes within one section (nil = Unsorted)
+    /// as explicit positions 0, 1, 2… Only `sort_order` on the
+    /// cookbook relationship changes.
+    static func reorderRecipes(
+        _ orderedRecipeIds: [UUID],
+        in sectionId: UUID?,
+        cookbookId: UUID
+    ) async throws {
+
+        _ =
+            try await fetchCookbook(
+                id: cookbookId
+            )
+
+        for (position, recipeId) in
+            orderedRecipeIds.enumerated() {
+
+            try await SupabaseManager.client
+                .from("cookbook_recipes")
+                .update(
+                    CookbookRecipePlacement(
+                        sectionId: sectionId,
+                        sortOrder: position
+                    )
+                )
+                .eq(
+                    "cookbook_id",
+                    value: cookbookId
+                )
+                .eq(
+                    "recipe_id",
+                    value: recipeId
+                )
+                .execute()
+        }
+    }
+
+    /// The new order after a drag, using the same rules as SwiftUI's
+    /// list move.
+    static func reordered(
+        _ ids: [UUID],
+        moving offsets: IndexSet,
+        to destination: Int
+    ) -> [UUID] {
+
+        // Pull out the moved items, then insert them where the drop
+        // lands once the items above it are accounted for.
+        let moved =
+            offsets.map { ids[$0] }
+
+        var remaining =
+            ids.enumerated()
+                .filter { !offsets.contains($0.offset) }
+                .map(\.element)
+
+        let insertAt =
+            destination
+                - offsets.filter { $0 < destination }.count
+
+        remaining.insert(
+            contentsOf: moved,
+            at: min(max(insertAt, 0), remaining.count)
+        )
+
+        return remaining
     }
 
     /// One past the highest position in a section, so a moved
