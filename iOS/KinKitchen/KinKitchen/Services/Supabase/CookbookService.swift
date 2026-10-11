@@ -464,6 +464,64 @@ enum CookbookService {
             .execute()
     }
 
+    // MARK: - Move Recipe To Section
+
+    /// Moves a cookbook recipe into a section (nil = Unsorted),
+    /// placing it at the end of that section. Only the cookbook
+    /// relationship changes, never the recipe.
+    static func moveRecipe(
+        recipeId: UUID,
+        in cookbookId: UUID,
+        to sectionId: UUID?,
+        relationships: [CookbookRecipe]
+    ) async throws {
+
+        _ =
+            try await fetchCookbook(
+                id: cookbookId
+            )
+
+        let sortOrder =
+            nextSortOrder(
+                in: sectionId,
+                relationships:
+                    relationships.filter {
+                        $0.recipeId != recipeId
+                    }
+            )
+
+        try await SupabaseManager.client
+            .from("cookbook_recipes")
+            .update(
+                CookbookRecipePlacement(
+                    sectionId: sectionId,
+                    sortOrder: sortOrder
+                )
+            )
+            .eq(
+                "cookbook_id",
+                value: cookbookId
+            )
+            .eq(
+                "recipe_id",
+                value: recipeId
+            )
+            .execute()
+    }
+
+    /// One past the highest position in a section, so a moved
+    /// recipe lands at the end.
+    static func nextSortOrder(
+        in sectionId: UUID?,
+        relationships: [CookbookRecipe]
+    ) -> Int {
+
+        (relationships
+            .filter { $0.sectionId == sectionId }
+            .map(\.sortOrder)
+            .max() ?? -1) + 1
+    }
+
     /// Trimmed name, or throws if it's empty or too long.
     static func validatedSectionName(
         _ name: String

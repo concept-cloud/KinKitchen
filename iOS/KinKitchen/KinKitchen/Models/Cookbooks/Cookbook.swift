@@ -121,6 +121,30 @@ struct CookbookSectionCreate: Encodable {
     }
 }
 
+// MARK: - Cookbook Recipe Placement
+
+/// Where a recipe sits in a cookbook: its section (nil = Unsorted)
+/// and position. Only these columns are updated; the recipe itself
+/// is never touched.
+struct CookbookRecipePlacement: Encodable {
+    let sectionId: UUID?
+    let sortOrder: Int
+
+    enum CodingKeys: String, CodingKey {
+        case sectionId = "section_id"
+        case sortOrder = "sort_order"
+    }
+
+    // Always send section_id, including null, so moving a recipe
+    // back to Unsorted actually clears it.
+    func encode(to encoder: Encoder) throws {
+        var container =
+            encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(sectionId, forKey: .sectionId)
+        try container.encode(sortOrder, forKey: .sortOrder)
+    }
+}
+
 // MARK: - Cookbook Recipe Create
 
 struct CookbookRecipeCreate: Encodable {

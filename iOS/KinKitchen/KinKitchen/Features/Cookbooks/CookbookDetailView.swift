@@ -31,6 +31,7 @@ struct CookbookDetailView: View {
     @State private var sectionToDelete: CookbookSection?
     @State private var isSavingSection = false
     @State private var sectionErrorMessage: String?
+    @State private var isMovingRecipe = false
     @State private var selectedRecipeId: UUID?
     @State private var recipeToRemove: Recipe?
 
@@ -949,27 +950,139 @@ private extension CookbookDetailView {
             }
             .buttonStyle(.plain)
 
-            Button {
-                recipeToRemove = recipe
+            Menu {
+                // Move to another section (or Unsorted).
+                if !sections.isEmpty {
+                    Menu {
+                        ForEach(sections) { section in
+                            Button {
+                                Task {
+                                    await moveRecipe(
+                                        recipe,
+                                        to: section.id
+                                    )
+                                }
+                            } label: {
+                                if sectionId(of: recipe) == section.id {
+                                    Label(section.name, systemImage: "checkmark")
+                                } else {
+                                    Text(section.name)
+                                }
+                            }
+                        }
+
+                        Divider()
+
+                        Button {
+                            Task {
+                                await moveRecipe(
+                                    recipe,
+                                    to: nil
+                                )
+                            }
+                        } label: {
+                            if sectionId(of: recipe) == nil {
+                                Label("Unsorted", systemImage: "checkmark")
+                            } else {
+                                Text("Unsorted")
+                            }
+                        }
+                    } label: {
+                        Label(
+                            "Move to Section",
+                            systemImage: "folder"
+                        )
+                    }
+                }
+
+                Button(role: .destructive) {
+                    recipeToRemove = recipe
+                } label: {
+                    Label(
+                        "Remove from Cookbook",
+                        systemImage: "minus.circle"
+                    )
+                }
             } label: {
                 Image(
-                    systemName: "minus.circle.fill"
+                    systemName: "ellipsis.circle"
                 )
                 .font(
-                    .system(size: 24)
+                    .system(size: 22)
                 )
                 .foregroundStyle(
-                    KinColors.error
+                    KinColors.secondaryText
                 )
                 .frame(
                     width: 36,
                     height: 44
                 )
             }
-            .buttonStyle(.plain)
-            .disabled(isRemovingRecipe)
+            .disabled(
+                isRemovingRecipe || isMovingRecipe
+            )
             .accessibilityLabel(
-                "Remove \(recipe.name)"
+                "\(recipe.name) options"
+            )
+        }
+    }
+
+    /// The recipe's current section, nil when Unsorted or when its
+    /// section no longer exists.
+    func sectionId(
+        of recipe: Recipe
+    ) -> UUID? {
+        guard
+            let sectionId =
+                relationships
+                    .first(where: { $0.recipeId == recipe.id })?
+                    .sectionId,
+            sections.contains(where: { $0.id == sectionId })
+        else {
+            return nil
+        }
+        return sectionId
+    }
+
+    @MainActor
+    func moveRecipe(
+        _ recipe: Recipe,
+        to sectionId: UUID?
+    ) async {
+        guard
+            !isMovingRecipe,
+            self.sectionId(of: recipe) != sectionId
+        else {
+            return
+        }
+
+        isMovingRecipe = true
+        sectionErrorMessage = nil
+
+        defer {
+            isMovingRecipe = false
+        }
+
+        do {
+            try await CookbookService.moveRecipe(
+                recipeId: recipe.id,
+                in: cookbookId,
+                to: sectionId,
+                relationships: relationships
+            )
+
+            // Show what's actually stored.
+            await loadCookbook(
+                showLoadingState: false
+            )
+
+        } catch {
+            sectionErrorMessage =
+                "\(recipe.name) couldn't be moved. Please try again."
+
+            print(
+                "COOKBOOK MOVE RECIPE ERROR:",
+                error.localizedDescription
             )
         }
     }
