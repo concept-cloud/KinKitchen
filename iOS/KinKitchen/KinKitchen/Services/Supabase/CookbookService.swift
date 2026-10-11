@@ -546,6 +546,65 @@ enum CookbookService {
             .execute()
     }
 
+    // MARK: - Featured Recipes
+
+    /// Features or un-features a recipe for the cookbook preview.
+    /// Up to 3 per section; the database enforces the same limit.
+    static func setFeatured(
+        _ isFeatured: Bool,
+        recipeId: UUID,
+        in cookbookId: UUID,
+        relationships: [CookbookRecipe]
+    ) async throws {
+
+        if isFeatured {
+            let sectionId =
+                relationships
+                    .first { $0.recipeId == recipeId }?
+                    .sectionId
+
+            guard
+                CookbookRecipe.canFeature(
+                    in: sectionId,
+                    relationships:
+                        relationships.filter {
+                            $0.recipeId != recipeId
+                        }
+                )
+            else {
+                throw CookbookServiceError.featuredLimitReached
+            }
+        }
+
+        _ =
+            try await fetchCookbook(
+                id: cookbookId
+            )
+
+        do {
+            try await SupabaseManager.client
+                .from("cookbook_recipes")
+                .update(
+                    ["is_featured": isFeatured]
+                )
+                .eq(
+                    "cookbook_id",
+                    value: cookbookId
+                )
+                .eq(
+                    "recipe_id",
+                    value: recipeId
+                )
+                .execute()
+        } catch {
+            if String(describing: error)
+                .contains("FEATURED_LIMIT") {
+                throw CookbookServiceError.featuredLimitReached
+            }
+            throw error
+        }
+    }
+
     // MARK: - Reorder Recipes
 
     /// Saves the order of recipes within one section (nil = Unsorted)
@@ -744,6 +803,7 @@ enum CookbookServiceError: LocalizedError {
     case cookbookNotFound
     case invalidSectionName
     case sectionNameTooLong
+    case featuredLimitReached
 
     var errorDescription: String? {
         switch self {
@@ -758,6 +818,9 @@ enum CookbookServiceError: LocalizedError {
 
         case .sectionNameTooLong:
             return "Section names can be up to \(CookbookSection.maxNameLength) characters."
+
+        case .featuredLimitReached:
+            return "Each section can feature up to \(CookbookRecipe.maxFeaturedPerSection) recipes. Remove one from the preview first."
         }
     }
 }

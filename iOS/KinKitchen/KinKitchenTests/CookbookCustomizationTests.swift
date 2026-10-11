@@ -178,6 +178,88 @@ struct CookbookCustomizationTests {
         #expect(!CookbookRecipe.displayOrder(second, first))
     }
 
+    // MARK: - KINKIT-177 Featured Recipes + Price
+
+    static func featured(
+        section: UUID?
+    ) -> CookbookRecipe {
+        CookbookRecipe(
+            cookbookId: cookbookId,
+            recipeId: UUID(),
+            sectionId: section,
+            sortOrder: 0,
+            isFeatured: true
+        )
+    }
+
+    @Test func upToThreeFeaturedPerSection() {
+        let two = [
+            Self.featured(section: Self.desserts),
+            Self.featured(section: Self.desserts)
+        ]
+        let three = two + [Self.featured(section: Self.desserts)]
+
+        #expect(CookbookRecipe.canFeature(in: Self.desserts, relationships: two))
+        #expect(!CookbookRecipe.canFeature(in: Self.desserts, relationships: three))
+    }
+
+    @Test func featuredLimitIsPerSection() {
+        let fullDesserts = [
+            Self.featured(section: Self.desserts),
+            Self.featured(section: Self.desserts),
+            Self.featured(section: Self.desserts)
+        ]
+
+        // Another section and Unsorted each have their own 3.
+        #expect(CookbookRecipe.canFeature(in: UUID(), relationships: fullDesserts))
+        #expect(CookbookRecipe.canFeature(in: nil, relationships: fullDesserts))
+    }
+
+    @Test func missingFeaturedFlagDecodesAsNotFeatured() throws {
+        let json = """
+        {
+          "cookbook_id": "\(Self.cookbookId.uuidString)",
+          "recipe_id": "\(UUID().uuidString)",
+          "section_id": null,
+          "sort_order": 2
+        }
+        """
+
+        let relationship =
+            try JSONDecoder().decode(
+                CookbookRecipe.self,
+                from: Data(json.utf8)
+            )
+
+        #expect(!relationship.isFeatured)
+    }
+
+    @Test func cookbooksAreFreeByDefault() throws {
+        let json = """
+        {
+          "id": "\(UUID().uuidString)",
+          "owner_id": "\(UUID().uuidString)",
+          "name": "Family Favorites",
+          "visibility": "private",
+          "created_at": "2026-10-11T00:00:00Z",
+          "updated_at": "2026-10-11T00:00:00Z"
+        }
+        """
+
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+
+        let cookbook =
+            try decoder.decode(
+                Cookbook.self,
+                from: Data(json.utf8)
+            )
+
+        #expect(cookbook.priceCents == 0)
+        #expect(cookbook.isFree)
+        #expect(cookbook.displayPrice == "Free")
+    }
+
     @Test func maxLengthSectionNameIsAllowed() throws {
         let name =
             String(

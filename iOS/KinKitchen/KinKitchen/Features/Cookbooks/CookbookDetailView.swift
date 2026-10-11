@@ -627,12 +627,20 @@ private extension CookbookDetailView {
     /// order (empty ones included), then Unsorted recipes last.
     /// Built fresh from the current data each time it opens.
     var previewChapters: [CookbookPreviewChapter] {
+        let featuredIds =
+            Set(
+                relationships
+                    .filter(\.isFeatured)
+                    .map(\.recipeId)
+            )
+
         var chapters =
             sections.map { section in
                 CookbookPreviewChapter(
                     id: section.id.uuidString,
                     title: section.name,
-                    recipes: recipes(inSection: section.id)
+                    recipes: recipes(inSection: section.id),
+                    featuredRecipeIds: featuredIds
                 )
             }
 
@@ -645,7 +653,8 @@ private extension CookbookDetailView {
                     title: sections.isEmpty
                         ? "Recipes"
                         : "More Recipes",
-                    recipes: unsorted
+                    recipes: unsorted,
+                    featuredRecipeIds: featuredIds
                 )
             )
         }
@@ -1137,7 +1146,8 @@ private extension CookbookDetailView {
                         cookbookId: relationship.cookbookId,
                         recipeId: relationship.recipeId,
                         sectionId: sectionId,
-                        sortOrder: position
+                        sortOrder: position,
+                        isFeatured: relationship.isFeatured
                     )
                 }
                 .sorted(by: CookbookRecipe.displayOrder)
@@ -1449,6 +1459,39 @@ private extension CookbookDetailView {
                     }
                 }
 
+                // Featured recipes appear in full in the preview.
+                if isFeatured(recipe) {
+                    Button {
+                        Task {
+                            await setFeatured(false, recipe)
+                        }
+                    } label: {
+                        Label(
+                            "Remove from Preview",
+                            systemImage: "star.slash"
+                        )
+                    }
+                } else if canFeature(recipe) {
+                    Button {
+                        Task {
+                            await setFeatured(true, recipe)
+                        }
+                    } label: {
+                        Label(
+                            "Feature in Preview",
+                            systemImage: "star"
+                        )
+                    }
+                } else {
+                    Button {} label: {
+                        Label(
+                            "Section has \(CookbookRecipe.maxFeaturedPerSection) featured",
+                            systemImage: "star"
+                        )
+                    }
+                    .disabled(true)
+                }
+
                 Button(role: .destructive) {
                     recipeToRemove = recipe
                 } label: {
@@ -1478,6 +1521,59 @@ private extension CookbookDetailView {
             .accessibilityLabel(
                 "\(recipe.name) options"
             )
+        }
+    }
+
+    // MARK: - Featured
+
+    func isFeatured(
+        _ recipe: Recipe
+    ) -> Bool {
+        relationships
+            .first { $0.recipeId == recipe.id }?
+            .isFeatured ?? false
+    }
+
+    /// Room for another featured recipe in this recipe's section.
+    func canFeature(
+        _ recipe: Recipe
+    ) -> Bool {
+        let sectionId =
+            relationships
+                .first { $0.recipeId == recipe.id }?
+                .sectionId
+
+        return CookbookRecipe.canFeature(
+            in: sectionId,
+            relationships:
+                relationships.filter {
+                    $0.recipeId != recipe.id
+                }
+        )
+    }
+
+    @MainActor
+    func setFeatured(
+        _ featured: Bool,
+        _ recipe: Recipe
+    ) async {
+        sectionErrorMessage = nil
+
+        do {
+            try await CookbookService.setFeatured(
+                featured,
+                recipeId: recipe.id,
+                in: cookbookId,
+                relationships: relationships
+            )
+
+            await loadCookbook(
+                showLoadingState: false
+            )
+
+        } catch {
+            sectionErrorMessage =
+                error.localizedDescription
         }
     }
 
@@ -1573,17 +1669,31 @@ private extension CookbookDetailView {
                 height: 64
             )
 
-            Text(recipe.name)
-                .font(
-                    KinTypography.headline
-                )
-                .foregroundStyle(
-                    KinColors.primaryText
-                )
-                .multilineTextAlignment(
-                    .leading
-                )
-                .lineLimit(2)
+            VStack(
+                alignment: .leading,
+                spacing: KinSpacing.xxSmall
+            ) {
+                Text(recipe.name)
+                    .font(
+                        KinTypography.headline
+                    )
+                    .foregroundStyle(
+                        KinColors.primaryText
+                    )
+                    .multilineTextAlignment(
+                        .leading
+                    )
+                    .lineLimit(2)
+
+                if isFeatured(recipe) {
+                    Label(
+                        "Featured in Preview",
+                        systemImage: "star.fill"
+                    )
+                    .font(KinTypography.caption)
+                    .foregroundStyle(KinColors.warning)
+                }
+            }
 
             Spacer()
 
