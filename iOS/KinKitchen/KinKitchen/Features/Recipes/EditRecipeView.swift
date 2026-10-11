@@ -76,6 +76,9 @@ struct EditRecipeView: View {
     @State private var archivedMessage: String?
     @State private var deleteErrorMessage: String?
 
+    /// Set when editing a version: the original's title.
+    @State private var versionOfTitle: String?
+
     // MARK: - Body
 
     var body: some View {
@@ -142,6 +145,10 @@ struct EditRecipeView: View {
                     alignment: .leading,
                     spacing: KinSpacing.xLarge
                 ) {
+                    if let versionOfTitle {
+                        versionNotice(versionOfTitle)
+                    }
+
                     recipePhotoSection
 
                     recipeDetailsSection
@@ -158,6 +165,33 @@ struct EditRecipeView: View {
             }
             .scrollDismissesKeyboard(.interactively)
         }
+    }
+
+
+    // MARK: - Version Notice
+
+    /// Not an editable field: where the version came from is kept
+    /// no matter what is changed below.
+    private func versionNotice(
+        _ originalTitle: String
+    ) -> some View {
+        Label {
+            Text(
+                "Your version of \u{201C}\(originalTitle)\u{201D}. Changes only affect your version; the original stays as it is."
+            )
+        } icon: {
+            Image(systemName: "square.on.square")
+        }
+        .font(KinTypography.caption)
+        .foregroundStyle(KinColors.secondaryText)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(KinSpacing.medium)
+        .background(KinColors.surface)
+        .clipShape(
+            RoundedRectangle(
+                cornerRadius: KinRadius.medium
+            )
+        )
     }
 
 
@@ -1330,8 +1364,16 @@ struct EditRecipeView: View {
                         id: recipeId
                     )
 
+            // A version saves only to itself, including its photo.
             let recipe =
-                detail.recipe
+                await RecipeService.ensureOwnPhoto(
+                    for: detail.recipe
+                )
+
+            versionOfTitle =
+                recipe.isVersion
+                    ? recipe.originalTitle ?? "another recipe"
+                    : nil
 
             recipeName =
                 recipe.name

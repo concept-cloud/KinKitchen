@@ -185,6 +185,59 @@ struct RecipeVersionTests {
         #expect(version.originalTitle == "Sunday Gravy")
     }
 
+    // MARK: - KINKIT-188 Edit Independently
+
+    @Test func olderVersionUsingTheOriginalsPhotoIsDetected() {
+        let rose = UUID()
+        let originalId = UUID()
+
+        var version =
+            Self.version(
+                owner: UUID(),
+                original: originalId,
+                originalOwner: rose,
+                originalName: "Sunday Gravy"
+            )
+
+        version.photoPath =
+            RecipeService.recipePhotoPath(
+                ownerId: rose,
+                recipeId: originalId
+            )
+
+        #expect(RecipeService.sharesAnotherRecipesPhoto(version))
+    }
+
+    @Test func versionWithItsOwnPhotoIsLeftAlone() {
+        var version =
+            Self.version(
+                owner: UUID(),
+                original: UUID(),
+                originalOwner: UUID(),
+                originalName: "Sunday Gravy"
+            )
+
+        version.photoPath =
+            RecipeService.recipePhotoPath(
+                ownerId: version.ownerId,
+                recipeId: version.id
+            )
+
+        #expect(!RecipeService.sharesAnotherRecipesPhoto(version))
+    }
+
+    @Test func recipeWithoutAPhotoHasNothingToCopy() {
+        let version =
+            Self.version(
+                owner: UUID(),
+                original: UUID(),
+                originalOwner: UUID(),
+                originalName: "Sunday Gravy"
+            )
+
+        #expect(!RecipeService.sharesAnotherRecipesPhoto(version))
+    }
+
     @Test func versionLineageDecodes() throws {
         let sourceId = UUID()
         let originalId = UUID()

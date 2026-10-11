@@ -489,7 +489,7 @@ enum RecipeService {
         from sourceRecipe: Recipe
     ) async throws -> Recipe {
 
-        var version: Recipe =
+        let version: Recipe =
             try await SupabaseManager.client
                 .rpc(
                     "create_recipe_version",
@@ -502,46 +502,104 @@ enum RecipeService {
                 .execute()
                 .value
 
-        // Give the version its own photo file. The original's owner
-        // replaces their photo in place, which would otherwise change
-        // this version's photo too.
-        if let sourcePhotoPath = version.photoPath {
-            let versionPhotoPath =
-                recipePhotoPath(
-                    ownerId: version.ownerId,
-                    recipeId: version.id
+        return await ensureOwnPhoto(
+            for: version
+        )
+    }
+
+
+    /// Whether a recipe uses a photo file stored under another recipe,
+    /// e.g. a version made before versions got their own copy.
+    static func sharesAnotherRecipesPhoto(
+        _ recipe: Recipe
+    ) -> Bool {
+        guard
+            let photoPath = recipe.photoPath,
+            !photoPath.isEmpty
+        else {
+            return false
+        }
+
+        return photoPath !=
+            recipePhotoPath(
+                ownerId: recipe.ownerId,
+                recipeId: recipe.id
+            )
+    }
+
+
+    /// Gives a version its own copy of the photo. The original's owner
+    /// replaces their photo in place, which would otherwise change the
+    /// version's photo too. Returns the recipe unchanged when there's
+    /// nothing to copy or the copy fails; the shared photo still shows.
+    static func ensureOwnPhoto(
+        for recipe: Recipe
+    ) async -> Recipe {
+
+        guard
+            recipe.isVersion,
+            sharesAnotherRecipesPhoto(recipe),
+            let sharedPhotoPath = recipe.photoPath,
+            let userId =
+                try? await SupabaseManager.client
+                    .auth
+                    .session
+                    .user
+                    .id,
+            userId == recipe.ownerId
+        else {
+            return recipe
+        }
+
+        let ownPhotoPath =
+            recipePhotoPath(
+                ownerId: recipe.ownerId,
+                recipeId: recipe.id
+            )
+
+        do {
+            try await SupabaseManager.client.storage
+                .from("recipe-photos")
+                .copy(
+                    from: sharedPhotoPath,
+                    to: ownPhotoPath
                 )
-
-            do {
-                try await SupabaseManager.client.storage
+        } catch {
+            // Already copied by an earlier attempt that didn't finish
+            // saving the path; reuse that file.
+            let existing =
+                try? await SupabaseManager.client.storage
                     .from("recipe-photos")
-                    .copy(
-                        from: sourcePhotoPath,
-                        to: versionPhotoPath
-                    )
+                    .download(path: ownPhotoPath)
 
-                version =
-                    try await SupabaseManager.client
-                        .from("recipes")
-                        .update(
-                            ["photo_path": versionPhotoPath]
-                        )
-                        .eq("id", value: version.id)
-                        .select()
-                        .single()
-                        .execute()
-                        .value
-            } catch {
-                // The version still shows the shared photo; nothing
-                // else about it depends on the copy.
+            guard existing != nil else {
                 print(
                     "VERSION PHOTO COPY ERROR:",
                     error.localizedDescription
                 )
+                return recipe
             }
         }
 
-        return version
+        do {
+            return try await SupabaseManager.client
+                .from("recipes")
+                .update(
+                    ["photo_path": ownPhotoPath]
+                )
+                .eq("id", value: recipe.id)
+                .eq("owner_id", value: userId)
+                .select()
+                .single()
+                .execute()
+                .value
+        } catch {
+            print(
+                "VERSION PHOTO PATH UPDATE ERROR:",
+                error.localizedDescription
+            )
+            return recipe
+        }
     }
 
 

@@ -1854,10 +1854,18 @@ struct RecipeDetailView: View {
                         id: recipeId
                     )
 
-            detail = loadedDetail
-
+            // The owner's older versions get their own photo copy so
+            // the original's photo changes can't reach them.
             let recipe =
-                loadedDetail.recipe
+                await RecipeService.ensureOwnPhoto(
+                    for: loadedDetail.recipe
+                )
+
+            detail =
+                RecipeWithIngredients(
+                    recipe: recipe,
+                    ingredients: loadedDetail.ingredients
+                )
 
             await loadRecipePhoto(
                 path: recipe.photoPath
