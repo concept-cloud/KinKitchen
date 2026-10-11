@@ -74,7 +74,8 @@ struct EditRecipeView: View {
     @State private var errorMessage: String?
     @State private var showingDeleteConfirmation = false
     @State private var archivedMessage: String?
-    
+    @State private var deleteErrorMessage: String?
+
     // MARK: - Body
 
     var body: some View {
@@ -99,29 +100,17 @@ struct EditRecipeView: View {
         .task {
             await loadRecipe()
         }
-        .confirmationDialog(
-            "Delete Recipe?",
+        .deletingOverlay(isDeleting)
+        .deleteConfirmation(
+            "Delete \"\(recipeName.isEmpty ? "Recipe" : recipeName)\"?",
             isPresented: $showingDeleteConfirmation,
-            titleVisibility: .visible
+            message: "This permanently deletes the recipe, its photo, ratings and stories, and removes it from your cookbooks. If it was served at a past gathering or others have made versions of it, it's kept for them and removed from your recipes instead. This can't be undone."
         ) {
-            Button(
-                "Delete Recipe",
-                role: .destructive
-            ) {
-                Task {
-                    await deleteRecipe()
-                }
+            Task {
+                await deleteRecipe()
             }
-
-            Button(
-                "Cancel",
-                role: .cancel
-            ) {}
-        } message: {
-            Text(
-                "This permanently deletes this recipe. This action cannot be undone."
-            )
         }
+        .deleteFailedAlert($deleteErrorMessage)
         // Shown when the recipe was kept for others instead of
         // deleted. Leaving afterwards behaves like a delete.
         .alert(
@@ -1631,6 +1620,7 @@ struct EditRecipeView: View {
         }
 
         isDeleting = true
+        deleteErrorMessage = nil
 
         defer {
             isDeleting = false
@@ -1653,13 +1643,16 @@ struct EditRecipeView: View {
             onDeleted()
             dismiss()
 
+        } catch is CancellationError {
+            return
         } catch {
-            // Nothing was changed; the recipe stays as it was.
-            errorMessage =
-                String(describing: error)
-                    .contains("NOT_RECIPE_OWNER")
-                    ? "Only the person who created this recipe can delete it."
-                    : "The recipe could not be deleted. Please try again."
+            // Nothing was changed; the recipe and any unsaved edits
+            // stay on screen.
+            deleteErrorMessage =
+                KinDeletion.failureMessage(
+                    for: error,
+                    deleting: .recipe
+                )
 
             print(
                 "EDIT RECIPE DELETE ERROR:",

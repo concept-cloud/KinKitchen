@@ -46,6 +46,7 @@ struct EditGatheringView: View {
     @State private var showCancelConfirmation = false
     @State private var showDeleteConfirmation = false
     @State private var isDeleting = false
+    @State private var deleteErrorMessage: String?
 
     /// Called after the gathering is permanently deleted, so the
     /// screen underneath can close instead of showing it.
@@ -197,34 +198,24 @@ struct EditGatheringView: View {
                 "Everyone invited will be told it's cancelled. Guests, dishes and claims are kept, and you can delete it later."
             )
         }
-        .alert(
+        .deleteConfirmation(
             "Delete \"\(gathering.name)\"?",
             isPresented:
-                $showDeleteConfirmation
+                $showDeleteConfirmation,
+            message: "This permanently deletes the gathering, its guest list, dishes and claims. Guests will be told it was removed. Recipes are not deleted. This can't be undone."
         ) {
 
-            Button(
-                "Cancel",
-                role: .cancel
-            ) {}
+            Task {
 
-            Button(
-                "Delete",
-                role: .destructive
-            ) {
-
-                Task {
-
-                    await deleteGathering()
-                }
+                await deleteGathering()
             }
-
-        } message: {
-
-            Text(
-                "This permanently deletes the gathering, its guest list, dishes and claims. Guests will be told it was removed. Recipes are not deleted. This can't be undone."
-            )
         }
+        .deleteFailedAlert(
+            $deleteErrorMessage
+        )
+        .deletingOverlay(
+            isDeleting
+        )
     }
 }
 
@@ -1475,7 +1466,7 @@ private extension EditGatheringView {
 
         isDeleting = true
 
-        errorMessage = nil
+        deleteErrorMessage = nil
 
 
         defer {
@@ -1494,13 +1485,18 @@ private extension EditGatheringView {
             onDeleted()
             dismiss()
 
+        } catch is CancellationError {
+
+            return
+
         } catch {
 
-            // Nothing changed; the gathering is still there.
-            errorMessage =
-                GatheringService.friendlyMessage(
+            // Nothing changed; the gathering and any unsaved edits
+            // stay on screen.
+            deleteErrorMessage =
+                KinDeletion.failureMessage(
                     for: error,
-                    fallback: "Unable to delete this gathering. Please try again."
+                    deleting: .gathering
                 )
 
             print(

@@ -52,6 +52,7 @@ struct CookbookDetailView: View {
     @State private var isShowingEditCookbook = false
     @State private var isShowingDeleteConfirmation = false
     @State private var isDeletingCookbook = false
+    @State private var deleteErrorMessage: String?
 
     var body: some View {
         ZStack {
@@ -59,22 +60,8 @@ struct CookbookDetailView: View {
                 .ignoresSafeArea()
 
             content
-
-            // Blocks other taps while a delete is in progress.
-            if isDeletingCookbook {
-                Color.black.opacity(0.15)
-                    .ignoresSafeArea()
-
-                ProgressView("Deleting…")
-                    .padding(KinSpacing.large)
-                    .background(KinColors.surface)
-                    .clipShape(
-                        RoundedRectangle(
-                            cornerRadius: KinRadius.medium
-                        )
-                    )
-            }
         }
+        .deletingOverlay(isDeletingCookbook)
         .navigationBarHidden(true)
         .task {
             await loadCookbook()
@@ -124,31 +111,18 @@ struct CookbookDetailView: View {
                 )
             }
         }
-        // A centered alert so Cancel is always visible.
-        .alert(
+        .deleteConfirmation(
             "Delete \"\(cookbook?.name ?? "Cookbook")\"?",
-            isPresented: $isShowingDeleteConfirmation
+            isPresented: $isShowingDeleteConfirmation,
+            message: "This permanently deletes the cookbook, its sections, and its cover. Your recipes will not be deleted. This can't be undone."
         ) {
-            Button(
-                "Cancel",
-                role: .cancel
-            ) {}
-
-            Button(
-                "Delete",
-                role: .destructive
-            ) {
-                Task {
-                    await deleteCookbook()
-                }
+            Task {
+                await deleteCookbook()
             }
-        } message: {
-            Text(
-                "This permanently deletes the cookbook, its sections, and its cover. Your recipes will not be deleted. This can't be undone."
-            )
         }
-        .confirmationDialog(
-            "Remove Recipe?",
+        .deleteFailedAlert($deleteErrorMessage)
+        .alert(
+            "Remove \"\(recipeToRemove?.name ?? "Recipe")\"?",
             isPresented: Binding(
                 get: {
                     recipeToRemove != nil
@@ -159,28 +133,22 @@ struct CookbookDetailView: View {
                     }
                 }
             ),
-            titleVisibility: .visible
-        ) {
-            if let recipeToRemove {
-                Button(
-                    "Remove \(recipeToRemove.name)",
-                    role: .destructive
-                ) {
-                    Task {
-                        await removeRecipe(
-                            recipeToRemove
-                        )
-                    }
-                }
+            presenting: recipeToRemove
+        ) { recipe in
+            Button(
+                "Cancel",
+                role: .cancel
+            ) {}
 
-                Button(
-                    "Cancel",
-                    role: .cancel
-                ) {
-                    self.recipeToRemove = nil
+            Button(
+                "Remove",
+                role: .destructive
+            ) {
+                Task {
+                    await removeRecipe(recipe)
                 }
             }
-        } message: {
+        } message: { _ in
             Text(
                 "This removes the recipe from this cookbook. The original recipe will not be deleted."
             )
@@ -254,27 +222,25 @@ struct CookbookDetailView: View {
 
             Button("Cancel", role: .cancel) {}
         }
-        .confirmationDialog(
-            "Delete Section?",
+        .alert(
+            "Delete \"\(sectionToDelete?.name ?? "Section")\"?",
             isPresented: Binding(
                 get: { sectionToDelete != nil },
                 set: { if !$0 { sectionToDelete = nil } }
             ),
-            titleVisibility: .visible
-        ) {
-            if let section = sectionToDelete {
-                Button(
-                    "Delete \(section.name)",
-                    role: .destructive
-                ) {
-                    Task {
-                        await deleteSection(section)
-                    }
+            presenting: sectionToDelete
+        ) { section in
+            Button("Cancel", role: .cancel) {}
+
+            Button(
+                "Delete",
+                role: .destructive
+            ) {
+                Task {
+                    await deleteSection(section)
                 }
             }
-
-            Button("Cancel", role: .cancel) {}
-        } message: {
+        } message: { _ in
             Text(
                 "Its recipes move to Unsorted. No recipes are deleted."
             )
@@ -2035,7 +2001,7 @@ private extension CookbookDetailView {
         }
 
         isDeletingCookbook = true
-        sectionErrorMessage = nil
+        deleteErrorMessage = nil
 
         do {
 
@@ -2053,13 +2019,13 @@ private extension CookbookDetailView {
 
         } catch {
 
-            // Shown inline so the cookbook stays on screen: a failed
-            // delete changed nothing.
-            sectionErrorMessage =
-                String(describing: error)
-                    .contains("NOT_COOKBOOK_OWNER")
-                    ? "Only the owner can delete this cookbook."
-                    : "The cookbook couldn't be deleted. Please try again."
+            // The cookbook stays on screen: a failed delete changed
+            // nothing.
+            deleteErrorMessage =
+                KinDeletion.failureMessage(
+                    for: error,
+                    deleting: .cookbook
+                )
 
             print(
                 "COOKBOOK DELETE ERROR:",
@@ -2099,8 +2065,14 @@ private extension CookbookDetailView {
         } catch is CancellationError {
             recipeToRemove = nil
         } catch {
-            errorMessage =
+            // Keep the cookbook on screen; the recipe is still in it.
+            sectionErrorMessage =
+                "The recipe couldn't be removed. Please try again."
+
+            print(
+                "COOKBOOK REMOVE RECIPE ERROR:",
                 error.localizedDescription
+            )
 
             recipeToRemove = nil
         }

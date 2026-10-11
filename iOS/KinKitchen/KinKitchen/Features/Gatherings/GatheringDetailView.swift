@@ -122,22 +122,17 @@ struct GatheringDetailView: View {
                 await loadGathering()
             }
         }
-        .alert(
+        .deleteConfirmation(
             "Delete \"\(gathering?.name ?? "Gathering")\"?",
-            isPresented: $showDeleteConfirmation
+            isPresented: $showDeleteConfirmation,
+            message: "This permanently deletes the cancelled gathering, its guest list, dishes and claims. Recipes are not deleted. This can't be undone."
         ) {
-            Button("Cancel", role: .cancel) {}
-
-            Button("Delete", role: .destructive) {
-                Task {
-                    await deleteCancelledGathering()
-                }
+            Task {
+                await deleteCancelledGathering()
             }
-        } message: {
-            Text(
-                "This permanently deletes the cancelled gathering, its guest list, dishes and claims. Recipes are not deleted. This can't be undone."
-            )
         }
+        .deleteFailedAlert($deleteErrorMessage)
+        .deletingOverlay(isDeletingGathering)
     }
 }
 
@@ -734,12 +729,6 @@ private extension GatheringDetailView {
             }
             .buttonStyle(.plain)
             .disabled(isDeletingGathering)
-
-            if let deleteErrorMessage {
-                Text(deleteErrorMessage)
-                    .font(KinTypography.caption)
-                    .foregroundStyle(KinColors.error)
-            }
         }
     }
 
@@ -765,12 +754,14 @@ private extension GatheringDetailView {
 
             dismiss()
 
+        } catch is CancellationError {
+            return
         } catch {
             // Nothing changed; the gathering is still shown.
             deleteErrorMessage =
-                GatheringService.friendlyMessage(
+                KinDeletion.failureMessage(
                     for: error,
-                    fallback: "Unable to delete this gathering. Please try again."
+                    deleting: .gathering
                 )
 
             print(

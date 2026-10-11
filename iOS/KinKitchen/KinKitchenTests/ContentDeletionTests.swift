@@ -70,6 +70,66 @@ struct ContentDeletionTests {
         )
     }
 
+    // MARK: - KINKIT-184 Standard failure handling
+
+    @Test func ownershipFailuresNameWhoCanDelete() {
+        #expect(
+            KinDeletion.failureMessage(
+                for: DatabaseError(description: "NOT_RECIPE_OWNER"),
+                deleting: .recipe
+            ) == "Only the person who created this recipe can delete it."
+        )
+        #expect(
+            KinDeletion.failureMessage(
+                for: DatabaseError(description: "NOT_COOKBOOK_OWNER"),
+                deleting: .cookbook
+            ) == "Only the owner can delete this cookbook."
+        )
+        #expect(
+            KinDeletion.failureMessage(
+                for: DatabaseError(description: "NOT_GATHERING_HOST"),
+                deleting: .gathering
+            ) == "Only the host can do this."
+        )
+    }
+
+    @Test func occurredGatheringFailureExplainsHistory() {
+        #expect(
+            KinDeletion.failureMessage(
+                for: DatabaseError(description: "GATHERING_ALREADY_OCCURRED"),
+                deleting: .gathering
+            ).contains("Gathering History")
+        )
+    }
+
+    @Test func offlineFailureSaysNothingWasDeleted() {
+        let message =
+            KinDeletion.failureMessage(
+                for: URLError(.notConnectedToInternet),
+                deleting: .cookbook
+            )
+
+        #expect(message.contains("offline"))
+        #expect(message.contains("cookbook was not deleted"))
+    }
+
+    @Test func unknownFailureNamesTheContentAndSaysNothingChanged() {
+        for content in [
+            KinDeletion.Content.recipe,
+            .cookbook,
+            .gathering
+        ] {
+            let message =
+                KinDeletion.failureMessage(
+                    for: DatabaseError(description: "boom"),
+                    deleting: content
+                )
+
+            #expect(message.contains(content.noun))
+            #expect(message.contains("Nothing was changed"))
+        }
+    }
+
     @Test func archivedFieldDecodesAndDefaultsToActive() throws {
         let base = """
         "id": "\(UUID().uuidString)",
