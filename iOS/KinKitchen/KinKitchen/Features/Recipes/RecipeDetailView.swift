@@ -67,6 +67,8 @@ struct RecipeDetailView: View {
 
     @State private var authorLineText: String?
     @State private var sharedByText: String?
+    @State private var versionOriginText: String?
+    @State private var versionSourceText: String?
     @State private var showAllergenWarningDetail = false
     
     @State private var showingRecipientSelection = false
@@ -468,6 +470,13 @@ struct RecipeDetailView: View {
                 )
                 .font(KinTypography.caption)
                 .foregroundStyle(KinColors.primary)
+            }
+
+            if let versionOriginText {
+                versionOriginCard(
+                    origin: versionOriginText,
+                    source: versionSourceText
+                )
             }
 
             HStack(spacing: KinSpacing.medium) {
@@ -1033,31 +1042,87 @@ struct RecipeDetailView: View {
 
     // MARK: - Recipe Lineage Actions
 
+    /// Where this version came from. Set apart from the recipe's own
+    /// content since it comes from the saved lineage, not the
+    /// owner's edits.
+    private func versionOriginCard(
+        origin: String,
+        source: String?
+    ) -> some View {
+        VStack(
+            alignment: .leading,
+            spacing: KinSpacing.small
+        ) {
+            Label(
+                "Recipe Version",
+                systemImage: "square.on.square"
+            )
+            .font(KinTypography.caption)
+            .foregroundStyle(KinColors.primary)
+
+            Text(origin)
+                .font(KinTypography.body)
+                .foregroundStyle(KinColors.primaryText)
+
+            if let source {
+                Text(source)
+                    .font(KinTypography.caption)
+                    .foregroundStyle(KinColors.secondaryText)
+            }
+
+            if originalRecipe != nil {
+                Button {
+                    showingOriginal = true
+                } label: {
+                    Label(
+                        "Open Original",
+                        systemImage: "arrow.uturn.backward"
+                    )
+                    .font(KinTypography.button)
+                    .foregroundStyle(KinColors.primary)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, KinSpacing.small)
+                    .background(KinColors.surface)
+                    .clipShape(
+                        RoundedRectangle(
+                            cornerRadius: KinRadius.medium
+                        )
+                    )
+                }
+                .buttonStyle(.plain)
+            } else {
+                // Deleted, archived away, or never shared with this
+                // user. The version works on its own.
+                Text(
+                    "The original isn't available to you, but this version is complete on its own."
+                )
+                .font(KinTypography.caption)
+                .foregroundStyle(KinColors.secondaryText)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(KinSpacing.medium)
+        .background(KinColors.primary.opacity(0.08))
+        .overlay(
+            RoundedRectangle(
+                cornerRadius: KinRadius.medium
+            )
+            .stroke(
+                KinColors.primary.opacity(0.25),
+                lineWidth: 1
+            )
+        )
+        .clipShape(
+            RoundedRectangle(
+                cornerRadius: KinRadius.medium
+            )
+        )
+    }
+
     @ViewBuilder
     private func lineageActions(
         _ recipe: Recipe
     ) -> some View {
-        if recipe.originalRecipeId != nil {
-            Button {
-                showingOriginal = true
-            } label: {
-                Label(
-                    "Show Original",
-                    systemImage: "arrow.uturn.backward"
-                )
-                .font(KinTypography.button)
-                .foregroundStyle(KinColors.primary)
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, KinSpacing.medium)
-                .background(KinColors.surface)
-                .clipShape(
-                    RoundedRectangle(
-                        cornerRadius: KinRadius.medium
-                    )
-                )
-            }
-            .buttonStyle(.plain)
-        }
 
         // Anyone who can open someone else's recipe can make their
         // own copy of it to change.
@@ -1706,8 +1771,13 @@ struct RecipeDetailView: View {
             )
 
         let userIds =
-            [authorId, recipe.ownerId, receivedShare?.senderId]
-                .compactMap { $0 }
+            [
+                authorId,
+                recipe.ownerId,
+                receivedShare?.senderId,
+                recipe.sourceOwnerId
+            ]
+            .compactMap { $0 }
 
         let profiles =
             (try? await ProfileService
@@ -1734,6 +1804,18 @@ struct RecipeDetailView: View {
             receivedShare.map {
                 "Shared with you by \(name($0.senderId))"
             }
+
+        versionOriginText =
+            RecipeAttribution.versionOrigin(
+                for: recipe,
+                name: name
+            )
+
+        versionSourceText =
+            RecipeAttribution.versionSource(
+                for: recipe,
+                name: name
+            )
     }
 
     // MARK: - Saved State

@@ -238,6 +238,129 @@ struct RecipeVersionTests {
         #expect(!RecipeService.sharesAnotherRecipesPhoto(version))
     }
 
+    // MARK: - KINKIT-189 Display Relationship
+
+    @Test func versionShowsOriginalTitleAndAuthor() {
+        let rose = UUID()
+
+        var version =
+            Self.version(
+                owner: UUID(),
+                original: UUID(),
+                originalOwner: rose,
+                originalName: "Sunday Gravy"
+            )
+        version.name = "Sam's Spicy Gravy"
+
+        #expect(
+            RecipeAttribution.versionOrigin(
+                for: version,
+                name: { _ in "Rose" }
+            ) == "Adapted from \u{201C}Sunday Gravy\u{201D} by Rose"
+        )
+    }
+
+    @Test func versionStillExplainsItsOriginAfterOriginalIsDeleted() {
+        // Links cleared by the delete; saved lineage remains.
+        let version =
+            Self.version(
+                owner: UUID(),
+                original: nil,
+                originalOwner: UUID(),
+                originalName: "Sunday Gravy"
+            )
+
+        #expect(
+            RecipeAttribution.versionOrigin(
+                for: version,
+                name: { _ in "Rose" }
+            )?.contains("Sunday Gravy") == true
+        )
+    }
+
+    @Test func normalRecipeShowsNoVersionInformation() {
+        let recipe =
+            Recipe(
+                id: UUID(),
+                ownerId: UUID(),
+                name: "Sunday Gravy",
+                createdAt: "2026-10-11T00:00:00Z",
+                updatedAt: "2026-10-11T00:00:00Z"
+            )
+
+        #expect(
+            RecipeAttribution.versionOrigin(
+                for: recipe,
+                name: { _ in "Rose" }
+            ) == nil
+        )
+        #expect(
+            RecipeAttribution.versionSource(
+                for: recipe,
+                name: { _ in "Rose" }
+            ) == nil
+        )
+    }
+
+    @Test func olderVersionWithoutSavedLineageStillReadsAsAVersion() {
+        let recipe =
+            Recipe(
+                id: UUID(),
+                ownerId: UUID(),
+                name: "Sunday Gravy",
+                sourceRecipeId: UUID(),
+                originalRecipeId: UUID(),
+                createdAt: "2026-10-11T00:00:00Z",
+                updatedAt: "2026-10-11T00:00:00Z"
+            )
+
+        #expect(
+            RecipeAttribution.versionOrigin(
+                for: recipe,
+                name: { _ in "Rose" }
+            ) == "Adapted from another recipe"
+        )
+    }
+
+    @Test func versionOfAVersionNamesTheCookItWasCopiedFrom() {
+        let rose = UUID()
+        let sam = UUID()
+
+        var version =
+            Self.version(
+                owner: UUID(),
+                original: UUID(),
+                originalOwner: rose,
+                originalName: "Sunday Gravy"
+            )
+        version.sourceOwnerId = sam
+        version.sourceRecipeName = "Sam's Gravy"
+
+        #expect(
+            RecipeAttribution.versionSource(
+                for: version,
+                name: { $0 == sam ? "Sam" : "Rose" }
+            ) == "Made from the version by Sam, \u{201C}Sam's Gravy\u{201D}"
+        )
+    }
+
+    @Test func versionCopiedStraightFromTheOriginalHasNoSourceLine() {
+        let version =
+            Self.version(
+                owner: UUID(),
+                original: UUID(),
+                originalOwner: UUID(),
+                originalName: "Sunday Gravy"
+            )
+
+        #expect(
+            RecipeAttribution.versionSource(
+                for: version,
+                name: { _ in "Rose" }
+            ) == nil
+        )
+    }
+
     @Test func versionLineageDecodes() throws {
         let sourceId = UUID()
         let originalId = UUID()

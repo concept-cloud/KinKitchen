@@ -80,6 +80,55 @@ enum RecipeAttribution {
     }
 
 
+    /// Where a version came from, from the lineage saved when it was
+    /// made, so it reads the same after the original is gone.
+    /// e.g. "Adapted from “Sunday Gravy” by Rose". Nil for recipes
+    /// that aren't versions.
+    static func versionOrigin(
+        for recipe: Recipe,
+        name: (UUID) -> String
+    ) -> String? {
+
+        guard recipe.isVersion else {
+            return nil
+        }
+
+        guard let title = recipe.originalTitle else {
+            return "Adapted from another recipe"
+        }
+
+        guard let authorId = recipe.originalOwnerId else {
+            return "Adapted from \u{201C}\(title)\u{201D}"
+        }
+
+        return "Adapted from \u{201C}\(title)\u{201D} by \(name(authorId))"
+    }
+
+
+    /// For a version of someone else's version, the cook whose
+    /// version it was copied from. e.g. "Made from the version by
+    /// Sam, “Sam's Gravy”". Nil when copied straight from the
+    /// original.
+    static func versionSource(
+        for recipe: Recipe,
+        name: (UUID) -> String
+    ) -> String? {
+
+        guard
+            let sourceOwnerId = recipe.sourceOwnerId,
+            sourceOwnerId != recipe.originalOwnerId
+        else {
+            return nil
+        }
+
+        guard let sourceName = recipe.sourceRecipeName else {
+            return "Made from the version by \(name(sourceOwnerId))"
+        }
+
+        return "Made from the version by \(name(sourceOwnerId)), \u{201C}\(sourceName)\u{201D}"
+    }
+
+
     /// e.g. "By Rose · version by Sam · originally from Grandma Rose".
     static func authorLine(
         for recipe: Recipe,
