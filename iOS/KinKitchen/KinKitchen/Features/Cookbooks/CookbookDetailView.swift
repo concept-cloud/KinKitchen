@@ -29,6 +29,7 @@ struct CookbookDetailView: View {
     @State private var selectedPage: CookbookPage?
     @State private var pageMovesForward = true
     @State private var isShowingReorderSections = false
+    @State private var isShowingPreview = false
     /// The page currently in drag-to-reorder mode, if any.
     @State private var editingPage: CookbookPage?
 
@@ -169,6 +170,18 @@ struct CookbookDetailView: View {
             Text(
                 "This removes the recipe from this cookbook. The original recipe will not be deleted."
             )
+        }
+        // MARK: - Preview
+        .fullScreenCover(
+            isPresented: $isShowingPreview
+        ) {
+            if let cookbook {
+                CookbookPreviewView(
+                    cookbook: cookbook,
+                    coverImage: coverImage,
+                    chapters: previewChapters
+                )
+            }
         }
         // MARK: - Section Dialogs
         .sheet(
@@ -410,6 +423,17 @@ private extension CookbookDetailView {
 
                 Menu {
                     Button {
+                        isShowingPreview = true
+                    } label: {
+                        Label(
+                            "Preview Cookbook",
+                            systemImage: "book.pages"
+                        )
+                    }
+
+                    Divider()
+
+                    Button {
                         isShowingRecipePicker = true
                     } label: {
                         Label(
@@ -598,6 +622,36 @@ private extension CookbookDetailView {
 // MARK: - Recipes
 
 private extension CookbookDetailView {
+
+    /// The cookbook as the preview presents it: sections in saved
+    /// order (empty ones included), then Unsorted recipes last.
+    /// Built fresh from the current data each time it opens.
+    var previewChapters: [CookbookPreviewChapter] {
+        var chapters =
+            sections.map { section in
+                CookbookPreviewChapter(
+                    id: section.id.uuidString,
+                    title: section.name,
+                    recipes: recipes(inSection: section.id)
+                )
+            }
+
+        let unsorted = unsortedRecipes
+
+        if !unsorted.isEmpty {
+            chapters.append(
+                CookbookPreviewChapter(
+                    id: "unsorted",
+                    title: sections.isEmpty
+                        ? "Recipes"
+                        : "More Recipes",
+                    recipes: unsorted
+                )
+            )
+        }
+
+        return chapters
+    }
 
     var currentPage: CookbookPage {
         pageSelection.wrappedValue
