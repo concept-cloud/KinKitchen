@@ -47,6 +47,11 @@ struct GatheringDetailView: View {
 
     @State private var selectedDishRecipeId: UUID?
 
+    @State private var gatheringWasDeleted = false
+    @State private var showDeleteConfirmation = false
+    @State private var isDeletingGathering = false
+    @State private var deleteErrorMessage: String?
+
     @State private var hostNotes = ""
     @State private var hostNotesDraft = ""
     @State private var isEditingHostNotes = false
@@ -106,9 +111,32 @@ struct GatheringDetailView: View {
             await loadGathering()
         }
         .onAppear {
+            // Deleted from Edit: leave instead of reloading something
+            // that no longer exists.
+            if gatheringWasDeleted {
+                dismiss()
+                return
+            }
+
             Task {
                 await loadGathering()
             }
+        }
+        .alert(
+            "Delete \"\(gathering?.name ?? "Gathering")\"?",
+            isPresented: $showDeleteConfirmation
+        ) {
+            Button("Cancel", role: .cancel) {}
+
+            Button("Delete", role: .destructive) {
+                Task {
+                    await deleteCancelledGathering()
+                }
+            }
+        } message: {
+            Text(
+                "This permanently deletes the cancelled gathering, its guest list, dishes and claims. Recipes are not deleted. This can't be undone."
+            )
         }
     }
 }
@@ -204,8 +232,16 @@ private extension GatheringDetailView {
                         gathering
                     )
 
-                    if isHistoricalGathering {
+                    if isHistoricalGathering
+                        || gathering.status == .cancelled {
                         archivedBanner(gathering)
+                    }
+
+                    // Cancelled gatherings can still be deleted by the
+                    // host; ones that happened cannot.
+                    if isHost,
+                       gathering.status == .cancelled {
+                        deleteCancelledSection
                     }
 
                     if isHistoricalGathering,
@@ -219,7 +255,8 @@ private extension GatheringDetailView {
                     }
 
                     if currentParticipant?.status == .pending,
-                       !isHistoricalGathering {
+                       !isHistoricalGathering,
+                       gathering.status != .cancelled {
                         invitationResponseSection(
                             gathering
                         )
@@ -361,7 +398,10 @@ private extension GatheringDetailView {
                     NavigationLink {
 
                         EditGatheringView(
-                            gathering: gathering
+                            gathering: gathering,
+                            onDeleted: {
+                                gatheringWasDeleted = true
+                            }
                         )
 
                     } label: {
@@ -628,7 +668,9 @@ private extension GatheringDetailView {
                 .foregroundStyle(KinColors.primaryText)
 
                 Text(
-                    "Kept in History for reference. Guests, dishes and recipes can be viewed but not changed."
+                    isCancelled
+                        ? "This gathering was cancelled. Guests, dishes and recipes can be viewed but not changed."
+                        : "Kept in History for reference. Guests, dishes and recipes can be viewed but not changed."
                 )
                 .font(KinTypography.caption)
                 .foregroundStyle(KinColors.secondaryText)
@@ -648,6 +690,94 @@ private extension GatheringDetailView {
                 cornerRadius: KinRadius.large
             )
         )
+    }
+}
+
+
+// MARK: - Delete Cancelled Gathering
+
+private extension GatheringDetailView {
+
+    var deleteCancelledSection: some View {
+
+        VStack(
+            alignment: .leading,
+            spacing: KinSpacing.small
+        ) {
+
+            Button {
+                showDeleteConfirmation = true
+            } label: {
+                HStack {
+                    Spacer()
+
+                    if isDeletingGathering {
+                        ProgressView()
+                            .tint(.white)
+                        Text("Deleting...")
+                    } else {
+                        Image(systemName: "trash")
+                        Text("Delete Gathering")
+                    }
+
+                    Spacer()
+                }
+                .font(KinTypography.button)
+                .foregroundStyle(.white)
+                .padding(.vertical, KinSpacing.medium)
+                .background(KinColors.error)
+                .clipShape(
+                    RoundedRectangle(
+                        cornerRadius: KinRadius.medium
+                    )
+                )
+            }
+            .buttonStyle(.plain)
+            .disabled(isDeletingGathering)
+
+            if let deleteErrorMessage {
+                Text(deleteErrorMessage)
+                    .font(KinTypography.caption)
+                    .foregroundStyle(KinColors.error)
+            }
+        }
+    }
+
+
+    @MainActor
+    func deleteCancelledGathering() async {
+
+        guard !isDeletingGathering else {
+            return
+        }
+
+        isDeletingGathering = true
+        deleteErrorMessage = nil
+
+        defer {
+            isDeletingGathering = false
+        }
+
+        do {
+            try await GatheringService.deleteGathering(
+                id: gatheringId
+            )
+
+            dismiss()
+
+        } catch {
+            // Nothing changed; the gathering is still shown.
+            deleteErrorMessage =
+                GatheringService.friendlyMessage(
+                    for: error,
+                    fallback: "Unable to delete this gathering. Please try again."
+                )
+
+            print(
+                "DELETE GATHERING ERROR:",
+                error.localizedDescription
+            )
+        }
     }
 }
 
@@ -1353,7 +1483,9 @@ private extension GatheringDetailView {
     /// Host controls only apply while the gathering is active.
     /// Historical gatherings are view-only.
     var canEditGathering: Bool {
-        isHost && !isHistoricalGathering
+        isHost
+            && !isHistoricalGathering
+            && gathering?.status != .cancelled
     }
 
     var visibleGatheringParticipants:
@@ -2996,7 +3128,11 @@ private extension GatheringDetailView {
             gatheringParticipantProfiles = []
 
             errorMessage =
-                "Unable to load gathering. Please try again."
+                // PGRST116: no row, so it was deleted (or the user can
+                // no longer see it), e.g. opened from an old screen.
+                (error as? PostgrestError)?.code == "PGRST116"
+                    ? "This gathering is no longer available. It may have been deleted by the host."
+                    : "Unable to load gathering. Please try again."
 
             print(
                 "GATHERING DETAIL ERROR:",

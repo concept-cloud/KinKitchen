@@ -44,13 +44,21 @@ struct EditGatheringView: View {
     @State private var isTimePickerExpanded = false
 
     @State private var showCancelConfirmation = false
+    @State private var showDeleteConfirmation = false
+    @State private var isDeleting = false
+
+    /// Called after the gathering is permanently deleted, so the
+    /// screen underneath can close instead of showing it.
+    let onDeleted: () -> Void
 
 
     // MARK: - Init
 
     init(
-        gathering: Gathering
+        gathering: Gathering,
+        onDeleted: @escaping () -> Void = {}
     ) {
+        self.onDeleted = onDeleted
 
         self.gathering = gathering
 
@@ -160,12 +168,17 @@ struct EditGatheringView: View {
             }
         }
 
-        .confirmationDialog(
-            "Cancel Gathering?",
+        // Centered alerts so the safe choice is always visible.
+        .alert(
+            "Cancel \"\(gathering.name)\"?",
             isPresented:
-                $showCancelConfirmation,
-            titleVisibility: .visible
+                $showCancelConfirmation
         ) {
+
+            Button(
+                "Keep Gathering",
+                role: .cancel
+            ) {}
 
             Button(
                 "Cancel Gathering",
@@ -178,17 +191,38 @@ struct EditGatheringView: View {
                 }
             }
 
+        } message: {
+
+            Text(
+                "Everyone invited will be told it's cancelled. Guests, dishes and claims are kept, and you can delete it later."
+            )
+        }
+        .alert(
+            "Delete \"\(gathering.name)\"?",
+            isPresented:
+                $showDeleteConfirmation
+        ) {
+
             Button(
-                "Keep Gathering",
+                "Cancel",
                 role: .cancel
             ) {}
+
+            Button(
+                "Delete",
+                role: .destructive
+            ) {
+
+                Task {
+
+                    await deleteGathering()
+                }
+            }
 
         } message: {
 
             Text(
-                """
-                This gathering will no longer appear as an active upcoming gathering. The gathering record will be preserved.
-                """
+                "This permanently deletes the gathering, its guest list, dishes and claims. Guests will be told it was removed. Recipes are not deleted. This can't be undone."
             )
         }
     }
@@ -1179,7 +1213,85 @@ private extension EditGatheringView {
             )
             .disabled(
                 isSaving ||
-                isCancelling
+                isCancelling ||
+                isDeleting
+            )
+
+
+            Text(
+                "Deleting removes the gathering and its guest list, dishes and claims for good. Your recipes are not affected."
+            )
+            .font(
+                KinTypography.caption
+            )
+            .foregroundStyle(
+                KinColors.secondaryText
+            )
+            .padding(
+                .top,
+                KinSpacing.small
+            )
+
+
+            Button {
+
+                showDeleteConfirmation =
+                    true
+
+            } label: {
+
+                HStack {
+
+                    Spacer()
+
+                    if isDeleting {
+
+                        ProgressView()
+                            .tint(.white)
+
+                        Text(
+                            "Deleting..."
+                        )
+
+                    } else {
+
+                        Image(
+                            systemName: "trash"
+                        )
+
+                        Text(
+                            "Delete Gathering"
+                        )
+                    }
+
+                    Spacer()
+                }
+                .font(
+                    KinTypography.button
+                )
+                .foregroundStyle(
+                    .white
+                )
+                .padding(
+                    KinSpacing.medium
+                )
+                .background(
+                    KinColors.error
+                )
+                .clipShape(
+                    RoundedRectangle(
+                        cornerRadius:
+                            KinRadius.medium
+                    )
+                )
+            }
+            .buttonStyle(
+                .plain
+            )
+            .disabled(
+                isSaving ||
+                isCancelling ||
+                isDeleting
             )
         }
         .padding(
@@ -1338,8 +1450,12 @@ private extension EditGatheringView {
 
         } catch {
 
+            // Nothing changed; the gathering is still upcoming.
             errorMessage =
-                "Unable to cancel this gathering. Please try again."
+                GatheringService.friendlyMessage(
+                    for: error,
+                    fallback: "Unable to cancel this gathering. Please try again."
+                )
 
 
             print(
@@ -1348,6 +1464,52 @@ private extension EditGatheringView {
             )
         }
     }
+
+
+    @MainActor
+    func deleteGathering() async {
+
+        guard !isDeleting else {
+            return
+        }
+
+        isDeleting = true
+
+        errorMessage = nil
+
+
+        defer {
+
+            isDeleting = false
+        }
+
+
+        do {
+
+            try await GatheringService
+                .deleteGathering(
+                    id: gathering.id
+                )
+
+            onDeleted()
+            dismiss()
+
+        } catch {
+
+            // Nothing changed; the gathering is still there.
+            errorMessage =
+                GatheringService.friendlyMessage(
+                    for: error,
+                    fallback: "Unable to delete this gathering. Please try again."
+                )
+
+            print(
+                "DELETE GATHERING ERROR:",
+                error.localizedDescription
+            )
+        }
+    }
+
 }
 
 

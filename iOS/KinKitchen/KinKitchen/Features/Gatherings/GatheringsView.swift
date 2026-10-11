@@ -369,7 +369,8 @@ private extension GatheringsView {
                     KinColors.secondaryText
                 )
 
-                if gathering.isHistorical() {
+                if gathering.isHistorical()
+                    || gathering.status == .cancelled {
                     historyStatusBadge(
                         gathering
                     )

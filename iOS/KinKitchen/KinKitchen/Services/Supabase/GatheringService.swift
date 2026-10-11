@@ -413,39 +413,76 @@ enum GatheringService {
     
     // MARK: - Cancel Gathering
 
+    /// Cancels an upcoming gathering the user hosts. Everything is kept
+    /// and invited guests are notified (see supabase/KINKIT-183).
     static func cancelGathering(
         id gatheringId: UUID
     ) async throws -> Gathering {
 
-        let user =
-            try await SupabaseManager.client
-                .auth
-                .session
-                .user
-
-        let payload =
-            GatheringStatusUpdate(
-                status: .cancelled
-            )
-
         let gathering: Gathering =
             try await SupabaseManager.client
-                .from("gatherings")
-                .update(payload)
-                .eq(
-                    "id",
-                    value: gatheringId
+                .rpc(
+                    "cancel_gathering",
+                    params: ["p_gathering_id": gatheringId]
                 )
-                .eq(
-                    "host_id",
-                    value: user.id
-                )
-                .select()
                 .single()
                 .execute()
                 .value
 
         return gathering
+    }
+
+
+    /// Friendly text for the database's cancel/delete refusal reasons.
+    static func friendlyMessage(
+        for error: Error,
+        fallback: String
+    ) -> String {
+
+        let description =
+            String(describing: error)
+
+        if description.contains("NOT_GATHERING_HOST") {
+            return "Only the host can do this."
+        }
+
+        if description.contains("GATHERING_ALREADY_OCCURRED") {
+            return "This gathering has already happened, so it's kept in Gathering History and can't be deleted."
+        }
+
+        if description.contains("GATHERING_CANNOT_BE_CANCELLED") {
+            return "Only upcoming gatherings that haven't started can be cancelled."
+        }
+
+        return fallback
+    }
+
+
+    // MARK: - Delete Gathering
+
+    /// Permanently deletes an upcoming or cancelled gathering the user
+    /// hosts, with its guests, dishes and claims, in one database
+    /// transaction. Gatherings that happened can't be deleted.
+    static func deleteGathering(
+        id gatheringId: UUID
+    ) async throws {
+
+        let result: GatheringDeletionResult =
+            try await SupabaseManager.client
+                .rpc(
+                    "delete_gathering",
+                    params: ["p_gathering_id": gatheringId]
+                )
+                .execute()
+                .value
+
+        // Already deleted; a leftover photo shouldn't fail the delete.
+        if let coverPath = result.coverImagePath,
+           !coverPath.isEmpty {
+            _ = try? await SupabaseManager.client.storage
+                .from("gathering-photos")
+                .remove(paths: [coverPath])
+        }
     }
 
 
@@ -799,12 +836,14 @@ enum GatheringService {
                     value:
                         user.id
                 )
-                .eq(
+                // Cancelled gatherings stay here for the host (marked
+                // Cancelled) so they can still be deleted.
+                .in(
                     "status",
-                    value:
-                        GatheringStatus
-                            .upcoming
-                            .rawValue
+                    values: [
+                        GatheringStatus.upcoming.rawValue,
+                        GatheringStatus.cancelled.rawValue
+                    ]
                 )
                 .gte(
                     "starts_at",
@@ -998,6 +1037,18 @@ enum GatheringService {
                 $0.gathering.startsAt >
                     $1.gathering.startsAt
             }
+    }
+}
+
+// MARK: - Gathering Deletion Result
+
+/// What `delete_gathering` returns.
+private struct GatheringDeletionResult: Decodable {
+
+    let coverImagePath: String?
+
+    enum CodingKeys: String, CodingKey {
+        case coverImagePath = "cover_image_path"
     }
 }
 

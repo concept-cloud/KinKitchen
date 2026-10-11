@@ -36,6 +36,40 @@ struct ContentDeletionTests {
         #expect(versions.contains("versions"))
     }
 
+    // MARK: - KINKIT-183 Gatherings
+
+    struct DatabaseError: Error, CustomStringConvertible {
+        let description: String
+    }
+
+    @Test func occurredGatheringExplainsItsKeptInHistory() {
+        let message =
+            GatheringService.friendlyMessage(
+                for: DatabaseError(description: "GATHERING_ALREADY_OCCURRED"),
+                fallback: "fallback"
+            )
+
+        #expect(message.contains("Gathering History"))
+    }
+
+    @Test func nonHostIsToldOnlyTheHostCan() {
+        #expect(
+            GatheringService.friendlyMessage(
+                for: DatabaseError(description: "NOT_GATHERING_HOST"),
+                fallback: "fallback"
+            ) == "Only the host can do this."
+        )
+    }
+
+    @Test func unknownFailureUsesFallback() {
+        #expect(
+            GatheringService.friendlyMessage(
+                for: DatabaseError(description: "network down"),
+                fallback: "Try again."
+            ) == "Try again."
+        )
+    }
+
     @Test func archivedFieldDecodesAndDefaultsToActive() throws {
         let base = """
         "id": "\(UUID().uuidString)",
