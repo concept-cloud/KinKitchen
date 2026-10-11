@@ -46,7 +46,8 @@ struct RecipeDetailView: View {
     @State private var isCreatingVersion = false
     @State private var createdVersionId: UUID?
     @State private var showingCreatedVersion = false
-    
+    @State private var versionErrorMessage: String?
+
     @State private var showingEditRecipe = false
     @State private var recipeWasDeleted = false
     
@@ -1057,7 +1058,65 @@ struct RecipeDetailView: View {
             }
             .buttonStyle(.plain)
         }
+
+        // Anyone who can open someone else's recipe can make their
+        // own copy of it to change.
+        if let currentUserId,
+           currentUserId != recipe.ownerId {
+            VStack(
+                alignment: .leading,
+                spacing: KinSpacing.small
+            ) {
+                Button {
+                    Task {
+                        await makeMyVersion(
+                            from: recipe
+                        )
+                    }
+                } label: {
+                    HStack(spacing: KinSpacing.small) {
+                        if isCreatingVersion {
+                            ProgressView()
+                                .tint(.white)
+
+                            Text("Creating Your Version…")
+                        } else {
+                            Image(
+                                systemName: "square.on.square"
+                            )
+
+                            Text("Make My Version")
+                        }
+                    }
+                    .font(KinTypography.button)
+                    .foregroundStyle(.white)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, KinSpacing.medium)
+                    .background(KinColors.primary)
+                    .clipShape(
+                        RoundedRectangle(
+                            cornerRadius: KinRadius.medium
+                        )
+                    )
+                }
+                .buttonStyle(.plain)
+                .disabled(isCreatingVersion)
+
+                Text(
+                    "Creates your own copy to change however you like. The original stays as it is."
+                )
+                .font(KinTypography.caption)
+                .foregroundStyle(KinColors.secondaryText)
+
+                if let versionErrorMessage {
+                    Text(versionErrorMessage)
+                        .font(KinTypography.caption)
+                        .foregroundStyle(KinColors.error)
+                }
+            }
+        }
     }
+
     // MARK: - Metadata Chip
 
     private func metadataChip(
@@ -1930,6 +1989,7 @@ struct RecipeDetailView: View {
         }
 
         isCreatingVersion = true
+        versionErrorMessage = nil
 
         defer {
             isCreatingVersion = false
@@ -1945,16 +2005,25 @@ struct RecipeDetailView: View {
             createdVersionId =
                 created.id
 
+            // The version exists either way; a stale count is fine.
             versions =
-                try await RecipeService
+                (try? await RecipeService
                     .fetchRecipeVersions(
                         for: recipe
-                    )
+                    )) ?? versions
 
             showingCreatedVersion =
                 true
 
+        } catch is CancellationError {
+            return
         } catch {
+            // The source recipe is untouched and no version exists.
+            versionErrorMessage =
+                RecipeService.versionFailureMessage(
+                    for: error
+                )
+
             print(
                 "CREATE RECIPE VERSION ERROR:",
                 error.localizedDescription

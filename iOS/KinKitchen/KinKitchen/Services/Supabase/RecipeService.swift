@@ -481,77 +481,95 @@ enum RecipeService {
 
     // MARK: - Create Version
 
+    /// Creates a new recipe owned by the current user from a recipe
+    /// they can view (see supabase/KINKIT-186). The recipe, its
+    /// ingredients, allergen associations and dietary tags are copied
+    /// in one database transaction; the source is never changed.
     static func createVersion(
         from sourceRecipe: Recipe
     ) async throws -> Recipe {
-        let user =
+
+        var version: Recipe =
             try await SupabaseManager.client
-                .auth
-                .session
-                .user
-
-        let sourceWithIngredients =
-            try await fetchRecipeWithIngredients(
-                id: sourceRecipe.id
-            )
-
-        let originalRecipeId =
-            sourceRecipe.originalRecipeId
-            ?? sourceRecipe.id
-
-        let newRecipeCreate =
-            RecipeCreate(
-                ownerId: user.id,
-                name: sourceRecipe.name,
-                description: sourceRecipe.description,
-                instructions: sourceRecipe.instructions,
-                servings: sourceRecipe.servings,
-                prepTimeMinutes:
-                    sourceRecipe.prepTimeMinutes,
-                cookTimeMinutes:
-                    sourceRecipe.cookTimeMinutes,
-                photoPath:
-                    sourceRecipe.photoPath,
-                category:
-                    sourceRecipe.category,
-                sourceRecipeId:
-                    sourceRecipe.id,
-                originalRecipeId:
-                    originalRecipeId
-            )
-
-        let newRecipe: Recipe =
-            try await SupabaseManager.client
-                .from("recipes")
-                .insert(newRecipeCreate)
-                .select()
+                .rpc(
+                    "create_recipe_version",
+                    params: [
+                        "p_source_recipe_id":
+                            sourceRecipe.id
+                    ]
+                )
                 .single()
                 .execute()
                 .value
 
-        let ingredientInputs =
-            sourceWithIngredients
-                .orderedIngredients
-                .map { ingredient in
-                    RecipeIngredientInput(
-                        name: ingredient.name,
-                        quantity:
-                            ingredient.quantity,
-                        unit:
-                            ingredient.unit,
-                        offProductId:
-                            ingredient.offProductId
+        // Give the version its own photo file. The original's owner
+        // replaces their photo in place, which would otherwise change
+        // this version's photo too.
+        if let sourcePhotoPath = version.photoPath {
+            let versionPhotoPath =
+                recipePhotoPath(
+                    ownerId: version.ownerId,
+                    recipeId: version.id
+                )
+
+            do {
+                try await SupabaseManager.client.storage
+                    .from("recipe-photos")
+                    .copy(
+                        from: sourcePhotoPath,
+                        to: versionPhotoPath
                     )
-                }
 
-        _ =
-            try await createIngredients(
-                recipeId: newRecipe.id,
-                ingredients:
-                    ingredientInputs
-            )
+                version =
+                    try await SupabaseManager.client
+                        .from("recipes")
+                        .update(
+                            ["photo_path": versionPhotoPath]
+                        )
+                        .eq("id", value: version.id)
+                        .select()
+                        .single()
+                        .execute()
+                        .value
+            } catch {
+                // The version still shows the shared photo; nothing
+                // else about it depends on the copy.
+                print(
+                    "VERSION PHOTO COPY ERROR:",
+                    error.localizedDescription
+                )
+            }
+        }
 
-        return newRecipe
+        return version
+    }
+
+
+    /// Friendly message for a failed Make My Version.
+    static func versionFailureMessage(
+        for error: Error
+    ) -> String {
+
+        let description =
+            String(describing: error)
+
+        if description.contains("SOURCE_RECIPE_UNAVAILABLE") {
+            return "This recipe is no longer available, so a version can't be made from it."
+        }
+
+        if description.contains("CANNOT_VERSION_OWN_RECIPE") {
+            return "This is already your recipe. Edit it instead."
+        }
+
+        return "Your version couldn't be created. Nothing was changed. Please try again."
+    }
+
+
+    static func recipePhotoPath(
+        ownerId: UUID,
+        recipeId: UUID
+    ) -> String {
+        "\(ownerId.uuidString.lowercased())/\(recipeId.uuidString.lowercased())/recipe.jpg"
     }
     
     // MARK: - Delete Recipe
@@ -1024,7 +1042,10 @@ enum RecipeService {
             try await SupabaseManager.client.auth.session.user
 
         let path =
-            "\(user.id.uuidString.lowercased())/\(recipeId.uuidString.lowercased())/recipe.jpg"
+            recipePhotoPath(
+                ownerId: user.id,
+                recipeId: recipeId
+            )
 
         try await SupabaseManager.client.storage
             .from("recipe-photos")
