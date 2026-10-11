@@ -1226,7 +1226,7 @@ struct AddRecipeView: View {
             // Only delete the recipe if the actual recipe/ingredient
             // creation failed.
             if let createdRecipe {
-                try? await RecipeService.deleteRecipe(
+                _ = try? await RecipeService.deleteRecipe(
                     id: createdRecipe.id
                 )
             }

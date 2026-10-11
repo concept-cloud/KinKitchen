@@ -144,7 +144,13 @@ struct EditGatheringView: View {
 
                     saveButton
 
-                    cancelSection
+                    // Once it has started it's on its way to Gathering
+                    // History; the database refuses cancel and delete.
+                    if gathering.canBeCancelled() {
+                        cancelSection
+                    } else {
+                        startedNotice
+                    }
                 }
                 .padding(
                     KinSpacing.large
@@ -1094,6 +1100,24 @@ private extension EditGatheringView {
 // MARK: - Cancel Gathering
 
 private extension EditGatheringView {
+
+    var startedNotice: some View {
+
+        Label(
+            "This gathering has started, so it can't be cancelled or deleted. It will be kept in Gathering History.",
+            systemImage: "clock.arrow.circlepath"
+        )
+        .font(
+            KinTypography.caption
+        )
+        .foregroundStyle(
+            KinColors.secondaryText
+        )
+        .padding(
+            .top,
+            KinSpacing.medium
+        )
+    }
 
     var cancelSection: some View {
 

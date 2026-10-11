@@ -2178,12 +2178,19 @@ struct RecipeDetailView: View {
 
             // A deleted original shouldn't stop this version
             // from opening.
+            // One its owner deleted (archived) counts as unavailable;
+            // the version keeps its saved credit either way.
             if recipe.originalRecipeId != nil {
-                originalRecipe =
+                let original =
                     try? await RecipeService
                         .fetchOriginalRecipe(
                             for: recipe
                         )
+
+                originalRecipe =
+                    original?.archivedAt == nil
+                        ? original
+                        : nil
             } else {
                 originalRecipe = nil
             }

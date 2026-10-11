@@ -454,6 +454,12 @@ enum RecipeService {
                     "original_recipe_id",
                     value: rootRecipeId
                 )
+                // Versions their owners deleted aren't listed.
+                .filter(
+                    "archived_at",
+                    operator: "is",
+                    value: "null"
+                )
                 .order(
                     "created_at",
                     ascending: true

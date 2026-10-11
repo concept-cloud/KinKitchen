@@ -235,7 +235,8 @@ private extension GatheringDetailView {
                     // Cancelled gatherings can still be deleted by the
                     // host; ones that happened cannot.
                     if isHost,
-                       gathering.status == .cancelled {
+                       gathering.status == .cancelled,
+                       gathering.canBeDeleted() {
                         deleteCancelledSection
                     }
 

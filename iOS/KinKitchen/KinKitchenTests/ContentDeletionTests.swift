@@ -70,6 +70,69 @@ struct ContentDeletionTests {
         )
     }
 
+    // MARK: - Sprint 6 regression: gathering lifecycle
+
+    static let now = Date(timeIntervalSince1970: 1_790_000_000)
+
+    static func gathering(
+        status: GatheringStatus,
+        hoursFromNow: Double
+    ) -> Gathering {
+        Gathering(
+            id: UUID(),
+            hostId: UUID(),
+            name: "Sunday Supper",
+            theme: nil,
+            coverImagePath: nil,
+            description: nil,
+            location: nil,
+            startsAt:
+                now.addingTimeInterval(hoursFromNow * 3_600),
+            guestLimit: nil,
+            status: status,
+            createdAt: now,
+            updatedAt: now
+        )
+    }
+
+    @Test func upcomingGatheringCanBeCancelledAndDeleted() {
+        let gathering =
+            Self.gathering(status: .upcoming, hoursFromNow: 48)
+
+        #expect(gathering.canBeCancelled(asOf: Self.now))
+        #expect(gathering.canBeDeleted(asOf: Self.now))
+    }
+
+    @Test func startedGatheringCanNeitherBeCancelledNorDeleted() {
+        // Started an hour ago: still editable, not yet in History,
+        // but it has happened.
+        let gathering =
+            Self.gathering(status: .upcoming, hoursFromNow: -1)
+
+        #expect(!gathering.canBeCancelled(asOf: Self.now))
+        #expect(!gathering.canBeDeleted(asOf: Self.now))
+    }
+
+    @Test func completedGatheringIsKeptInHistory() {
+        for hours in [-48.0, 48.0] {
+            let gathering =
+                Self.gathering(status: .completed, hoursFromNow: hours)
+
+            #expect(!gathering.canBeCancelled(asOf: Self.now))
+            #expect(!gathering.canBeDeleted(asOf: Self.now))
+        }
+    }
+
+    @Test func cancelledGatheringCanBeDeletedButNotCancelledAgain() {
+        for hours in [-48.0, 48.0] {
+            let gathering =
+                Self.gathering(status: .cancelled, hoursFromNow: hours)
+
+            #expect(!gathering.canBeCancelled(asOf: Self.now))
+            #expect(gathering.canBeDeleted(asOf: Self.now))
+        }
+    }
+
     // MARK: - KINKIT-184 Standard failure handling
 
     @Test func ownershipFailuresNameWhoCanDelete() {

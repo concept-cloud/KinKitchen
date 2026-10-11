@@ -12,7 +12,7 @@ import Foundation
 /// Another recipe in the same family (the original or a version of
 /// it) where the existing dietary check found none of the user's
 /// conflicts. Never a promise that the recipe is allergy-safe.
-struct VersionSuggestion:
+nonisolated struct VersionSuggestion:
     Identifiable,
     Hashable {
 
@@ -54,7 +54,7 @@ struct VersionSuggestion:
 
 // MARK: - Version Suggestions
 
-struct VersionSuggestions:
+nonisolated struct VersionSuggestions:
     Hashable {
 
     /// What the user's Dietary Profile flagged in the recipe being
@@ -136,7 +136,7 @@ enum VersionSuggestionService {
                                     candidateConflicts:
                                         conflictKeys(result),
                                     candidateIsIncomplete:
-                                        result.hasIncompleteInformation
+                                        !result.unknownIngredients.isEmpty
                                 )
                         else {
                             return nil
@@ -176,7 +176,7 @@ enum VersionSuggestionService {
     /// Allergen and restriction conflicts, as comparable keys.
     /// Preferences (dislikes) don't count; they aren't a safety
     /// concern and shouldn't drive suggestions.
-    static func conflictKeys(
+    nonisolated static func conflictKeys(
         _ result: RecipientRecipeDietaryCheckResult
     ) -> Set<String> {
 
@@ -191,7 +191,7 @@ enum VersionSuggestionService {
     }
 
 
-    static func conflictNames(
+    nonisolated static func conflictNames(
         _ result: RecipientRecipeDietaryCheckResult
     ) -> [String] {
 
@@ -206,7 +206,7 @@ enum VersionSuggestionService {
     /// candidates with no detected allergen or restriction conflict
     /// at all: one sharing the same conflict isn't an alternative,
     /// and one with a different conflict isn't a better match.
-    static func fit(
+    nonisolated static func fit(
         currentConflicts: Set<String>,
         candidateConflicts: Set<String>,
         candidateIsIncomplete: Bool
@@ -226,7 +226,7 @@ enum VersionSuggestionService {
 
 
     /// Fully checked first, then most recently updated.
-    static func ranked(
+    nonisolated static func ranked(
         _ suggestions: [VersionSuggestion]
     ) -> [VersionSuggestion] {
 

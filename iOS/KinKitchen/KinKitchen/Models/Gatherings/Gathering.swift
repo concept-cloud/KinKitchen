@@ -119,6 +119,29 @@ extension Gathering {
     }
 
 
+    /// Matches cancel_gathering (supabase/KINKIT-183): only an
+    /// upcoming gathering that hasn't started.
+    func canBeCancelled(
+        asOf now: Date = Date()
+    ) -> Bool {
+
+        status == .upcoming
+            && startsAt > now
+    }
+
+
+    /// Matches delete_gathering (supabase/KINKIT-183): a cancelled
+    /// gathering, or an upcoming one that hasn't started. Anything
+    /// that happened stays in Gathering History.
+    func canBeDeleted(
+        asOf now: Date = Date()
+    ) -> Bool {
+
+        status == .cancelled
+            || canBeCancelled(asOf: now)
+    }
+
+
     /// Still active: upcoming or happening now, not completed
     /// (by the host or by time) and not cancelled.
     func isActive(
