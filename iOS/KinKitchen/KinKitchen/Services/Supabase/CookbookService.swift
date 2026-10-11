@@ -191,28 +191,30 @@ enum CookbookService {
 
     // MARK: - Delete Cookbook
 
+    /// Deletes a cookbook the user owns along with its sections and
+    /// recipe links, in one database transaction (see
+    /// supabase/KINKIT-182). Recipes are never deleted.
     static func deleteCookbook(
         id cookbookId: UUID
     ) async throws {
 
-        let user =
+        let result: CookbookDeletionResult =
             try await SupabaseManager.client
-                .auth
-                .session
-                .user
+                .rpc(
+                    "delete_cookbook",
+                    params: ["p_cookbook_id": cookbookId]
+                )
+                .execute()
+                .value
 
-        try await SupabaseManager.client
-            .from("cookbooks")
-            .delete()
-            .eq(
-                "id",
-                value: cookbookId
-            )
-            .eq(
-                "owner_id",
-                value: user.id
-            )
-            .execute()
+        // The cookbook is already gone; a leftover cover file
+        // shouldn't turn a successful delete into an error.
+        if let coverPath = result.coverPath,
+           !coverPath.isEmpty {
+            _ = try? await SupabaseManager.client.storage
+                .from("cookbook-covers")
+                .remove(paths: [coverPath])
+        }
     }
 
     // MARK: - Add Recipe
@@ -793,6 +795,18 @@ enum CookbookService {
         return cleaned.isEmpty
             ? nil
             : cleaned
+    }
+}
+
+// MARK: - Cookbook Deletion Result
+
+/// What `delete_cookbook` returns.
+private struct CookbookDeletionResult: Decodable {
+
+    let coverPath: String?
+
+    enum CodingKeys: String, CodingKey {
+        case coverPath = "cover_path"
     }
 }
 

@@ -59,6 +59,21 @@ struct CookbookDetailView: View {
                 .ignoresSafeArea()
 
             content
+
+            // Blocks other taps while a delete is in progress.
+            if isDeletingCookbook {
+                Color.black.opacity(0.15)
+                    .ignoresSafeArea()
+
+                ProgressView("Deleting…")
+                    .padding(KinSpacing.large)
+                    .background(KinColors.surface)
+                    .clipShape(
+                        RoundedRectangle(
+                            cornerRadius: KinRadius.medium
+                        )
+                    )
+            }
         }
         .navigationBarHidden(true)
         .task {
@@ -109,28 +124,27 @@ struct CookbookDetailView: View {
                 )
             }
         }
-        .confirmationDialog(
-            "Delete Cookbook?",
-            isPresented: $isShowingDeleteConfirmation,
-            titleVisibility: .visible
+        // A centered alert so Cancel is always visible.
+        .alert(
+            "Delete \"\(cookbook?.name ?? "Cookbook")\"?",
+            isPresented: $isShowingDeleteConfirmation
         ) {
             Button(
-                "Delete Cookbook",
+                "Cancel",
+                role: .cancel
+            ) {}
+
+            Button(
+                "Delete",
                 role: .destructive
             ) {
                 Task {
                     await deleteCookbook()
                 }
             }
-
-            Button(
-                "Cancel",
-                role: .cancel
-            ) {
-            }
         } message: {
             Text(
-                "This permanently deletes the cookbook and removes its recipe organization. Your original recipes will not be deleted."
+                "This permanently deletes the cookbook, its sections, and its cover. Your recipes will not be deleted. This can't be undone."
             )
         }
         .confirmationDialog(
@@ -495,6 +509,7 @@ private extension CookbookDetailView {
                             systemImage: "trash"
                         )
                     }
+                    .disabled(isDeletingCookbook)
                 } label: {
                     Image(
                         systemName: "ellipsis"
@@ -2020,7 +2035,7 @@ private extension CookbookDetailView {
         }
 
         isDeletingCookbook = true
-        errorMessage = nil
+        sectionErrorMessage = nil
 
         do {
 
@@ -2029,6 +2044,7 @@ private extension CookbookDetailView {
                     id: cookbookId
                 )
 
+            // Back to Cookbooks, which reloads without it.
             dismiss()
 
         } catch is CancellationError {
@@ -2037,8 +2053,18 @@ private extension CookbookDetailView {
 
         } catch {
 
-            errorMessage =
+            // Shown inline so the cookbook stays on screen: a failed
+            // delete changed nothing.
+            sectionErrorMessage =
+                String(describing: error)
+                    .contains("NOT_COOKBOOK_OWNER")
+                    ? "Only the owner can delete this cookbook."
+                    : "The cookbook couldn't be deleted. Please try again."
+
+            print(
+                "COOKBOOK DELETE ERROR:",
                 error.localizedDescription
+            )
 
             isDeletingCookbook = false
         }
