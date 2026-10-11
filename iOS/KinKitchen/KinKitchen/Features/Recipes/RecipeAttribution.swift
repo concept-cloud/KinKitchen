@@ -21,12 +21,18 @@ enum RecipeAttribution {
     /// The user who created the original recipe.
     ///
     /// For someone's version of a recipe, that's the owner of
-    /// the original. Returns nil when the original can't be
-    /// loaded, rather than crediting the version's owner.
+    /// the original, saved on the version when it was made, so the
+    /// credit survives the original being unshared or deleted.
+    /// Older versions without it fall back to the loaded original,
+    /// and return nil rather than crediting the version's owner.
     static func originalAuthorId(
         of recipe: Recipe,
         originalOwners: [UUID: UUID]
     ) -> UUID? {
+
+        if let savedOwner = recipe.originalOwnerId {
+            return savedOwner
+        }
 
         guard
             let originalId =

@@ -28,6 +28,14 @@ struct Recipe: Codable, Identifiable, Hashable {
     var sourceRecipeId: UUID?
     var originalRecipeId: UUID?
 
+    /// Lineage saved by the database when a version is created
+    /// (supabase/KINKIT-187). Never edited, and kept even if the
+    /// source or original later becomes unavailable.
+    var sourceRecipeName: String? = nil
+    var sourceOwnerId: UUID? = nil
+    var originalRecipeName: String? = nil
+    var originalOwnerId: UUID? = nil
+
     /// Set when the owner deleted a recipe that had to be kept for
     /// others (past gathering attendees, or other users' versions).
     /// Hidden from the owner's own lists.
@@ -53,6 +61,10 @@ struct Recipe: Codable, Identifiable, Hashable {
         case category
         case sourceRecipeId = "source_recipe_id"
         case originalRecipeId = "original_recipe_id"
+        case sourceRecipeName = "source_recipe_name"
+        case sourceOwnerId = "source_owner_id"
+        case originalRecipeName = "original_recipe_name"
+        case originalOwnerId = "original_owner_id"
         case archivedAt = "archived_at"
         case createdAt = "created_at"
         case updatedAt = "updated_at"
@@ -200,6 +212,28 @@ struct RecipeUpdate: Encodable {
             "photo_path"
 
         case category
+    }
+}
+
+
+// MARK: - Lineage
+
+extension Recipe {
+
+    /// Made with Make My Version rather than written from scratch.
+    /// Stays true after the source is deleted, since the saved
+    /// lineage remains.
+    var isVersion: Bool {
+        sourceRecipeId != nil
+            || originalRecipeId != nil
+            || sourceOwnerId != nil
+            || originalOwnerId != nil
+    }
+
+    /// Title of the first recipe in the family, as it was when the
+    /// version was made. Unaffected by renaming the version.
+    var originalTitle: String? {
+        originalRecipeName ?? sourceRecipeName
     }
 }
 
