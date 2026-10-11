@@ -465,6 +465,38 @@ enum RecipeService {
     }
 
 
+    // MARK: - Fetch Recipe Family
+
+    /// The family's original plus every version of it that the user
+    /// can open (RLS decides), excluding recipes their owners have
+    /// deleted (archived).
+    static func fetchRecipeFamily(
+        for recipe: Recipe
+    ) async throws -> [Recipe] {
+        let rootRecipeId =
+            (recipe.originalRecipeId ?? recipe.id)
+                .uuidString
+                .lowercased()
+
+        let family: [Recipe] =
+            try await SupabaseManager.client
+                .from("recipes")
+                .select()
+                .or(
+                    "id.eq.\(rootRecipeId),original_recipe_id.eq.\(rootRecipeId)"
+                )
+                .filter(
+                    "archived_at",
+                    operator: "is",
+                    value: "null"
+                )
+                .execute()
+                .value
+
+        return family
+    }
+
+
     // MARK: - Fetch Version Count
 
     static func fetchVersionCount(

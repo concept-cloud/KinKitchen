@@ -69,6 +69,11 @@ struct RecipeDetailView: View {
     @State private var sharedByText: String?
     @State private var versionOriginText: String?
     @State private var versionSourceText: String?
+
+    /// Other versions with no detected Dietary Profile conflict.
+    @State private var versionSuggestions: VersionSuggestions?
+    @State private var suggestionAuthorNames: [UUID: String] = [:]
+    @State private var hasAppeared = false
     @State private var showAllergenWarningDetail = false
     
     @State private var showingRecipientSelection = false
@@ -209,6 +214,19 @@ struct RecipeDetailView: View {
                 AllergenWarningDetailView(
                     result: dietaryCheckResult
                 )
+            }
+        }
+        // Coming back (e.g. after changing the Dietary Profile)
+        // re-checks the warning and the suggested versions.
+        .onAppear {
+            guard hasAppeared else {
+                hasAppeared = true
+                return
+            }
+
+            Task {
+                await loadDietaryCheck()
+                await loadVersionSuggestions()
             }
         }
         .onChange(of: showingEditRecipe) { _, isShowing in
@@ -518,6 +536,10 @@ struct RecipeDetailView: View {
             timeDetails(recipe)
             
             allergenWarningIndicator
+
+            if let versionSuggestions {
+                versionSuggestionsCard(versionSuggestions)
+            }
 
             ratingSection
 
@@ -1751,6 +1773,169 @@ struct RecipeDetailView: View {
     }
     
     
+    // MARK: - Version Suggestions
+
+    @MainActor
+    private func loadVersionSuggestions() async {
+
+        guard
+            let recipe = detail?.recipe,
+            let currentUserId
+        else {
+            versionSuggestions = nil
+            return
+        }
+
+        let found =
+            await VersionSuggestionService
+                .suggestions(
+                    for: recipe,
+                    userId: currentUserId
+                )
+
+        if let found {
+            let ownerIds =
+                Array(Set(found.suggestions.map(\.recipe.ownerId)))
+
+            let profiles =
+                (try? await ProfileService
+                    .fetchProfiles(userIds: ownerIds)) ?? []
+
+            suggestionAuthorNames =
+                Dictionary(
+                    uniqueKeysWithValues:
+                        ownerIds.map { ownerId in
+                            (
+                                ownerId,
+                                ownerId == currentUserId
+                                    ? "you"
+                                    : profiles
+                                        .first { $0.id == ownerId }?
+                                        .bestDisplayName
+                                        ?? "a Kin Kitchen user"
+                            )
+                        }
+                )
+        }
+
+        versionSuggestions = found
+    }
+
+
+    /// e.g. "Version by Sam" or "Original recipe by Rose".
+    private func suggestionRelationship(
+        _ recipe: Recipe
+    ) -> String {
+        let author =
+            suggestionAuthorNames[recipe.ownerId]
+                ?? "a Kin Kitchen user"
+
+        return recipe.isVersion
+            ? "Version by \(author)"
+            : "Original recipe by \(author)"
+    }
+
+
+    private func versionSuggestionsCard(
+        _ found: VersionSuggestions
+    ) -> some View {
+        VStack(
+            alignment: .leading,
+            spacing: KinSpacing.medium
+        ) {
+            VStack(
+                alignment: .leading,
+                spacing: KinSpacing.small
+            ) {
+                Label(
+                    found.suggestions.count == 1
+                        ? "Another Version to Consider"
+                        : "Other Versions to Consider",
+                    systemImage: "square.on.square"
+                )
+                .font(KinTypography.title3)
+                .foregroundStyle(KinColors.primaryText)
+
+                Text(
+                    "Your Dietary Profile flagged \(found.conflictNames.joined(separator: ", ")) here. These versions of the recipe had no conflict detected."
+                )
+                .font(KinTypography.caption)
+                .foregroundStyle(KinColors.secondaryText)
+            }
+
+            ForEach(found.suggestions) { suggestion in
+                Button {
+                    selectedVersionId = suggestion.recipe.id
+                    showingSelectedVersion = true
+                } label: {
+                    HStack(spacing: KinSpacing.medium) {
+                        VStack(
+                            alignment: .leading,
+                            spacing: 2
+                        ) {
+                            Text(suggestion.recipe.name)
+                                .font(KinTypography.body)
+                                .foregroundStyle(KinColors.primaryText)
+
+                            Text(
+                                suggestionRelationship(
+                                    suggestion.recipe
+                                )
+                            )
+                            .font(KinTypography.caption)
+                            .foregroundStyle(KinColors.secondaryText)
+
+                            Label(
+                                suggestion.fit.label,
+                                systemImage:
+                                    suggestion.fit == .noDetectedConflict
+                                        ? "checkmark.circle"
+                                        : "questionmark.circle"
+                            )
+                            .font(KinTypography.caption)
+                            .foregroundStyle(
+                                suggestion.fit == .noDetectedConflict
+                                    ? KinColors.success
+                                    : KinColors.secondaryText
+                            )
+                        }
+
+                        Spacer()
+
+                        Image(systemName: "chevron.right")
+                            .font(.caption)
+                            .foregroundStyle(KinColors.primary)
+                    }
+                    .padding(KinSpacing.medium)
+                    .background(KinColors.surface)
+                    .clipShape(
+                        RoundedRectangle(
+                            cornerRadius: KinRadius.medium
+                        )
+                    )
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(
+                    "\(suggestion.recipe.name). \(suggestionRelationship(suggestion.recipe)). \(suggestion.fit.label)."
+                )
+            }
+
+            Text(
+                "Based on the listed ingredients only. This is not a guarantee that a recipe is allergy-safe. Always check ingredients yourself."
+            )
+            .font(KinTypography.caption)
+            .foregroundStyle(KinColors.secondaryText)
+        }
+        .padding(KinSpacing.medium)
+        .background(KinColors.primary.opacity(0.06))
+        .clipShape(
+            RoundedRectangle(
+                cornerRadius: KinRadius.medium
+            )
+        )
+    }
+
+
     // MARK: - Load Recipe
 
     // MARK: - Attribution
@@ -2010,6 +2195,11 @@ struct RecipeDetailView: View {
             await loadAttribution(
                 for: recipe
             )
+
+            // After the recipe shows; never blocks or fails loading.
+            Task {
+                await loadVersionSuggestions()
+            }
 
         } catch {
             // PGRST116: no row came back, so the recipe was
