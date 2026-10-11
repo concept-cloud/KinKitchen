@@ -27,7 +27,12 @@ struct Recipe: Codable, Identifiable, Hashable {
     
     var sourceRecipeId: UUID?
     var originalRecipeId: UUID?
-    
+
+    /// Set when the owner deleted a recipe that had to be kept for
+    /// others (past gathering attendees, or other users' versions).
+    /// Hidden from the owner's own lists.
+    var archivedAt: String?
+
     let createdAt: String
     var updatedAt: String
 
@@ -48,8 +53,41 @@ struct Recipe: Codable, Identifiable, Hashable {
         case category
         case sourceRecipeId = "source_recipe_id"
         case originalRecipeId = "original_recipe_id"
+        case archivedAt = "archived_at"
         case createdAt = "created_at"
         case updatedAt = "updated_at"
+    }
+}
+
+
+// MARK: - Recipe Deletion Outcome
+
+/// What happened when the owner deleted a recipe.
+enum RecipeDeletionOutcome: Equatable {
+
+    /// Gone for good.
+    case deleted
+
+    /// Removed from the owner's recipes but kept for others.
+    case archived(reason: ArchiveReason)
+
+    enum ArchiveReason: Equatable {
+        /// Served at a past gathering; attendees keep it.
+        case pastGathering
+        /// Other people made versions of it.
+        case versions
+    }
+
+    /// Explains an archive to the owner.
+    var message: String? {
+        switch self {
+        case .deleted:
+            return nil
+        case .archived(.pastGathering):
+            return "This recipe was served at a past gathering, so it's been removed from your recipes but kept for the people who attended."
+        case .archived(.versions):
+            return "Other cooks have made their own versions of this recipe, so it's been removed from your recipes but kept so their versions still credit you."
+        }
     }
 }
 

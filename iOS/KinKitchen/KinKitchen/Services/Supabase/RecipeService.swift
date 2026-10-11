@@ -105,6 +105,12 @@ enum RecipeService {
                     "owner_id",
                     value: user.id
                 )
+                // Archived recipes were deleted by the owner.
+                .filter(
+                    "archived_at",
+                    operator: "is",
+                    value: "null"
+                )
                 .order(
                     "updated_at",
                     ascending: false
@@ -550,28 +556,41 @@ enum RecipeService {
     
     // MARK: - Delete Recipe
 
+    /// Deletes a recipe the user owns, or archives it when it has to be
+    /// kept for others (see supabase/KINKIT-181). Runs as one database
+    /// transaction, so a failure changes nothing.
+    @discardableResult
     static func deleteRecipe(
         id recipeId: UUID
-    ) async throws {
+    ) async throws -> RecipeDeletionOutcome {
 
-        let user =
+        let result: RecipeDeletionResult =
             try await SupabaseManager.client
-                .auth
-                .session
-                .user
+                .rpc(
+                    "delete_recipe",
+                    params: ["p_recipe_id": recipeId]
+                )
+                .execute()
+                .value
 
-        try await SupabaseManager.client
-            .from("recipes")
-            .delete()
-            .eq(
-                "id",
-                value: recipeId
+        if result.outcome == "archived" {
+            return .archived(
+                reason:
+                    result.reason == "versions"
+                        ? .versions
+                        : .pastGathering
             )
-            .eq(
-                "owner_id",
-                value: user.id
-            )
-            .execute()
+        }
+
+        // The recipe is already gone; a leftover photo file shouldn't
+        // turn a successful delete into an error.
+        if let photoPath = result.photoPath {
+            _ = try? await SupabaseManager.client.storage
+                .from("recipe-photos")
+                .remove(paths: [photoPath])
+        }
+
+        return .deleted
     }
 
 
@@ -1092,6 +1111,23 @@ struct RecipeIngredientInput {
         self.quantity = quantity
         self.unit = unit
         self.offProductId = offProductId
+    }
+}
+
+
+// MARK: - Recipe Deletion Result
+
+/// What `delete_recipe` returns.
+private struct RecipeDeletionResult: Decodable {
+
+    let outcome: String
+    let reason: String?
+    let photoPath: String?
+
+    enum CodingKeys: String, CodingKey {
+        case outcome
+        case reason
+        case photoPath = "photo_path"
     }
 }
 

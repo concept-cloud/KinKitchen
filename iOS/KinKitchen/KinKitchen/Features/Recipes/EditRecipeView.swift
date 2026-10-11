@@ -73,6 +73,7 @@ struct EditRecipeView: View {
 
     @State private var errorMessage: String?
     @State private var showingDeleteConfirmation = false
+    @State private var archivedMessage: String?
     
     // MARK: - Body
 
@@ -120,6 +121,23 @@ struct EditRecipeView: View {
             Text(
                 "This permanently deletes this recipe. This action cannot be undone."
             )
+        }
+        // Shown when the recipe was kept for others instead of
+        // deleted. Leaving afterwards behaves like a delete.
+        .alert(
+            "Removed from Your Recipes",
+            isPresented: Binding(
+                get: { archivedMessage != nil },
+                set: { if !$0 { archivedMessage = nil } }
+            )
+        ) {
+            Button("OK") {
+                archivedMessage = nil
+                onDeleted()
+                dismiss()
+            }
+        } message: {
+            Text(archivedMessage ?? "")
         }
     }
 
@@ -1619,23 +1637,29 @@ struct EditRecipeView: View {
         }
 
         do {
-            try await RecipeService
-                .deleteRecipe(
-                    id: recipeId
-                )
+            let outcome =
+                try await RecipeService
+                    .deleteRecipe(
+                        id: recipeId
+                    )
+
+            // Archived recipes are gone from the owner's lists too;
+            // explain why they still exist before leaving.
+            if let message = outcome.message {
+                archivedMessage = message
+                return
+            }
 
             onDeleted()
             dismiss()
 
         } catch {
-            // Raised by the recipe delete guard in Supabase
-            // (supabase/KINKIT-158) for recipes served at a past
-            // gathering, so attendees never lose them.
+            // Nothing was changed; the recipe stays as it was.
             errorMessage =
                 String(describing: error)
-                    .contains("RECIPE_IN_PAST_GATHERING")
-                    ? "This recipe was part of a past gathering, so it's being kept for the people who attended. It can't be deleted."
-                    : "The recipe could not be deleted."
+                    .contains("NOT_RECIPE_OWNER")
+                    ? "Only the person who created this recipe can delete it."
+                    : "The recipe could not be deleted. Please try again."
 
             print(
                 "EDIT RECIPE DELETE ERROR:",
