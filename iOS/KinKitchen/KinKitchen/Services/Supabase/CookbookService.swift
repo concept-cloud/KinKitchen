@@ -453,6 +453,38 @@ enum CookbookService {
         return updated
     }
 
+    /// Saves section order as explicit positions 0, 1, 2… Recipes keep
+    /// their section; only the section's `sort_order` changes.
+    static func reorderSections(
+        _ orderedSectionIds: [UUID],
+        cookbookId: UUID
+    ) async throws {
+
+        _ =
+            try await fetchCookbook(
+                id: cookbookId
+            )
+
+        for (position, sectionId) in
+            orderedSectionIds.enumerated() {
+
+            try await SupabaseManager.client
+                .from("cookbook_sections")
+                .update(
+                    ["sort_order": position]
+                )
+                .eq(
+                    "id",
+                    value: sectionId
+                )
+                .eq(
+                    "cookbook_id",
+                    value: cookbookId
+                )
+                .execute()
+        }
+    }
+
     /// Deletes the section only. Its recipes stay in the cookbook as
     /// Unsorted (the database clears their section_id).
     static func deleteSection(

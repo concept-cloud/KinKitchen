@@ -27,6 +27,8 @@ struct CookbookDetailView: View {
     @State private var sections: [CookbookSection] = []
 
     @State private var selectedPage: CookbookPage?
+    @State private var pageMovesForward = true
+    @State private var isShowingReorderSections = false
     /// The page currently in drag-to-reorder mode, if any.
     @State private var editingPage: CookbookPage?
 
@@ -169,6 +171,19 @@ struct CookbookDetailView: View {
             )
         }
         // MARK: - Section Dialogs
+        .sheet(
+            isPresented: $isShowingReorderSections
+        ) {
+            ReorderCookbookSectionsView(
+                cookbookId: cookbookId,
+                sections: sections,
+                onSaved: { reordered in
+                    withAnimation {
+                        sections = reordered
+                    }
+                }
+            )
+        }
         .alert(
             "New Section",
             isPresented: $isShowingNewSection
@@ -294,24 +309,60 @@ private extension CookbookDetailView {
     func cookbookContent(
         _ cookbook: Cookbook
     ) -> some View {
-        VStack(
-            alignment: .leading,
-            spacing: KinSpacing.medium
-        ) {
-            VStack(
+        ScrollView {
+            LazyVStack(
                 alignment: .leading,
-                spacing: KinSpacing.medium
+                spacing: KinSpacing.medium,
+                pinnedViews: [.sectionHeaders]
             ) {
-                header(cookbook)
+                VStack(
+                    alignment: .leading,
+                    spacing: KinSpacing.medium
+                ) {
+                    header(cookbook)
 
-                cookbookInformation(cookbook)
+                    cookbookInformation(cookbook)
+                }
+                .padding(
+                    .horizontal,
+                    KinSpacing.large
+                )
+
+                if let sectionErrorMessage {
+                    Text(sectionErrorMessage)
+                        .font(KinTypography.caption)
+                        .foregroundStyle(KinColors.error)
+                        .padding(.horizontal, KinSpacing.large)
+                }
+
+                if recipes.isEmpty && sections.isEmpty {
+                    VStack(spacing: KinSpacing.medium) {
+                        emptyRecipesState
+                        newSectionButton
+                    }
+                    .padding(.horizontal, KinSpacing.large)
+                } else {
+                    // Tabs stick to the top while the page scrolls.
+                    Section {
+                        ZStack(alignment: .top) {
+                            pageView(currentPage)
+                                .id(currentPage)
+                                .transition(pageTransition)
+                        }
+                        .clipped()
+                        .contentShape(Rectangle())
+                        .simultaneousGesture(pageSwipe)
+                    } header: {
+                        sectionTabs
+                            .padding(.vertical, KinSpacing.small)
+                            .background(KinColors.background)
+                    }
+                }
             }
             .padding(
-                .horizontal,
-                KinSpacing.large
+                .bottom,
+                KinSpacing.xxLarge
             )
-
-            recipesSection
         }
     }
 }
@@ -366,7 +417,28 @@ private extension CookbookDetailView {
                             systemImage: "plus"
                         )
                     }
-                    
+
+                    Button {
+                        sectionNameDraft = ""
+                        isShowingNewSection = true
+                    } label: {
+                        Label(
+                            "New Section",
+                            systemImage: "folder.badge.plus"
+                        )
+                    }
+
+                    if sections.count > 1 {
+                        Button {
+                            isShowingReorderSections = true
+                        } label: {
+                            Label(
+                                "Reorder Sections",
+                                systemImage: "arrow.up.arrow.down"
+                            )
+                        }
+                    }
+
                     Button {
                         isShowingCoverPicker = true
                     } label: {
@@ -527,92 +599,56 @@ private extension CookbookDetailView {
 
 private extension CookbookDetailView {
 
-    /// Recipes count and add button, then section tabs over pages you
-    /// swipe between. Each page is one section's recipes.
-    var recipesSection: some View {
-        VStack(
-            alignment: .leading,
-            spacing: KinSpacing.medium
-        ) {
-            HStack {
-                Text("Recipes")
-                    .font(
-                        KinTypography.title2
-                    )
-                    .foregroundStyle(
-                        KinColors.primaryText
-                    )
+    var currentPage: CookbookPage {
+        pageSelection.wrappedValue
+    }
 
-                Text("\(recipes.count)")
-                    .font(
-                        KinTypography.headline
-                    )
-                    .foregroundStyle(
-                        KinColors.secondaryText
-                    )
-
-                Spacer()
-
-                Button {
-                    isShowingRecipePicker = true
-                } label: {
-                    Image(
-                        systemName: "plus"
-                    )
-                    .font(
-                        .system(
-                            size: 16,
-                            weight: .bold
-                        )
-                    )
-                    .foregroundStyle(.white)
-                    .frame(
-                        width: 34,
-                        height: 34
-                    )
-                    .background(
-                        KinColors.primary
-                    )
-                    .clipShape(Circle())
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel(
-                    "Add Recipes"
+    /// The page slides in from the side you're heading toward.
+    var pageTransition: AnyTransition {
+        .asymmetric(
+            insertion:
+                .move(
+                    edge: pageMovesForward
+                        ? .trailing
+                        : .leading
                 )
-            }
-            .padding(.horizontal, KinSpacing.large)
-
-            if let sectionErrorMessage {
-                Text(sectionErrorMessage)
-                    .font(KinTypography.caption)
-                    .foregroundStyle(KinColors.error)
-                    .padding(.horizontal, KinSpacing.large)
-            }
-
-            if recipes.isEmpty && sections.isEmpty {
-                ScrollView {
-                    VStack(spacing: KinSpacing.medium) {
-                        emptyRecipesState
-                        newSectionButton
-                    }
-                    .padding(.horizontal, KinSpacing.large)
-                }
-            } else {
-                sectionTabs
-
-                TabView(
-                    selection: pageSelection
-                ) {
-                    ForEach(pages, id: \.self) { page in
-                        pageView(page)
-                            .tag(page)
-                    }
-                }
-                .tabViewStyle(
-                    .page(indexDisplayMode: .never)
+                .combined(with: .opacity),
+            removal:
+                .move(
+                    edge: pageMovesForward
+                        ? .leading
+                        : .trailing
                 )
+                .combined(with: .opacity)
+        )
+    }
+
+    /// Swipe left for the next section, right for the previous one.
+    /// Mostly-vertical drags are left to the scroll view.
+    var pageSwipe: some Gesture {
+        DragGesture(minimumDistance: 25)
+            .onEnded { value in
+                let horizontal = value.translation.width
+                let vertical = value.translation.height
+
+                guard
+                    abs(horizontal) > 60,
+                    abs(horizontal) > abs(vertical) * 1.5,
+                    let index = pages.firstIndex(of: currentPage)
+                else {
+                    return
+                }
+
+                let nextIndex =
+                    horizontal < 0 ? index + 1 : index - 1
+
+                guard pages.indices.contains(nextIndex) else {
+                    return
+                }
+
+                pageSelection.wrappedValue =
+                    pages[nextIndex]
             }
-        }
     }
 
     var newSectionButton: some View {
@@ -670,7 +706,18 @@ private extension CookbookDetailView {
                 return pages.first ?? .unsorted
             },
             set: { newPage in
-                withAnimation(.easeInOut(duration: 0.2)) {
+                let current =
+                    pages.firstIndex(of: currentPage) ?? 0
+                let next =
+                    pages.firstIndex(of: newPage) ?? 0
+
+                guard current != next else {
+                    return
+                }
+
+                pageMovesForward = next > current
+
+                withAnimation(.easeInOut(duration: 0.25)) {
                     selectedPage = newPage
                 }
                 // Leaving a page ends its reordering.
@@ -862,48 +909,107 @@ private extension CookbookDetailView {
                     )
                 )
                 .padding(.horizontal, KinSpacing.large)
-
-                Spacer()
             } else {
-                List {
-                    ForEach(pageRecipes) { recipe in
-                        recipeRow(recipe)
-                            .listRowInsets(
-                                EdgeInsets(
-                                    top: KinSpacing.small / 2,
-                                    leading: KinSpacing.large,
-                                    bottom: KinSpacing.small / 2,
-                                    trailing: KinSpacing.large
-                                )
+                VStack(spacing: KinSpacing.small) {
+                    ForEach(
+                        Array(pageRecipes.enumerated()),
+                        id: \.element.id
+                    ) { index, recipe in
+                        if isEditing {
+                            reorderRow(
+                                recipe,
+                                at: index,
+                                of: pageRecipes.count,
+                                on: page
                             )
-                            .listRowSeparator(.hidden)
-                            .listRowBackground(Color.clear)
+                        } else {
+                            recipeRow(recipe)
+                        }
                     }
-                    .onMove(
-                        perform: isEditing
-                            ? { offsets, destination in
-                                moveRecipes(
-                                    on: page,
-                                    from: offsets,
-                                    to: destination
-                                )
-                            }
-                            : nil
+                }
+                .padding(.horizontal, KinSpacing.large)
+            }
+        }
+        // Keep short pages from collapsing so swiping still works.
+        .frame(
+            maxWidth: .infinity,
+            minHeight: 240,
+            alignment: .top
+        )
+    }
+
+    /// A recipe in Reorder mode: the card plus up/down buttons.
+    func reorderRow(
+        _ recipe: Recipe,
+        at index: Int,
+        of count: Int,
+        on page: CookbookPage
+    ) -> some View {
+        HStack(spacing: KinSpacing.small) {
+            recipeCard(recipe)
+
+            VStack(spacing: KinSpacing.xSmall) {
+                reorderButton(
+                    systemImage: "chevron.up",
+                    label: "Move \(recipe.name) up",
+                    isDisabled: index == 0
+                ) {
+                    moveRecipes(
+                        on: page,
+                        from: [index],
+                        to: index - 1
                     )
                 }
-                .listStyle(.plain)
-                .scrollContentBackground(.hidden)
-                .environment(
-                    \.editMode,
-                    .constant(isEditing ? .active : .inactive)
-                )
-                .refreshable {
-                    await loadCookbook(
-                        showLoadingState: false
+
+                reorderButton(
+                    systemImage: "chevron.down",
+                    label: "Move \(recipe.name) down",
+                    isDisabled: index == count - 1
+                ) {
+                    // List-move convention: drop after the next item.
+                    moveRecipes(
+                        on: page,
+                        from: [index],
+                        to: index + 2
                     )
                 }
             }
         }
+    }
+
+    func reorderButton(
+        systemImage: String,
+        label: String,
+        isDisabled: Bool,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button {
+            withAnimation(.easeInOut(duration: 0.2)) {
+                action()
+            }
+        } label: {
+            Image(systemName: systemImage)
+                .font(.system(size: 14, weight: .bold))
+                .foregroundStyle(
+                    isDisabled
+                        ? KinColors.secondaryText.opacity(0.4)
+                        : KinColors.primary
+                )
+                .frame(width: 36, height: 30)
+                .background(
+                    KinColors.primary.opacity(
+                        isDisabled ? 0.04 : 0.12
+                    )
+                )
+                .clipShape(
+                    RoundedRectangle(
+                        cornerRadius: KinRadius.medium
+                    )
+                )
+        }
+        .buttonStyle(.plain)
+        .disabled(isDisabled)
+        .accessibilityLabel(label)
     }
 
     // MARK: - Reorder Recipes
