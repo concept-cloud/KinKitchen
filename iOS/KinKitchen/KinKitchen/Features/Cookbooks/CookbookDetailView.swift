@@ -28,15 +28,14 @@ struct CookbookDetailView: View {
 
     @State private var selectedPage: CookbookPage?
     @State private var pageMovesForward = true
-    @State private var isShowingReorderSections = false
+    @State private var isShowingEditSections = false
+    @State private var pendingEditAction: EditCookbookAction?
     @State private var isShowingPreview = false
     /// The page currently in drag-to-reorder mode, if any.
     @State private var editingPage: CookbookPage?
 
     @State private var isShowingNewSection = false
     @State private var sectionNameDraft = ""
-    @State private var sectionToRename: CookbookSection?
-    @State private var sectionToDelete: CookbookSection?
     @State private var isSavingSection = false
     @State private var sectionErrorMessage: String?
     @State private var isMovingRecipe = false
@@ -100,13 +99,28 @@ struct CookbookDetailView: View {
             )
         }
         .sheet(
-            isPresented: $isShowingEditCookbook
+            isPresented: $isShowingEditCookbook,
+            onDismiss: {
+                // Cover and delete open once the sheet has closed.
+                switch pendingEditAction {
+                case .changeCover:
+                    isShowingCoverPicker = true
+                case .delete:
+                    isShowingDeleteConfirmation = true
+                case nil:
+                    break
+                }
+                pendingEditAction = nil
+            }
         ) {
             if let cookbook {
                 EditCookbookView(
                     cookbook: cookbook,
                     onUpdated: { updatedCookbook in
                         self.cookbook = updatedCookbook
+                    },
+                    onAction: { action in
+                        pendingEditAction = action
                     }
                 )
             }
@@ -167,16 +181,17 @@ struct CookbookDetailView: View {
         }
         // MARK: - Section Dialogs
         .sheet(
-            isPresented: $isShowingReorderSections
-        ) {
-            ReorderCookbookSectionsView(
-                cookbookId: cookbookId,
-                sections: sections,
-                onSaved: { reordered in
-                    withAnimation {
-                        sections = reordered
-                    }
+            isPresented: $isShowingEditSections,
+            onDismiss: {
+                // Pick up every change made in the sheet, as stored.
+                Task {
+                    await loadCookbook(showLoadingState: false)
                 }
+            }
+        ) {
+            EditCookbookSectionsView(
+                cookbookId: cookbookId,
+                sections: sections
             )
         }
         .alert(
@@ -198,52 +213,6 @@ struct CookbookDetailView: View {
             Button("Cancel", role: .cancel) {}
         } message: {
             Text("Group recipes in this cookbook, like Appetizers or Family Favorites.")
-        }
-        .alert(
-            "Rename Section",
-            isPresented: Binding(
-                get: { sectionToRename != nil },
-                set: { if !$0 { sectionToRename = nil } }
-            )
-        ) {
-            TextField(
-                "Section name",
-                text: $sectionNameDraft
-            )
-            .textInputAutocapitalization(.words)
-
-            Button("Save") {
-                if let section = sectionToRename {
-                    Task {
-                        await renameSection(section)
-                    }
-                }
-            }
-
-            Button("Cancel", role: .cancel) {}
-        }
-        .alert(
-            "Delete \"\(sectionToDelete?.name ?? "Section")\"?",
-            isPresented: Binding(
-                get: { sectionToDelete != nil },
-                set: { if !$0 { sectionToDelete = nil } }
-            ),
-            presenting: sectionToDelete
-        ) { section in
-            Button("Cancel", role: .cancel) {}
-
-            Button(
-                "Delete",
-                role: .destructive
-            ) {
-                Task {
-                    await deleteSection(section)
-                }
-            }
-        } message: { _ in
-            Text(
-                "Its recipes move to Unsorted. No recipes are deleted."
-            )
         }
         .navigationDestination(
             isPresented: Binding(
@@ -456,61 +425,13 @@ private extension CookbookDetailView {
                     }
 
                     Button {
-                        sectionNameDraft = ""
-                        isShowingNewSection = true
+                        isShowingEditSections = true
                     } label: {
                         Label(
-                            "New Section",
-                            systemImage: "folder.badge.plus"
+                            "Edit Sections",
+                            systemImage: "folder"
                         )
                     }
-
-                    // The open section's own options.
-                    if case .section(let id) = currentPage,
-                       let section = sections.first(where: { $0.id == id }) {
-                        Button {
-                            sectionNameDraft = section.name
-                            sectionToRename = section
-                        } label: {
-                            Label(
-                                "Rename \"\(section.name)\"",
-                                systemImage: "pencil"
-                            )
-                        }
-
-                        Button(role: .destructive) {
-                            sectionToDelete = section
-                        } label: {
-                            Label(
-                                "Delete \"\(section.name)\"",
-                                systemImage: "trash"
-                            )
-                        }
-                    }
-
-                    if sections.count > 1 {
-                        Button {
-                            isShowingReorderSections = true
-                        } label: {
-                            Label(
-                                "Reorder Sections",
-                                systemImage: "arrow.up.arrow.down"
-                            )
-                        }
-                    }
-
-                    Button {
-                        isShowingCoverPicker = true
-                    } label: {
-                        Label(
-                            cookbook.coverPath == nil
-                                ? "Add Cover Image"
-                                : "Change Cover Image",
-                            systemImage: "photo"
-                        )
-                    }
-
-                    Divider()
 
                     Button {
                         isShowingEditCookbook = true
@@ -520,18 +441,6 @@ private extension CookbookDetailView {
                             systemImage: "pencil"
                         )
                     }
-
-                    Button(
-                        role: .destructive
-                    ) {
-                        isShowingDeleteConfirmation = true
-                    } label: {
-                        Label(
-                            "Delete Cookbook",
-                            systemImage: "trash"
-                        )
-                    }
-                    .disabled(isDeletingCookbook)
                 } label: {
                     Image(
                         systemName: "ellipsis"
@@ -1193,72 +1102,6 @@ private extension CookbookDetailView {
                 )
 
             sections.append(section)
-
-        } catch {
-            sectionErrorMessage =
-                error.localizedDescription
-        }
-    }
-
-    @MainActor
-    func renameSection(
-        _ section: CookbookSection
-    ) async {
-        guard !isSavingSection else {
-            return
-        }
-
-        isSavingSection = true
-        sectionErrorMessage = nil
-
-        defer {
-            isSavingSection = false
-        }
-
-        do {
-            let updated =
-                try await CookbookService.renameSection(
-                    section,
-                    to: sectionNameDraft
-                )
-
-            if let index =
-                sections.firstIndex(where: {
-                    $0.id == section.id
-                }) {
-                sections[index] = updated
-            }
-
-        } catch {
-            sectionErrorMessage =
-                error.localizedDescription
-        }
-    }
-
-    @MainActor
-    func deleteSection(
-        _ section: CookbookSection
-    ) async {
-        guard !isSavingSection else {
-            return
-        }
-
-        isSavingSection = true
-        sectionErrorMessage = nil
-
-        defer {
-            isSavingSection = false
-        }
-
-        do {
-            try await CookbookService.deleteSection(
-                section
-            )
-
-            // Reload so its recipes show under Unsorted, as stored.
-            await loadCookbook(
-                showLoadingState: false
-            )
 
         } catch {
             sectionErrorMessage =
@@ -2027,10 +1870,18 @@ private extension CookbookDetailView {
 
 // MARK: - Edit Cookbook View
 
+/// Things Edit Cookbook hands back to the cookbook screen to do once
+/// the sheet closes.
+enum EditCookbookAction {
+    case changeCover
+    case delete
+}
+
 private struct EditCookbookView: View {
 
     let cookbook: Cookbook
     let onUpdated: (Cookbook) -> Void
+    let onAction: (EditCookbookAction) -> Void
 
     @Environment(\.dismiss)
     private var dismiss
@@ -2043,10 +1894,12 @@ private struct EditCookbookView: View {
 
     init(
         cookbook: Cookbook,
-        onUpdated: @escaping (Cookbook) -> Void
+        onUpdated: @escaping (Cookbook) -> Void,
+        onAction: @escaping (EditCookbookAction) -> Void
     ) {
         self.cookbook = cookbook
         self.onUpdated = onUpdated
+        self.onAction = onAction
 
         _name =
             State(
@@ -2083,6 +1936,8 @@ private struct EditCookbookView: View {
                                 errorMessage
                             )
                         }
+
+                        coverAndDelete
                     }
                     .padding(
                         KinSpacing.large
@@ -2130,6 +1985,64 @@ private struct EditCookbookView: View {
                 isSaving
             )
         }
+    }
+}
+
+// MARK: - Edit Cookbook Cover & Delete
+
+private extension EditCookbookView {
+
+    var coverAndDelete: some View {
+
+        VStack(
+            spacing: KinSpacing.medium
+        ) {
+
+            Button {
+                onAction(.changeCover)
+                dismiss()
+            } label: {
+                Label(
+                    cookbook.coverPath == nil
+                        ? "Add Cover Image"
+                        : "Change Cover Image",
+                    systemImage: "photo"
+                )
+                .font(KinTypography.headline)
+                .foregroundStyle(KinColors.primary)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, KinSpacing.medium)
+                .background(KinColors.primary.opacity(0.10))
+                .clipShape(
+                    RoundedRectangle(
+                        cornerRadius: KinRadius.medium
+                    )
+                )
+            }
+            .buttonStyle(.plain)
+
+            Button {
+                onAction(.delete)
+                dismiss()
+            } label: {
+                Label(
+                    "Delete Cookbook",
+                    systemImage: KinIcons.delete
+                )
+                .font(KinTypography.headline)
+                .foregroundStyle(KinColors.error)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, KinSpacing.medium)
+                .background(KinColors.error.opacity(0.10))
+                .clipShape(
+                    RoundedRectangle(
+                        cornerRadius: KinRadius.medium
+                    )
+                )
+            }
+            .buttonStyle(.plain)
+        }
+        .disabled(isSaving)
     }
 }
 
