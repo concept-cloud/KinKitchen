@@ -146,8 +146,7 @@ struct HomeView: View {
                 homeBackground
             )
             // Photo runs up under the status bar. Once it scrolls away,
-            // the bar gets the page color so content never runs under
-            // the clock and bell.
+            // a soft fade sits behind the clock and bell.
             .onScrollGeometryChange(
                 for: Bool.self
             ) { geometry in
@@ -162,16 +161,57 @@ struct HomeView: View {
             .ignoresSafeArea(
                 edges: .top
             )
-            // Over the photo: no bar background or scroll-edge haze, so
-            // its top shows through untinted. Past it: the page color.
-            .toolbarBackground(
-                KinColors.background,
-                for: .navigationBar
-            )
+            // No bar background or scroll-edge haze; the soft fades
+            // below handle content scrolling under the clock and bell.
             .toolbarBackgroundVisibility(
-                scrolledPastHero ? .visible : .hidden,
+                .hidden,
                 for: .navigationBar
             )
+            .overlay(
+                alignment: .top
+            ) {
+
+                // Solid behind the clock and bell, then a soft fade, so
+                // content scrolls away gently instead of being sliced.
+                LinearGradient(
+                    stops: [
+                        .init(
+                            color: KinColors.background,
+                            location: 0
+                        ),
+                        .init(
+                            color: KinColors.background,
+                            location: 0.7
+                        ),
+                        .init(
+                            color: KinColors.background.opacity(0),
+                            location: 1
+                        )
+                    ],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+                .frame(height: 140)
+                .ignoresSafeArea(edges: .top)
+                .opacity(scrolledPastHero ? 1 : 0)
+                .allowsHitTesting(false)
+            }
+            .overlay(
+                alignment: .bottom
+            ) {
+
+                // Content fades out above the tab bar.
+                LinearGradient(
+                    colors: [
+                        KinColors.background.opacity(0),
+                        KinColors.background
+                    ],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+                .frame(height: 28)
+                .allowsHitTesting(false)
+            }
             .scrollEdgeEffectHidden(
                 true,
                 for: .top
