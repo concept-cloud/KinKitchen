@@ -93,6 +93,42 @@ enum CookbookService {
         return cookbooks
     }
 
+    // MARK: - Recipe Counts
+
+    /// How many recipes each cookbook holds, in one request.
+    /// Cookbooks with no recipes are missing from the result.
+    static func fetchRecipeCounts(
+        cookbookIds: [UUID]
+    ) async throws -> [UUID: Int] {
+
+        guard !cookbookIds.isEmpty else {
+            return [:]
+        }
+
+        struct Row: Decodable {
+            let cookbookId: UUID
+
+            enum CodingKeys: String, CodingKey {
+                case cookbookId = "cookbook_id"
+            }
+        }
+
+        let rows: [Row] =
+            try await SupabaseManager.client
+                .from("cookbook_recipes")
+                .select("cookbook_id")
+                .in(
+                    "cookbook_id",
+                    values: cookbookIds
+                )
+                .execute()
+                .value
+
+        return rows.reduce(into: [:]) { counts, row in
+            counts[row.cookbookId, default: 0] += 1
+        }
+    }
+
     // MARK: - Fetch Cookbook
 
     static func fetchCookbook(

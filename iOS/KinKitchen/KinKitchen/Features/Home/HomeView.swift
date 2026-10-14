@@ -1472,58 +1472,14 @@ private extension HomeView {
 
         } label: {
 
-            KinStorageImage(
-                bucket: "cookbook-covers",
-                path: cookbook.coverPath,
-                placeholderIcon: KinIcons.cookbooks
+            KinCookbookCoverCard(
+                cookbook: cookbook,
+                height: 140,
+                titleFont: KinTypography.title3
             )
-            .overlay(
-                alignment: .bottomLeading
-            ) {
-
-                ZStack(
-                    alignment: .bottomLeading
-                ) {
-
-                    LinearGradient(
-                        colors: [
-                            .black.opacity(0),
-                            .black.opacity(0.7)
-                        ],
-                        startPoint: .center,
-                        endPoint: .bottom
-                    )
-
-                    Text(cookbook.name)
-                        .font(KinTypography.title3)
-                        .foregroundStyle(.white)
-                        .lineLimit(2)
-                        .shadow(
-                            color: .black.opacity(0.4),
-                            radius: 3,
-                            y: 1
-                        )
-                        .padding(KinSpacing.medium)
-                }
-            }
-            .frame(
-                width: 220,
-                height: 140
-            )
-            .clipShape(
-                RoundedRectangle(
-                    cornerRadius: KinRadius.large
-                )
-            )
-            .shadow(
-                color: .black.opacity(0.08),
-                radius: 6,
-                y: 2
-            )
+            .frame(width: 220)
         }
         .buttonStyle(.plain)
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel("\(cookbook.name), cookbook")
         .accessibilityHint("Opens the cookbook")
         .accessibilityAddTraits(.isButton)
     }

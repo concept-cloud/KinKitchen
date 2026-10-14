@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import Supabase
 
 struct CookbooksView: View {
 
@@ -15,6 +16,7 @@ struct CookbooksView: View {
     @State private var navigationPath = NavigationPath()
     @State private var isShowingCreateCookbook = false
     @State private var selectedCookbookId: UUID?
+    @State private var recipeCounts: [UUID: Int] = [:]
 
     var body: some View {
         NavigationStack(path: $navigationPath) {
@@ -66,7 +68,7 @@ private extension CookbooksView {
 
     var header: some View {
         HStack {
-            Text("Cookbooks")
+            Text("My Cookbooks")
                 .font(KinTypography.largeTitle)
                 .foregroundStyle(KinColors.primaryText)
 
@@ -133,7 +135,7 @@ private extension CookbooksView {
     var cookbookList: some View {
         ScrollView {
             LazyVStack(
-                spacing: KinSpacing.medium
+                spacing: KinSpacing.large
             ) {
                 ForEach(cookbooks) { cookbook in
                     cookbookCard(cookbook)
@@ -157,106 +159,33 @@ private extension CookbooksView {
     func cookbookCard(
         _ cookbook: Cookbook
     ) -> some View {
+
         Button {
             navigationPath.append(cookbook.id)
         } label: {
-            HStack(
-                spacing: KinSpacing.medium
-            ) {
-                cookbookCover(cookbook)
-
-                VStack(
-                    alignment: .leading,
-                    spacing: KinSpacing.small
-                ) {
-                    Text(cookbook.name)
-                        .font(KinTypography.headline)
-                        .foregroundStyle(
-                            KinColors.primaryText
-                        )
-                        .multilineTextAlignment(.leading)
-
-                    if let description =
-                        cookbook.description,
-                       !description.isEmpty {
-
-                        Text(description)
-                            .font(KinTypography.body)
-                            .foregroundStyle(
-                                KinColors.secondaryText
-                            )
-                            .lineLimit(2)
-                            .multilineTextAlignment(.leading)
-                    }
-                }
-
-                Spacer()
-
-                Image(
-                    systemName: "chevron.right"
-                )
-                .font(
-                    .system(
-                        size: 16,
-                        weight: .semibold
-                    )
-                )
-                .foregroundStyle(
-                    KinColors.secondaryText
-                )
-            }
-            .padding(KinSpacing.medium)
-            .frame(
-                maxWidth: .infinity,
-                alignment: .leading
-            )
-            .background(KinColors.surface)
-            .clipShape(
-                RoundedRectangle(
-                    cornerRadius: KinRadius.medium
-                )
+            KinCookbookCoverCard(
+                cookbook: cookbook,
+                recipeCount: recipeCounts[cookbook.id] ?? 0,
+                badge: badge(for: cookbook)
             )
         }
         .buttonStyle(.plain)
-        .accessibilityLabel(
-            "Open \(cookbook.name)"
-        )
+        .accessibilityHint("Opens the cookbook")
     }
-}
 
-// MARK: - Cookbook Cover
 
-private extension CookbooksView {
+    /// Owned cookbooks say Private; anything else (cookbook sharing
+    /// isn't built yet) would say Shared.
+    func badge(
+        for cookbook: Cookbook
+    ) -> CookbookBadge {
 
-    @ViewBuilder
-    func cookbookCover(
-        _ cookbook: Cookbook
-    ) -> some View {
-        ZStack {
-            RoundedRectangle(
-                cornerRadius: KinRadius.medium
-            )
-            .fill(
-                KinColors.primary.opacity(0.12)
-            )
+        let userId =
+            SupabaseManager.client.auth.currentUser?.id
 
-            Image(
-                systemName: KinIcons.cookbooks
-            )
-            .font(
-                .system(
-                    size: 28,
-                    weight: .semibold
-                )
-            )
-            .foregroundStyle(
-                KinColors.primary
-            )
-        }
-        .frame(
-            width: 76,
-            height: 76
-        )
+        return cookbook.ownerId == userId
+            ? .mine
+            : .shared(by: nil)
     }
 }
 
@@ -324,7 +253,7 @@ private extension CookbooksView {
                 )
 
             Text(
-                "Create a cookbook to organize your favorite recipes."
+                "Gather your family's favorite recipes into a cookbook, organized your way."
             )
             .font(KinTypography.body)
             .foregroundStyle(
@@ -335,6 +264,29 @@ private extension CookbooksView {
                 .horizontal,
                 KinSpacing.xxLarge
             )
+
+            Button {
+                isShowingCreateCookbook = true
+            } label: {
+                Label(
+                    "Create a Cookbook",
+                    systemImage: KinIcons.add
+                )
+                .font(KinTypography.headline)
+                .foregroundStyle(.white)
+                .padding(
+                    .horizontal,
+                    KinSpacing.large
+                )
+                .padding(
+                    .vertical,
+                    KinSpacing.medium
+                )
+                .background(KinColors.primary)
+                .clipShape(Capsule())
+            }
+            .buttonStyle(.plain)
+            .padding(.top, KinSpacing.small)
 
             Spacer()
         }
@@ -438,6 +390,12 @@ private extension CookbooksView {
                     .fetchCurrentUserCookbooks()
 
             isLoading = false
+
+            // Counts are extra; the library still shows without them.
+            recipeCounts =
+                (try? await CookbookService.fetchRecipeCounts(
+                    cookbookIds: cookbooks.map(\.id)
+                )) ?? recipeCounts
         } catch is CancellationError {
             isLoading = false
         } catch {
