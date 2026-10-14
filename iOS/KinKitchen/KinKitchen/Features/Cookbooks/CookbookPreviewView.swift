@@ -229,10 +229,13 @@ private extension CookbookPreviewView {
         .padding(.vertical, KinSpacing.small)
     }
 
-    /// A thin progress line plus "5 / 24", like the edge of a book.
+    /// Section shortcuts (plus the cover and contents), then a thin
+    /// progress line and "5 / 24", like the edge of a book.
     var pageProgress: some View {
 
         VStack(spacing: KinSpacing.xSmall) {
+
+            sectionShortcuts
 
             GeometryReader { proxy in
                 ZStack(alignment: .leading) {
@@ -248,18 +251,110 @@ private extension CookbookPreviewView {
                 }
             }
             .frame(height: 3)
+            .padding(.horizontal, KinSpacing.xxLarge)
+            .padding(.top, KinSpacing.xSmall)
+            .accessibilityHidden(true)
 
             Text("\(pageIndex + 1) / \(pages.count)")
                 .font(KinTypography.caption2)
                 .foregroundStyle(KinColors.secondaryText)
                 .monospacedDigit()
+                .accessibilityLabel("Page \(pageIndex + 1) of \(pages.count)")
         }
-        .padding(.horizontal, KinSpacing.xxLarge)
         .padding(.vertical, KinSpacing.small)
-        .background(KinColors.background.opacity(0.92))
+        .background(KinColors.background.opacity(0.95))
         .animation(.easeInOut(duration: 0.2), value: pageIndex)
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel("Page \(pageIndex + 1) of \(pages.count)")
+    }
+
+    /// The section being read, if any (nil on the cover and contents).
+    var currentChapterIndex: Int? {
+        guard pages.indices.contains(pageIndex) else {
+            return nil
+        }
+        switch pages[pageIndex] {
+        case .chapter(let index), .recipe(let index, _):
+            return index
+        case .cover, .contents:
+            return nil
+        }
+    }
+
+    /// Cover, Contents, then one chip per section in its tab color.
+    /// The current one is filled in.
+    var sectionShortcuts: some View {
+
+        ScrollViewReader { proxy in
+
+            ScrollView(.horizontal, showsIndicators: false) {
+
+                HStack(spacing: KinSpacing.small) {
+
+                    shortcut(
+                        "Cover",
+                        icon: KinIcons.cookbooks,
+                        color: KinColors.primaryText,
+                        isCurrent: pages.first == pages[safe: pageIndex]
+                    ) {
+                        jump(to: .cover)
+                    }
+                    .id("cover")
+
+                    shortcut(
+                        "Contents",
+                        icon: "list.bullet",
+                        color: KinColors.primaryText,
+                        isCurrent: pages[safe: pageIndex] == .contents
+                    ) {
+                        jump(to: .contents)
+                    }
+
+                    ForEach(Array(chapters.enumerated()), id: \.element.id) { index, chapter in
+                        shortcut(
+                            chapter.title,
+                            icon: CookbookSectionRail.icon(for: chapter.title),
+                            color: CookbookSectionRail.color(at: index),
+                            isCurrent: currentChapterIndex == index
+                        ) {
+                            jump(to: .chapter(index))
+                        }
+                        .id(index)
+                    }
+                }
+                .padding(.horizontal, KinSpacing.large)
+            }
+            // Keep the current section's chip in view while swiping.
+            .onChange(of: currentChapterIndex) { _, index in
+                withAnimation {
+                    if let index {
+                        proxy.scrollTo(index, anchor: .center)
+                    } else {
+                        proxy.scrollTo("cover", anchor: .leading)
+                    }
+                }
+            }
+        }
+    }
+
+    func shortcut(
+        _ title: String,
+        icon: String,
+        color: Color,
+        isCurrent: Bool,
+        action: @escaping () -> Void
+    ) -> some View {
+
+        Button(action: action) {
+            Label(title, systemImage: icon)
+                .font(KinTypography.footnote)
+                .lineLimit(1)
+                .foregroundStyle(isCurrent ? .white : color)
+                .padding(.horizontal, KinSpacing.medium)
+                .padding(.vertical, KinSpacing.small)
+                .background(isCurrent ? color : color.opacity(0.12))
+                .clipShape(Capsule())
+        }
+        .buttonStyle(.plain)
+        .accessibilityAddTraits(isCurrent ? .isSelected : [])
     }
 
     /// Room for the top bar above each page's content.
@@ -1036,5 +1131,14 @@ private struct DottedLeader: View {
         .frame(height: 14)
         .frame(minWidth: 12)
         .accessibilityHidden(true)
+    }
+}
+
+
+// MARK: - Safe Index
+
+private extension Array {
+    subscript(safe index: Int) -> Element? {
+        indices.contains(index) ? self[index] : nil
     }
 }
