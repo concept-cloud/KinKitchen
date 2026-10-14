@@ -8,12 +8,16 @@
 import SwiftUI
 import Supabase
 
-/// Square gathering cover for cards, with a placeholder when there's
-/// no photo. Shared by the Gatherings list and Home.
+/// Gathering cover for cards, with a placeholder when there's no photo.
+/// Shared by the Gatherings list and Home.
+///
+/// With a `size` it's a rounded square. Without one it fills whatever
+/// space it's given (e.g. as a card background) and leaves clipping and
+/// corners to the parent.
 struct GatheringCardImage: View {
 
     let path: String?
-    var size: CGFloat = 82
+    var size: CGFloat? = 82
 
     @State private var imageData: Data?
     @State private var isLoading = false
@@ -21,68 +25,85 @@ struct GatheringCardImage: View {
 
     var body: some View {
 
-        ZStack {
+        if let size {
 
-            RoundedRectangle(
-                cornerRadius:
-                    KinRadius.medium
-            )
-            .fill(
-                KinColors.background
-            )
-
-            if
-                let imageData,
-                let image =
-                    UIImage(
-                        data: imageData
-                    )
-            {
-
-                Image(
-                    uiImage: image
-                )
-                .resizable()
-                .scaledToFill()
+            cover
                 .frame(
                     width: size,
                     height: size
                 )
-                .clipped()
-
-            } else {
-
-                Image(
-                    systemName:
-                        "fork.knife"
-                )
-                .font(
-                    .system(
-                        size: size * 0.32,
-                        weight: .semibold
+                .clipShape(
+                    RoundedRectangle(
+                        cornerRadius:
+                            KinRadius.medium
                     )
                 )
-                .foregroundStyle(
-                    KinColors.secondaryText
-                )
-            }
-        }
-        .frame(
-            width: size,
-            height: size
-        )
-        .clipShape(
-            RoundedRectangle(
-                cornerRadius:
-                    KinRadius.medium
-            )
-        )
-        .task(
-            id: path
-        ) {
 
-            await loadImage()
+        } else {
+
+            cover
         }
+    }
+
+
+    private var cover: some View {
+
+        // Color.clear sizes to the space offered, so a large photo
+        // never stretches its parent.
+        Color.clear
+            .overlay {
+
+                if
+                    let imageData,
+                    let image =
+                        UIImage(
+                            data: imageData
+                        )
+                {
+
+                    Image(
+                        uiImage: image
+                    )
+                    .resizable()
+                    .scaledToFill()
+
+                } else {
+
+                    ZStack {
+
+                        LinearGradient(
+                            colors: [
+                                KinColors.accent.opacity(0.35),
+                                KinColors.primary.opacity(0.25)
+                            ],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+
+                        Image(
+                            systemName:
+                                "fork.knife"
+                        )
+                        .font(
+                            .system(
+                                size: (size ?? 84) * 0.32,
+                                weight: .semibold
+                            )
+                        )
+                        .foregroundStyle(
+                            KinColors.primary.opacity(0.6)
+                        )
+                    }
+                }
+            }
+            .clipped()
+            .accessibilityHidden(true)
+            .task(
+                id: path
+            ) {
+
+                await loadImage()
+            }
     }
 
 

@@ -859,14 +859,14 @@ private extension HomeView {
         } label: {
 
             HStack(
-                alignment: .top,
-                spacing: KinSpacing.medium
+                spacing: 0
             ) {
 
-                GatheringCardImage(
-                    path: gathering.coverImagePath,
-                    size: 84
-                )
+                // Lets the photo show clearly on the left.
+                Color.clear
+                    .frame(
+                        width: 104
+                    )
 
                 VStack(
                     alignment: .leading,
@@ -953,13 +953,48 @@ private extension HomeView {
                         )
                     }
                 }
+                .padding(
+                    KinSpacing.medium
+                )
             }
-            .padding(
-                KinSpacing.medium
+            .frame(
+                minHeight: 132
             )
-            .background(
-                KinColors.surface
-            )
+            .background {
+
+                // Photo fills the card, then fades into the card color
+                // (light or dark) behind the text.
+                ZStack {
+
+                    GatheringCardImage(
+                        path: gathering.coverImagePath,
+                        size: nil
+                    )
+
+                    LinearGradient(
+                        stops: [
+                            .init(
+                                color: KinColors.surface.opacity(0),
+                                location: 0
+                            ),
+                            .init(
+                                color: KinColors.surface.opacity(0),
+                                location: 0.12
+                            ),
+                            .init(
+                                color: KinColors.surface.opacity(0.85),
+                                location: 0.4
+                            ),
+                            .init(
+                                color: KinColors.surface,
+                                location: 0.55
+                            )
+                        ],
+                        startPoint: .leading,
+                        endPoint: .trailing
+                    )
+                }
+            }
             .clipShape(
                 RoundedRectangle(
                     cornerRadius: KinRadius.large
@@ -1107,7 +1142,32 @@ private extension HomeView {
 
         isLoadingGatherings = false
 
-        if !unreadNotifications.isEmpty && !reduceMotion {
+        ringBellIfUnread()
+    }
+
+    // MARK: - Bell
+
+    /// Rings the bell a few seconds after Home loads, once the screen
+    /// has settled, if anything is still unread.
+    func ringBellIfUnread() {
+
+        guard
+            !unreadNotifications.isEmpty,
+            !reduceMotion
+        else {
+            return
+        }
+
+        Task {
+
+            try? await Task.sleep(
+                for: .seconds(3)
+            )
+
+            guard !unreadNotifications.isEmpty else {
+                return
+            }
+
             bellRings += 1
         }
     }
