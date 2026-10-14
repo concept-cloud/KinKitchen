@@ -167,6 +167,7 @@ struct CookbookLibraryTests {
         #expect(!filter.matches(category: "Dinner", sectionId: nil, isFeatured: false))
         #expect(!filter.matches(category: nil, sectionId: nil, isFeatured: false))
         #expect(filter.categoryTitle == "2 Categories")
+        #expect(filter.activeCount == 1)
     }
 
     @Test func filtersCombine() {
@@ -177,5 +178,6 @@ struct CookbookLibraryTests {
         #expect(filter.matches(category: nil, sectionId: Self.dinner, isFeatured: true))
         #expect(!filter.matches(category: nil, sectionId: Self.dinner, isFeatured: false))
         #expect(!filter.matches(category: nil, sectionId: Self.breakfast, isFeatured: true))
+        #expect(filter.activeCount == 2)
     }
 }

@@ -35,6 +35,7 @@ struct OrganizeCookbookView: View {
     @State private var layout: CookbookLayout
     @State private var selection = Set<UUID>()
     @State private var filter = OrganizeFilter()
+    @State private var searchText = ""
     private let featuredRecipeIds: Set<UUID>
 
     @State private var isSaving = false
@@ -91,7 +92,7 @@ struct OrganizeCookbookView: View {
 
                 switch mode {
                 case .recipes:
-                    filterBar
+                    searchAndFilterBar
                     recipesList
                 case .sections:
                     sectionsList
@@ -183,7 +184,7 @@ struct OrganizeCookbookView: View {
         List(selection: $selection) {
 
             if visibleRows.isEmpty {
-                Text("No recipes match these filters.")
+                Text("No recipes match your search and filters.")
                     .font(KinTypography.body)
                     .foregroundStyle(KinColors.secondaryText)
                     .listRowBackground(Color.clear)
@@ -231,10 +232,17 @@ struct OrganizeCookbookView: View {
         .onChange(of: filter) {
             selection.formIntersection(visibleRecipeIds)
         }
+        .onChange(of: searchText) {
+            selection.formIntersection(visibleRecipeIds)
+        }
+    }
+
+    private var trimmedSearch: String {
+        searchText.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
     private var isFiltering: Bool {
-        filter.isActive
+        filter.isActive || !trimmedSearch.isEmpty
     }
 
     /// All rows, or only matching recipes under their section headings
@@ -245,7 +253,7 @@ struct OrganizeCookbookView: View {
         }
 
         return layout.groups.flatMap { group -> [CookbookLayout.Row] in
-            let matches =
+            let filtered =
                 group.recipeIds.filter { id in
                     filter.matches(
                         category: recipesById[id]?.category,
@@ -254,6 +262,13 @@ struct OrganizeCookbookView: View {
                     )
                 }
 
+            let matches =
+                trimmedSearch.isEmpty
+                    ? filtered
+                    : HomeSearch.filter(filtered, query: trimmedSearch) { id in
+                        [recipesById[id]?.name, recipesById[id]?.category]
+                    }
+
             return matches.isEmpty
                 ? []
                 : [.heading(group.sectionId)] + matches.map(CookbookLayout.Row.recipe)
@@ -261,108 +276,143 @@ struct OrganizeCookbookView: View {
     }
 
 
-    // MARK: - Filter Bar
+    // MARK: - Search & Filter Bar
 
-    private var filterBar: some View {
+    /// Search by name, with the filters in a menu at the end of the
+    /// same bar. The filter icon fills in and shows a count when any
+    /// filter is on.
+    private var searchAndFilterBar: some View {
 
-        ScrollView(.horizontal, showsIndicators: false) {
+        HStack(spacing: KinSpacing.small) {
 
-            HStack(spacing: KinSpacing.small) {
+            Image(systemName: KinIcons.search)
+                .foregroundStyle(KinColors.secondaryText)
+                .accessibilityHidden(true)
 
-                // Section: one at a time.
-                Menu {
-                    Button {
-                        filter.section = nil
-                    } label: {
-                        checkLabel("All Sections", isOn: filter.section == nil)
-                    }
+            TextField("Search recipes", text: $searchText)
+                .font(KinTypography.body)
+                .foregroundStyle(KinColors.primaryText)
+                .submitLabel(.search)
+                .autocorrectionDisabled()
 
-                    Divider()
-
-                    ForEach(layout.groups, id: \.sectionId) { group in
-                        Button {
-                            filter.section = .some(group.sectionId)
-                        } label: {
-                            checkLabel(
-                                name(of: group.sectionId),
-                                isOn: filter.section == .some(group.sectionId)
-                            )
-                        }
-                    }
-                } label: {
-                    filterChip(
-                        filter.section.map { name(of: $0) } ?? "Section",
-                        isOn: filter.section != nil,
-                        showsMenu: true
-                    )
-                }
-
-                // Categories: any of the chosen ones.
-                Menu {
-                    ForEach(RecipeCategory.allCases) { category in
-                        Button {
-                            filter.toggle(category)
-                        } label: {
-                            checkLabel(
-                                category.rawValue,
-                                isOn: filter.categories.contains(category)
-                            )
-                        }
-                    }
-                } label: {
-                    filterChip(
-                        filter.categoryTitle,
-                        isOn: !filter.categories.isEmpty,
-                        showsMenu: true
-                    )
-                }
-
+            if !searchText.isEmpty {
                 Button {
-                    filter.featuredOnly.toggle()
+                    searchText = ""
                 } label: {
-                    filterChip(
-                        "Featured",
-                        isOn: filter.featuredOnly,
-                        showsMenu: false
-                    )
+                    Image(systemName: "xmark.circle.fill")
+                        .foregroundStyle(KinColors.secondaryText)
                 }
                 .buttonStyle(.plain)
-                .accessibilityAddTraits(filter.featuredOnly ? .isSelected : [])
-
-                if filter.isActive {
-                    Button("Clear") {
-                        filter = OrganizeFilter()
-                    }
-                    .font(KinTypography.subheadline)
-                    .foregroundStyle(KinColors.primary)
-                }
+                .accessibilityLabel("Clear search")
             }
-            .padding(.horizontal, KinSpacing.large)
-            .padding(.vertical, KinSpacing.xSmall)
+
+            Divider()
+                .frame(height: 22)
+
+            filterMenu
         }
+        .padding(.leading, KinSpacing.medium)
+        .padding(.trailing, KinSpacing.small)
+        .padding(.vertical, KinSpacing.small)
+        .background(KinColors.surface)
+        .clipShape(Capsule())
+        .padding(.horizontal, KinSpacing.large)
+        .padding(.vertical, KinSpacing.xSmall)
     }
 
-    private func filterChip(
-        _ title: String,
-        isOn: Bool,
-        showsMenu: Bool
-    ) -> some View {
+    private var filterMenu: some View {
 
-        HStack(spacing: KinSpacing.xxSmall) {
-            Text(title)
-                .lineLimit(1)
+        Menu {
+            // Section: one at a time.
+            Menu {
+                Button {
+                    filter.section = nil
+                } label: {
+                    checkLabel("All Sections", isOn: filter.section == nil)
+                }
 
-            if showsMenu {
-                Image(systemName: KinIcons.dropdown)
-                    .font(.system(size: 10, weight: .bold))
+                Divider()
+
+                ForEach(layout.groups, id: \.sectionId) { group in
+                    Button {
+                        filter.section = .some(group.sectionId)
+                    } label: {
+                        checkLabel(
+                            name(of: group.sectionId),
+                            isOn: filter.section == .some(group.sectionId)
+                        )
+                    }
+                }
+            } label: {
+                Label(
+                    filter.section.map { "Section: \(name(of: $0))" } ?? "Section",
+                    systemImage: "folder"
+                )
             }
+
+            // Categories: any of the chosen ones.
+            Menu {
+                ForEach(RecipeCategory.allCases) { category in
+                    Button {
+                        filter.toggle(category)
+                    } label: {
+                        checkLabel(
+                            category.rawValue,
+                            isOn: filter.categories.contains(category)
+                        )
+                    }
+                }
+            } label: {
+                Label(
+                    filter.categories.isEmpty
+                        ? "Category"
+                        : "Category: \(filter.categoryTitle)",
+                    systemImage: "tag"
+                )
+            }
+
+            Toggle(isOn: $filter.featuredOnly) {
+                Label("Featured Only", systemImage: "star")
+            }
+
+            if filter.isActive {
+                Divider()
+
+                Button(role: .destructive) {
+                    filter = OrganizeFilter()
+                } label: {
+                    Label("Clear Filters", systemImage: KinIcons.close)
+                }
+            }
+        } label: {
+            Image(
+                systemName: filter.isActive
+                    ? "line.3.horizontal.decrease.circle.fill"
+                    : "line.3.horizontal.decrease.circle"
+            )
+            .font(.system(size: 22))
+            .foregroundStyle(
+                filter.isActive ? KinColors.primary : KinColors.secondaryText
+            )
+            .overlay(alignment: .topTrailing) {
+                if filter.activeCount > 0 {
+                    Text("\(filter.activeCount)")
+                        .font(.system(size: 10, weight: .bold))
+                        .foregroundStyle(.white)
+                        .frame(minWidth: 15, minHeight: 15)
+                        .background(KinColors.primary)
+                        .clipShape(Circle())
+                        .offset(x: 5, y: -5)
+                }
+            }
+            .frame(width: 36, height: 32)
         }
-        .font(KinTypography.subheadline)
-        .foregroundStyle(isOn ? .white : KinColors.primaryText)
-        .padding(.horizontal, KinSpacing.medium)
-        .padding(.vertical, KinSpacing.small)
-        .background(isOn ? KinColors.primary : KinColors.surface)
-        .clipShape(Capsule())
+        .accessibilityLabel("Filters")
+        .accessibilityValue(
+            filter.activeCount == 0
+                ? "None"
+                : "\(filter.activeCount) on"
+        )
     }
 
     @ViewBuilder
@@ -671,7 +721,14 @@ nonisolated struct OrganizeFilter: Equatable {
     var featuredOnly = false
 
     var isActive: Bool {
-        section != nil || !categories.isEmpty || featuredOnly
+        activeCount > 0
+    }
+
+    /// How many kinds of filter are on (section, category, featured).
+    var activeCount: Int {
+        (section != nil ? 1 : 0)
+            + (categories.isEmpty ? 0 : 1)
+            + (featuredOnly ? 1 : 0)
     }
 
     var categoryTitle: String {
