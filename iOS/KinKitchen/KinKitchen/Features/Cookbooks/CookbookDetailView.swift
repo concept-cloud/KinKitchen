@@ -463,6 +463,29 @@ private extension CookbookDetailView {
                         )
                     }
 
+                    // The open section's own options.
+                    if case .section(let id) = currentPage,
+                       let section = sections.first(where: { $0.id == id }) {
+                        Button {
+                            sectionNameDraft = section.name
+                            sectionToRename = section
+                        } label: {
+                            Label(
+                                "Rename \"\(section.name)\"",
+                                systemImage: "pencil"
+                            )
+                        }
+
+                        Button(role: .destructive) {
+                            sectionToDelete = section
+                        } label: {
+                            Label(
+                                "Delete \"\(section.name)\"",
+                                systemImage: "trash"
+                            )
+                        }
+                    }
+
                     if sections.count > 1 {
                         Button {
                             isShowingReorderSections = true
@@ -867,28 +890,6 @@ private extension CookbookDetailView {
                     .foregroundStyle(KinColors.primary)
                 }
 
-                if let section {
-                    Menu {
-                        Button {
-                            sectionNameDraft = section.name
-                            sectionToRename = section
-                        } label: {
-                            Label("Rename Section", systemImage: "pencil")
-                        }
-
-                        Button(role: .destructive) {
-                            sectionToDelete = section
-                        } label: {
-                            Label("Delete Section", systemImage: "trash")
-                        }
-                    } label: {
-                        Image(systemName: "ellipsis.circle")
-                            .font(.title3)
-                            .foregroundStyle(KinColors.secondaryText)
-                            .frame(width: 44, height: 32)
-                    }
-                    .accessibilityLabel("\(section.name) options")
-                }
             }
             .padding(.horizontal, KinSpacing.large)
 
@@ -898,7 +899,7 @@ private extension CookbookDetailView {
                         .font(KinTypography.footnote)
                         .foregroundStyle(KinColors.secondaryText)
 
-                    Text("Use ⋯ on a recipe and choose Move to Section.")
+                    Text("Press and hold a recipe and choose Move to Section.")
                         .font(KinTypography.caption)
                         .foregroundStyle(KinColors.secondaryText)
                 }
@@ -1343,17 +1344,14 @@ private extension CookbookDetailView {
     func recipeRow(
         _ recipe: Recipe
     ) -> some View {
-        HStack(
-            spacing: KinSpacing.small
-        ) {
-            Button {
-                selectedRecipeId = recipe.id
-            } label: {
-                recipeCard(recipe)
-            }
-            .buttonStyle(.plain)
-
-            Menu {
+        Button {
+            selectedRecipeId = recipe.id
+        } label: {
+            recipeCard(recipe)
+        }
+        .buttonStyle(.plain)
+        // Organizing options: press and hold the card.
+        .contextMenu {
                 // Move to another section (or Unsorted).
                 if !sections.isEmpty {
                     Menu {
@@ -1439,28 +1437,13 @@ private extension CookbookDetailView {
                         systemImage: "minus.circle"
                     )
                 }
-            } label: {
-                Image(
-                    systemName: "ellipsis.circle"
-                )
-                .font(
-                    .system(size: 22)
-                )
-                .foregroundStyle(
-                    KinColors.secondaryText
-                )
-                .frame(
-                    width: 36,
-                    height: 44
-                )
-            }
-            .disabled(
-                isRemovingRecipe || isMovingRecipe
-            )
-            .accessibilityLabel(
-                "\(recipe.name) options"
-            )
         }
+        .disabled(
+            isRemovingRecipe || isMovingRecipe
+        )
+        .accessibilityHint(
+            "Opens the recipe. Press and hold for options."
+        )
     }
 
     // MARK: - Featured
@@ -1576,92 +1559,85 @@ private extension CookbookDetailView {
         }
     }
 
+    /// The recipe photo fills the card and fades into the card color
+    /// behind the name, like the gathering cards on Home.
     func recipeCard(
         _ recipe: Recipe
     ) -> some View {
-        HStack(
-            spacing: KinSpacing.medium
+        let details =
+            HomeView.recipeDetails(
+                minutes: recipe.totalTimeMinutes,
+                formattedTime: recipe.formattedTotalTime,
+                category: recipe.category
+            )
+
+        return VStack(
+            alignment: .leading,
+            spacing: KinSpacing.xxSmall
         ) {
-            ZStack {
-                RoundedRectangle(
-                    cornerRadius: KinRadius.medium
-                )
-                .fill(
-                    KinColors.primary.opacity(0.12)
-                )
+            Text(recipe.name)
+                .font(KinTypography.headline)
+                .foregroundStyle(KinColors.primaryText)
+                .multilineTextAlignment(.leading)
+                .lineLimit(2)
 
-                Image(
-                    systemName: "fork.knife"
-                )
-                .font(
-                    .system(
-                        size: 24,
-                        weight: .semibold
-                    )
-                )
-                .foregroundStyle(
-                    KinColors.primary
-                )
-            }
-            .frame(
-                width: 64,
-                height: 64
-            )
-
-            VStack(
-                alignment: .leading,
-                spacing: KinSpacing.xxSmall
-            ) {
-                Text(recipe.name)
-                    .font(
-                        KinTypography.headline
-                    )
-                    .foregroundStyle(
-                        KinColors.primaryText
-                    )
-                    .multilineTextAlignment(
-                        .leading
-                    )
-                    .lineLimit(2)
-
-                if isFeatured(recipe) {
-                    Label(
-                        "Featured in Preview",
-                        systemImage: "star.fill"
-                    )
-                    .font(KinTypography.caption)
-                    .foregroundStyle(KinColors.warning)
-                }
+            if let details {
+                Text(details)
+                    .font(KinTypography.footnote)
+                    .foregroundStyle(KinColors.secondaryText)
             }
 
-            Spacer()
-
-            Image(
-                systemName: "chevron.right"
-            )
-            .font(
-                .system(
-                    size: 14,
-                    weight: .semibold
+            if isFeatured(recipe) {
+                Label(
+                    "Featured in Preview",
+                    systemImage: "star.fill"
                 )
-            )
-            .foregroundStyle(
-                KinColors.secondaryText
-            )
+                .font(KinTypography.caption)
+                .foregroundStyle(KinColors.warning)
+            }
         }
-        .padding(
-            KinSpacing.medium
-        )
+        .padding(KinSpacing.medium)
         .frame(
             maxWidth: .infinity,
+            minHeight: 88,
             alignment: .leading
         )
-        .background(
-            KinColors.surface
-        )
+        .background {
+            ZStack {
+                KinColors.surface
+
+                KinStorageImage(
+                    bucket: "recipe-photos",
+                    path: recipe.photoPath
+                )
+                // The photo shows on the right and fades out toward
+                // the text.
+                .mask {
+                    LinearGradient(
+                        stops: [
+                            .init(color: .clear, location: 0.3),
+                            .init(color: .black.opacity(0.6), location: 0.62),
+                            .init(color: .black, location: 1)
+                        ],
+                        startPoint: .leading,
+                        endPoint: .trailing
+                    )
+                }
+            }
+        }
         .clipShape(
             RoundedRectangle(
-                cornerRadius: KinRadius.medium
+                cornerRadius: KinRadius.large
+            )
+        )
+        .shadow(
+            color: .black.opacity(0.06),
+            radius: 6,
+            y: 2
+        )
+        .contentShape(
+            RoundedRectangle(
+                cornerRadius: KinRadius.large
             )
         )
     }
