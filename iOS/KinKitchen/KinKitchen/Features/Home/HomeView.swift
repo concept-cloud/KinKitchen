@@ -10,11 +10,13 @@ import SwiftUI
 
 struct HomeView: View {
     @Environment(\.scenePhase) private var scenePhase
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     /// Switches the app's main tab (ContentView owns the tab bar).
     var selectTab: (KinTab) -> Void = { _ in }
 
     @State private var showingAddRecipe = false
+    @State private var showingAddGathering = false
     
     @State private var upcomingGatherings:
     [GatheringListItem] = []
@@ -161,6 +163,22 @@ struct HomeView: View {
             ) {
 
                 NotificationsView()
+            }
+            // MARK: - Add Gathering Destination
+
+            .navigationDestination(
+                isPresented: $showingAddGathering
+            ) {
+
+                AddGatheringView()
+            }
+            // Show a just-created gathering when coming back.
+            .onChange(of: showingAddGathering) {
+                if !showingAddGathering {
+                    Task {
+                        await loadHome()
+                    }
+                }
             }
             // MARK: - Add Recipe Destination
 
@@ -362,44 +380,68 @@ private extension HomeView {
     }
 
 
+    /// Four shortcuts; wraps to two rows at accessibility text sizes.
     var quickActionsSection: some View {
 
-        HStack(
+        let columns =
+            Array(
+                repeating:
+                    GridItem(
+                        .flexible(),
+                        spacing: KinSpacing.medium,
+                        alignment: .top
+                    ),
+                count:
+                    dynamicTypeSize.isAccessibilitySize
+                        ? 2
+                        : 4
+            )
+
+        return LazyVGrid(
+            columns: columns,
             spacing: KinSpacing.medium
         ) {
 
-            // Add Recipe
-
-            KinIconButton(
-                icon: KinIcons.add
+            KinQuickActionTile(
+                title: "New Recipe",
+                icon: "frying.pan.fill",
+                tint: KinColors.primary,
+                hint: "Opens a new recipe"
             ) {
 
                 showingAddRecipe = true
             }
 
+            KinQuickActionTile(
+                title: "New Gathering",
+                icon: KinIcons.gatherings,
+                tint: KinColors.success,
+                hint: "Plans a new gathering"
+            ) {
 
-            // Recipes
+                showingAddGathering = true
+            }
 
-            KinIconButton(
-                icon: KinIcons.recipes
+            KinQuickActionTile(
+                title: "My Cookbooks",
+                icon: "book.fill",
+                tint: .orange,
+                hint: "Opens the Cookbooks tab"
+            ) {
+
+                selectTab(.cookbooks)
+            }
+
+            KinQuickActionTile(
+                title: "Recipes",
+                icon: KinIcons.recipes,
+                tint: .blue,
+                hint: "Opens the Recipes tab"
             ) {
 
                 selectTab(.recipes)
             }
-
-
-            // Gatherings
-
-            KinIconButton(
-                icon: KinIcons.gatherings
-            ) {
-
-                selectTab(.gatherings)
-            }
         }
-        .frame(
-            maxWidth: .infinity
-        )
     }
 
 
