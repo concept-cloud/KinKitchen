@@ -1052,9 +1052,15 @@ private struct CookbookRecipePhoto: View {
                 .fill(KinColors.primary.opacity(0.12))
 
             if let photo {
-                Image(uiImage: photo)
-                    .resizable()
-                    .scaledToFill()
+                // Color.clear takes the space offered; the photo fills
+                // it without widening the page.
+                Color.clear
+                    .overlay {
+                        Image(uiImage: photo)
+                            .resizable()
+                            .scaledToFill()
+                    }
+                    .clipped()
             } else {
                 Image(systemName: "fork.knife")
                     .font(.system(size: 22, weight: .semibold))
