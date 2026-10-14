@@ -1,7 +1,17 @@
 {
   "images" : [
     {
-      "filename" : "KinKitchenHomeHero.png",
+      "filename" : "HomeHeroLight.png",
+      "idiom" : "universal"
+    },
+    {
+      "appearances" : [
+        {
+          "appearance" : "luminosity",
+          "value" : "dark"
+        }
+      ],
+      "filename" : "HomeHeroDark.png",
       "idiom" : "universal"
     }
   ],

@@ -19,6 +19,7 @@ struct HomeView: View {
     @State private var showingAddRecipe = false
     @State private var showingAddGathering = false
     @State private var showingSearch = false
+    @State private var scrolledPastHero = false
     @State private var comingSoon: ComingSoonFeature?
     @State private var bellRings = 0
     @State private var recentRecipes: [Recipe] = []
@@ -144,16 +145,31 @@ struct HomeView: View {
             .background(
                 homeBackground
             )
-            // Photo runs up under the status bar. A clear bar with a
-            // dark scheme keeps the status bar light over it, and holds
-            // the bell.
+            // Photo runs up under the status bar. Once it scrolls away,
+            // the bar gets the page color so content never runs under
+            // the clock and bell.
+            .onScrollGeometryChange(
+                for: Bool.self
+            ) { geometry in
+                geometry.contentOffset.y
+                    + geometry.contentInsets.top
+                    > geometry.containerSize.width * 1.0
+            } action: { _, isPast in
+                withAnimation(.easeInOut(duration: 0.2)) {
+                    scrolledPastHero = isPast
+                }
+            }
             .ignoresSafeArea(
                 edges: .top
             )
-            // No bar background or scroll-edge haze over the photo,
-            // so its top (light or dark) shows through untinted.
+            // Over the photo: no bar background or scroll-edge haze, so
+            // its top shows through untinted. Past it: the page color.
+            .toolbarBackground(
+                KinColors.background,
+                for: .navigationBar
+            )
             .toolbarBackgroundVisibility(
-                .hidden,
+                scrolledPastHero ? .visible : .hidden,
                 for: .navigationBar
             )
             .scrollEdgeEffectHidden(
@@ -354,20 +370,11 @@ private enum ComingSoonFeature {
 private extension HomeView {
 
     /// Warm wash behind the top of Home, fading into the app background.
+    /// Plain page color; the hero photo provides the warmth at the top.
     var homeBackground: some View {
 
-        LinearGradient(
-            colors: [
-                KinColors.accent.opacity(0.22),
-                KinColors.background
-            ],
-            startPoint: .top,
-            endPoint: .center
-        )
-        .background(
-            KinColors.background
-        )
-        .ignoresSafeArea()
+        KinColors.background
+            .ignoresSafeArea()
     }
 
 
@@ -1270,6 +1277,8 @@ private extension HomeView {
     }
 
 
+    static var recipeCardWidth: CGFloat { 136 }
+
     func recipeTile(
         _ recipe: Recipe
     ) -> some View {
@@ -1287,9 +1296,10 @@ private extension HomeView {
 
         } label: {
 
+            // Photo and details together on one card.
             VStack(
                 alignment: .leading,
-                spacing: KinSpacing.xSmall
+                spacing: 0
             ) {
 
                 KinStorageImage(
@@ -1297,37 +1307,58 @@ private extension HomeView {
                     path: recipe.photoPath
                 )
                 .frame(
-                    width: 124,
-                    height: 124
-                )
-                .clipShape(
-                    RoundedRectangle(
-                        cornerRadius: KinRadius.medium
-                    )
+                    width: Self.recipeCardWidth,
+                    height: 112
                 )
 
-                Text(recipe.name)
-                    .font(KinTypography.footnote)
-                    .fontWeight(.semibold)
-                    .foregroundStyle(KinColors.primaryText)
-                    .lineLimit(
-                        2,
-                        reservesSpace: true
-                    )
+                VStack(
+                    alignment: .leading,
+                    spacing: KinSpacing.xxSmall
+                ) {
 
-                if let details {
+                    Text(recipe.name)
+                        .font(KinTypography.footnote)
+                        .fontWeight(.semibold)
+                        .foregroundStyle(KinColors.primaryText)
+                        .lineLimit(2)
+                        .fixedSize(
+                            horizontal: false,
+                            vertical: true
+                        )
 
-                    Text(details)
+                    Text(details ?? " ")
                         .font(KinTypography.caption2)
                         .foregroundStyle(KinColors.secondaryText)
                         .lineLimit(1)
                 }
+                .padding(KinSpacing.small)
+                .frame(
+                    width: Self.recipeCardWidth,
+                    alignment: .topLeading
+                )
+
+                Spacer(minLength: 0)
             }
             .frame(
-                width: 124,
-                alignment: .leading
+                width: Self.recipeCardWidth,
+                height: 182
             )
-            .contentShape(Rectangle())
+            .background(KinColors.surface)
+            .clipShape(
+                RoundedRectangle(
+                    cornerRadius: KinRadius.large
+                )
+            )
+            .shadow(
+                color: .black.opacity(0.06),
+                radius: 6,
+                y: 2
+            )
+            .contentShape(
+                RoundedRectangle(
+                    cornerRadius: KinRadius.large
+                )
+            )
         }
         .buttonStyle(.plain)
         .accessibilityElement(children: .ignore)
