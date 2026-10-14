@@ -862,12 +862,6 @@ private extension HomeView {
                 spacing: 0
             ) {
 
-                // Lets the photo show clearly on the left.
-                Color.clear
-                    .frame(
-                        width: 80
-                    )
-
                 VStack(
                     alignment: .leading,
                     spacing: KinSpacing.xSmall
@@ -956,15 +950,21 @@ private extension HomeView {
                 .padding(
                     KinSpacing.medium
                 )
+                // A soft halo in the card color keeps text crisp
+                // where it runs over the photo.
+                .shadow(
+                    color: KinColors.surface,
+                    radius: 3
+                )
             }
             .frame(
                 minHeight: 132
             )
             .background {
 
-                // Photo fills the card and stays visible all the way
-                // across; the card color (light or dark) fades in
-                // partway behind the text so it stays readable.
+                // Photo fills the card. The card color (light or dark)
+                // sits behind the text on the left and fades out to
+                // the right so the photo shows through.
                 ZStack {
 
                     GatheringCardImage(
@@ -975,19 +975,19 @@ private extension HomeView {
                     LinearGradient(
                         stops: [
                             .init(
-                                color: KinColors.surface.opacity(0),
+                                color: KinColors.surface.opacity(0.92),
                                 location: 0
                             ),
                             .init(
-                                color: KinColors.surface.opacity(0.15),
-                                location: 0.25
+                                color: KinColors.surface.opacity(0.82),
+                                location: 0.45
                             ),
                             .init(
-                                color: KinColors.surface.opacity(0.6),
-                                location: 0.55
+                                color: KinColors.surface.opacity(0.35),
+                                location: 0.75
                             ),
                             .init(
-                                color: KinColors.surface.opacity(0.75),
+                                color: KinColors.surface.opacity(0.1),
                                 location: 1
                             )
                         ],
