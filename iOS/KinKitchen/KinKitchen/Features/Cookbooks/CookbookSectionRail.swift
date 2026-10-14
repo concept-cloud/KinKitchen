@@ -101,7 +101,7 @@ struct CookbookSectionRail: View {
         .accessibilityValue(
             tabs.isEmpty
                 ? ""
-                : "\(tabs[selectedIndex].title), \(selectedIndex + 1) of \(tabs.count)"
+                : "\(tabs[selectedIndex].title), \(KinCookbookCoverCard.recipeCountText(tabs[selectedIndex].recipeCount) ?? ""), section \(selectedIndex + 1) of \(tabs.count)"
         )
         .accessibilityHint("Swipe up or down to change section")
         .accessibilityAdjustableAction { direction in
@@ -182,6 +182,25 @@ struct CookbookSectionRail: View {
                 bottomLeadingRadius: KinRadius.medium
             )
         )
+        // Recipe count, like a small tag on the divider.
+        .overlay(
+            alignment: .topLeading
+        ) {
+            Text("\(tab.recipeCount)")
+                .font(
+                    .system(
+                        size: 10,
+                        weight: .bold
+                    )
+                    .monospacedDigit()
+                )
+                .foregroundStyle(color)
+                .padding(.horizontal, 4)
+                .frame(minWidth: 16, minHeight: 16)
+                .background(.white)
+                .clipShape(Capsule())
+                .padding(3)
+        }
         .overlay(
             alignment: .leading
         ) {
