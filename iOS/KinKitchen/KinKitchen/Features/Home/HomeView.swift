@@ -371,6 +371,10 @@ private extension HomeView {
     }
 
 
+    /// Where the table begins in the hero photos: the fade into the
+    /// page starts here and the search bar sits on it.
+    private static let heroFadeStart: CGFloat = 0.74
+
     /// The Kin Kitchen hero photo (light and dark versions in the
     /// HomeHero asset), full width from the top of the screen with
     /// nothing cropped, fading into the page at the bottom.
@@ -388,11 +392,11 @@ private extension HomeView {
                     stops: [
                         .init(
                             color: KinColors.background.opacity(0),
-                            location: 0.62
+                            location: Self.heroFadeStart
                         ),
                         .init(
-                            color: KinColors.background.opacity(0.6),
-                            location: 0.85
+                            color: KinColors.background.opacity(0.75),
+                            location: 0.87
                         ),
                         .init(
                             color: KinColors.background,
@@ -406,20 +410,22 @@ private extension HomeView {
             .accessibilityElement()
             .accessibilityLabel("Kin Kitchen")
             .accessibilityAddTraits(.isHeader)
-            // Search sits on the table, above where the photo fades out.
-            .overlay(
-                alignment: .bottom
-            ) {
+            // Search sits at the top of the fade, where the table
+            // begins, and the fade runs on below it into the page.
+            .overlay {
 
-                searchEntry
-                    .padding(
-                        .horizontal,
-                        KinSpacing.large
-                    )
-                    .padding(
-                        .bottom,
-                        KinSpacing.large
-                    )
+                GeometryReader { proxy in
+
+                    searchEntry
+                        .padding(
+                            .horizontal,
+                            KinSpacing.large
+                        )
+                        .padding(
+                            .top,
+                            proxy.size.height * Self.heroFadeStart
+                        )
+                }
             }
     }
 
