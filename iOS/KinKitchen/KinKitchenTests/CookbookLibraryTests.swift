@@ -206,4 +206,22 @@ struct CookbookLibraryTests {
         #expect(only.next == nil)
         #expect(only.text == "1 of 1")
     }
+
+    // MARK: - C2.4 Reading page
+
+    @Test func stepsAreOnePerLineWithoutTypedNumbers() {
+        let steps = CookbookReadingPage.steps(from: """
+        1. Preheat the oven.
+
+        2) Mix the flour and sugar.
+          Bake 20 minutes
+        """)
+
+        #expect(steps == ["Preheat the oven.", "Mix the flour and sugar.", "Bake 20 minutes"])
+    }
+
+    @Test func noInstructionsMeansNoSteps() {
+        #expect(CookbookReadingPage.steps(from: nil).isEmpty)
+        #expect(CookbookReadingPage.steps(from: "  \n ").isEmpty)
+    }
 }

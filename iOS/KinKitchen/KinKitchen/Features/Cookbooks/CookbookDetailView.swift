@@ -235,10 +235,18 @@ struct CookbookDetailView: View {
                 // Turn pages through the open section's recipes,
                 // in saved order, starting with the one tapped.
                 CookbookRecipePager(
-                    sectionTitle: title(for: currentPage),
-                    recipeIds: recipes(on: currentPage).map(\.id),
-                    startingAt: selectedRecipeId,
-                    onClose: {
+                    chapters: pages.map { page in
+                        CookbookRecipePager.Chapter(
+                            id: page,
+                            title: title(for: page),
+                            recipeIds: recipes(on: page).map(\.id)
+                        )
+                    },
+                    startingIn: currentPage,
+                    at: selectedRecipeId,
+                    onClose: { page in
+                        // Come back to the section you were reading.
+                        selectedPage = page
                         self.selectedRecipeId = nil
                     }
                 )

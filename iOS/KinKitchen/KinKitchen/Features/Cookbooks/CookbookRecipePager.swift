@@ -7,67 +7,155 @@
 
 import SwiftUI
 
-/// Recipes in one cookbook section, one per page, in saved order.
-/// Swipe left or right to turn pages (or use the arrows); scroll up and
-/// down within a recipe as usual. Pages stop at the section's first
-/// and last recipe.
+/// Reading a cookbook: one recipe per page, in saved order.
+///
+/// - Swipe left or right (or use the arrows) to turn pages within the
+///   section; pages stop at its first and last recipe.
+/// - The section tabs stay on the right edge to jump to another
+///   section while reading.
+/// - Scroll up and down within a recipe as usual.
 struct CookbookRecipePager: View {
 
-    let sectionTitle: String
-    let recipeIds: [UUID]
-    let onClose: () -> Void
+    struct Chapter: Identifiable, Equatable {
+        let id: CookbookPage
+        let title: String
+        let recipeIds: [UUID]
+    }
 
+    let chapters: [Chapter]
+    /// Hands back the section being read so the cookbook can open on it.
+    let onClose: (CookbookPage) -> Void
+
+    @State private var chapterId: CookbookPage
     @State private var currentId: UUID
+    @State private var fullDetailsId: UUID?
 
     init(
-        sectionTitle: String,
-        recipeIds: [UUID],
-        startingAt startId: UUID,
-        onClose: @escaping () -> Void
+        chapters: [Chapter],
+        startingIn chapterId: CookbookPage,
+        at recipeId: UUID,
+        onClose: @escaping (CookbookPage) -> Void
     ) {
-        self.sectionTitle = sectionTitle
         // Always include the recipe that was tapped.
-        self.recipeIds =
-            recipeIds.contains(startId) ? recipeIds : [startId]
+        let found =
+            chapters.contains {
+                $0.id == chapterId && $0.recipeIds.contains(recipeId)
+            }
+
+        self.chapters =
+            found
+                ? chapters
+                : [Chapter(id: chapterId, title: "Recipe", recipeIds: [recipeId])]
+
         self.onClose = onClose
-        _currentId = State(initialValue: startId)
+        _chapterId = State(initialValue: chapterId)
+        _currentId = State(initialValue: recipeId)
+    }
+
+    private var chapter: Chapter {
+        chapters.first { $0.id == chapterId } ?? chapters[0]
     }
 
     private var position: RecipePagePosition {
         RecipePagePosition(
-            ids: recipeIds,
+            ids: chapter.recipeIds,
             current: currentId
         )
     }
 
+    private var showsRail: Bool {
+        chapters.count > 1
+    }
+
     var body: some View {
 
+        Group {
+            if chapter.recipeIds.isEmpty {
+                emptyChapter
+            } else {
+                pages
+            }
+        }
+        .background(KinColors.background)
+        .overlay(alignment: .topTrailing) {
+            if showsRail {
+                CookbookSectionRail(
+                    tabs: chapters.map {
+                        CookbookSectionRail.Tab(
+                            id: $0.id,
+                            title: $0.title,
+                            recipeCount: $0.recipeIds.count
+                        )
+                    },
+                    selectedId: chapterId,
+                    onSelect: open
+                )
+                .padding(.top, 220)
+                .padding(.bottom, 90)
+                .ignoresSafeArea(edges: .trailing)
+            }
+        }
+        .safeAreaInset(edge: .bottom) {
+            if chapter.recipeIds.count > 1 {
+                pageBar
+            }
+        }
+        .sensoryFeedback(.selection, trigger: currentId)
+        .navigationBarHidden(true)
+        .navigationDestination(item: $fullDetailsId) { id in
+            RecipeDetailView(
+                recipeId: id,
+                onBack: { fullDetailsId = nil }
+            )
+        }
+    }
+
+    private var pages: some View {
+
         TabView(selection: $currentId) {
-
-            ForEach(recipeIds, id: \.self) { id in
-
-                RecipeDetailView(
+            ForEach(chapter.recipeIds, id: \.self) { id in
+                CookbookReadingPage(
                     recipeId: id,
-                    onBack: onClose
+                    trailingInset: showsRail ? CookbookSectionRail.width : 0,
+                    onBack: { onClose(chapterId) },
+                    onFullDetails: { fullDetailsId = id }
                 )
                 .tag(id)
             }
         }
-        .tabViewStyle(
-            .page(indexDisplayMode: .never)
-        )
-        .background(KinColors.background)
-        .ignoresSafeArea(edges: .bottom)
-        .safeAreaInset(edge: .bottom) {
-            if recipeIds.count > 1 {
-                pageBar
+        .tabViewStyle(.page(indexDisplayMode: .never))
+        .ignoresSafeArea(edges: .top)
+        // A new section starts a fresh set of pages.
+        .id(chapterId)
+    }
+
+    private var emptyChapter: some View {
+        VStack(spacing: KinSpacing.medium) {
+            Image(systemName: KinIcons.cookbooks)
+                .font(.system(size: 36))
+                .foregroundStyle(KinColors.secondaryText)
+            Text("No recipes in \(chapter.title) yet.")
+                .font(KinTypography.body)
+                .foregroundStyle(KinColors.secondaryText)
+            Button("Back to Cookbook") {
+                onClose(chapterId)
             }
+            .font(KinTypography.headline)
+            .foregroundStyle(KinColors.primary)
         }
-        .sensoryFeedback(
-            .selection,
-            trigger: currentId
-        )
-        .navigationBarHidden(true)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .padding(.trailing, showsRail ? CookbookSectionRail.width : 0)
+    }
+
+    /// Jumps to a section's first recipe.
+    private func open(_ id: CookbookPage) {
+        guard let target = chapters.first(where: { $0.id == id }) else {
+            return
+        }
+        chapterId = id
+        if let first = target.recipeIds.first {
+            currentId = first
+        }
     }
 
 
@@ -86,8 +174,7 @@ struct CookbookRecipePager: View {
             )
 
             VStack(spacing: KinSpacing.xxSmall) {
-
-                Text(sectionTitle)
+                Text(chapter.title)
                     .font(KinTypography.caption)
                     .foregroundStyle(KinColors.secondaryText)
                     .lineLimit(1)
