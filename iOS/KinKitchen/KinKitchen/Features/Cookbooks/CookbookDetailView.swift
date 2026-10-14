@@ -32,7 +32,6 @@ struct CookbookDetailView: View {
     @State private var pendingEditAction: EditCookbookAction?
     @State private var isShowingPreview = false
     /// The page currently in drag-to-reorder mode, if any.
-    @State private var editingPage: CookbookPage?
 
     @State private var isShowingNewSection = false
     @State private var sectionNameDraft = ""
@@ -189,9 +188,11 @@ struct CookbookDetailView: View {
                 }
             }
         ) {
-            EditCookbookSectionsView(
+            OrganizeCookbookView(
                 cookbookId: cookbookId,
-                sections: sections
+                sections: sections,
+                relationships: relationships,
+                recipesById: recipesById
             )
         }
         .alert(
@@ -428,7 +429,7 @@ private extension CookbookDetailView {
                         isShowingEditSections = true
                     } label: {
                         Label(
-                            "Edit Sections",
+                            "Organize Cookbook",
                             systemImage: "folder"
                         )
                     }
@@ -737,10 +738,6 @@ private extension CookbookDetailView {
                 withAnimation(.easeInOut(duration: 0.25)) {
                     selectedPage = newPage
                 }
-                // Leaving a page ends its reordering.
-                if editingPage != newPage {
-                    editingPage = nil
-                }
             }
         )
     }
@@ -776,9 +773,6 @@ private extension CookbookDetailView {
         let pageRecipes =
             recipes(on: page)
 
-        let isEditing =
-            editingPage == page
-
         let section: CookbookSection? = {
             if case .section(let id) = page {
                 return sections.first { $0.id == id }
@@ -798,16 +792,6 @@ private extension CookbookDetailView {
                     count: pageRecipes.count
                 )
 
-                if pageRecipes.count > 1 {
-                    Button(isEditing ? "Done" : "Reorder") {
-                        withAnimation {
-                            editingPage =
-                                isEditing ? nil : page
-                        }
-                    }
-                    .font(KinTypography.callout)
-                    .foregroundStyle(KinColors.primary)
-                }
 
             }
             .padding(.horizontal, KinSpacing.large)
@@ -818,7 +802,7 @@ private extension CookbookDetailView {
                         .font(KinTypography.footnote)
                         .foregroundStyle(KinColors.secondaryText)
 
-                    Text("Press and hold a recipe and choose Move to Section.")
+                    Text("Use ⋯ → Organize Cookbook, or press and hold a recipe, to move recipes here.")
                         .font(KinTypography.caption)
                         .foregroundStyle(KinColors.secondaryText)
                 }
@@ -833,20 +817,8 @@ private extension CookbookDetailView {
                 .padding(.horizontal, KinSpacing.large)
             } else {
                 VStack(spacing: KinSpacing.small) {
-                    ForEach(
-                        Array(pageRecipes.enumerated()),
-                        id: \.element.id
-                    ) { index, recipe in
-                        if isEditing {
-                            reorderRow(
-                                recipe,
-                                at: index,
-                                of: pageRecipes.count,
-                                on: page
-                            )
-                        } else {
-                            recipeRow(recipe)
-                        }
+                    ForEach(pageRecipes) { recipe in
+                        recipeRow(recipe)
                     }
                 }
                 .padding(.horizontal, KinSpacing.large)
@@ -858,163 +830,6 @@ private extension CookbookDetailView {
             minHeight: 240,
             alignment: .top
         )
-    }
-
-    /// A recipe in Reorder mode: the card plus up/down buttons.
-    func reorderRow(
-        _ recipe: Recipe,
-        at index: Int,
-        of count: Int,
-        on page: CookbookPage
-    ) -> some View {
-        HStack(spacing: KinSpacing.small) {
-            recipeCard(recipe)
-
-            VStack(spacing: KinSpacing.xSmall) {
-                reorderButton(
-                    systemImage: "chevron.up",
-                    label: "Move \(recipe.name) up",
-                    isDisabled: index == 0
-                ) {
-                    moveRecipes(
-                        on: page,
-                        from: [index],
-                        to: index - 1
-                    )
-                }
-
-                reorderButton(
-                    systemImage: "chevron.down",
-                    label: "Move \(recipe.name) down",
-                    isDisabled: index == count - 1
-                ) {
-                    // List-move convention: drop after the next item.
-                    moveRecipes(
-                        on: page,
-                        from: [index],
-                        to: index + 2
-                    )
-                }
-            }
-        }
-    }
-
-    func reorderButton(
-        systemImage: String,
-        label: String,
-        isDisabled: Bool,
-        action: @escaping () -> Void
-    ) -> some View {
-        Button {
-            withAnimation(.easeInOut(duration: 0.2)) {
-                action()
-            }
-        } label: {
-            Image(systemName: systemImage)
-                .font(.system(size: 14, weight: .bold))
-                .foregroundStyle(
-                    isDisabled
-                        ? KinColors.secondaryText.opacity(0.4)
-                        : KinColors.primary
-                )
-                .frame(width: 36, height: 30)
-                .background(
-                    KinColors.primary.opacity(
-                        isDisabled ? 0.04 : 0.12
-                    )
-                )
-                .clipShape(
-                    RoundedRectangle(
-                        cornerRadius: KinRadius.medium
-                    )
-                )
-        }
-        .buttonStyle(.plain)
-        .disabled(isDisabled)
-        .accessibilityLabel(label)
-    }
-
-    // MARK: - Reorder Recipes
-
-    /// Shows the new order right away, then saves it. If saving
-    /// fails, reloads the stored order and says so.
-    func moveRecipes(
-        on page: CookbookPage,
-        from offsets: IndexSet,
-        to destination: Int
-    ) {
-        let newOrder =
-            CookbookService.reordered(
-                recipes(on: page).map(\.id),
-                moving: offsets,
-                to: destination
-            )
-
-        let sectionId: UUID? = {
-            if case .section(let id) = page {
-                return id
-            }
-            return nil
-        }()
-
-        applyLocalOrder(
-            newOrder,
-            in: sectionId
-        )
-
-        Task {
-            do {
-                try await CookbookService.reorderRecipes(
-                    newOrder,
-                    in: sectionId,
-                    cookbookId: cookbookId
-                )
-            } catch {
-                sectionErrorMessage =
-                    "The new order couldn't be saved. Please try again."
-
-                print(
-                    "COOKBOOK REORDER ERROR:",
-                    error.localizedDescription
-                )
-
-                await loadCookbook(
-                    showLoadingState: false
-                )
-            }
-        }
-    }
-
-    func applyLocalOrder(
-        _ orderedRecipeIds: [UUID],
-        in sectionId: UUID?
-    ) {
-        relationships =
-            relationships
-                .map { relationship in
-                    guard
-                        let position =
-                            orderedRecipeIds.firstIndex(
-                                of: relationship.recipeId
-                            )
-                    else {
-                        return relationship
-                    }
-
-                    return CookbookRecipe(
-                        cookbookId: relationship.cookbookId,
-                        recipeId: relationship.recipeId,
-                        sectionId: sectionId,
-                        sortOrder: position,
-                        isFeatured: relationship.isFeatured
-                    )
-                }
-                .sorted(by: CookbookRecipe.displayOrder)
-
-        recipes =
-            relationships.compactMap {
-                recipesById[$0.recipeId]
-            }
     }
 
     // MARK: - Sections
