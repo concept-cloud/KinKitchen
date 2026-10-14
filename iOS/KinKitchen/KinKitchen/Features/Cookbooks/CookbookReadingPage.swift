@@ -104,7 +104,7 @@ struct CookbookReadingPage: View {
                 .frame(width: 44, height: 44)
                 .background(KinColors.surface)
                 .clipShape(Circle())
-                .shadow(color: .black.opacity(0.12), radius: 4, y: 1)
+                .kinFloatingShadow()
         }
         .buttonStyle(.plain)
         .padding(.leading, KinSpacing.large)
@@ -187,7 +187,7 @@ struct CookbookReadingPage: View {
                 topTrailingRadius: KinRadius.xLarge
             )
             .fill(Self.paper)
-            .shadow(color: .black.opacity(0.08), radius: 10, y: -2)
+            .kinSheetShadow()
         )
         .offset(y: -28)
     }

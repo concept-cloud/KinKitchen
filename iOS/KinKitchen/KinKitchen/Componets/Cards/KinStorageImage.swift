@@ -33,28 +33,7 @@ struct KinStorageImage: View {
 
                 } else {
 
-                    ZStack {
-
-                        LinearGradient(
-                            colors: [
-                                KinColors.accent.opacity(0.35),
-                                KinColors.primary.opacity(0.25)
-                            ],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        )
-
-                        Image(systemName: placeholderIcon)
-                            .font(
-                                .system(
-                                    size: 26,
-                                    weight: .semibold
-                                )
-                            )
-                            .foregroundStyle(
-                                KinColors.primary.opacity(0.6)
-                            )
-                    }
+                    KinPhotoPlaceholder(icon: placeholderIcon)
                 }
             }
             .clipped()

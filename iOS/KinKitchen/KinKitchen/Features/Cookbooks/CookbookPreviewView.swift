@@ -453,7 +453,7 @@ private extension CookbookPreviewView {
                     .foregroundStyle(.white.opacity(0.75))
                     .padding(.top, KinSpacing.medium)
             }
-            .shadow(color: .black.opacity(0.4), radius: 4, y: 1)
+            .kinTextOnPhoto()
             .padding(.leading, KinSpacing.xLarge + 22)
             .padding(.trailing, KinSpacing.xLarge)
             .padding(.bottom, KinSpacing.xxLarge)
@@ -852,7 +852,7 @@ private struct CookbookRecipePage: View {
                         topTrailingRadius: KinRadius.xLarge
                     )
                     .fill(CookbookReadingPage.paper)
-                    .shadow(color: .black.opacity(0.08), radius: 10, y: -2)
+                    .kinSheetShadow()
                 )
                 .offset(y: -28)
             }
@@ -1062,9 +1062,10 @@ private struct CookbookRecipePhoto: View {
                     }
                     .clipped()
             } else {
-                Image(systemName: "fork.knife")
-                    .font(.system(size: 22, weight: .semibold))
-                    .foregroundStyle(KinColors.primary)
+                KinPhotoPlaceholder(
+                    icon: "fork.knife",
+                    iconSize: size == nil ? 40 : 22
+                )
             }
         }
         .frame(width: size, height: size ?? 280)

@@ -61,11 +61,7 @@ struct KinCookbookCoverCard: View {
                         .foregroundStyle(.white.opacity(0.9))
                 }
             }
-            .shadow(
-                color: .black.opacity(0.5),
-                radius: 4,
-                y: 1
-            )
+            .kinTextOnPhoto()
             .padding(KinSpacing.large)
         }
         .overlay(
@@ -103,11 +99,7 @@ struct KinCookbookCoverCard: View {
                 cornerRadius: KinRadius.large
             )
         )
-        .shadow(
-            color: .black.opacity(0.08),
-            radius: 6,
-            y: 2
-        )
+        .kinCardShadow()
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(
             [

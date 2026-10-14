@@ -167,7 +167,7 @@ extension CookbookRecipe {
     /// Saved position first. Recipes added before ordering existed
     /// all share position 0, so ties fall back to the recipe ID to
     /// keep the order stable between loads.
-    static func displayOrder(
+    nonisolated static func displayOrder(
         _ first: CookbookRecipe,
         _ second: CookbookRecipe
     ) -> Bool {

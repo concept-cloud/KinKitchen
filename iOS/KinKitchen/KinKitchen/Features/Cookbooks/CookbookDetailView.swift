@@ -576,7 +576,7 @@ private extension CookbookDetailView {
                 }
             }
             .foregroundStyle(.white)
-            .shadow(color: .black.opacity(0.5), radius: 4, y: 1)
+            .kinTextOnPhoto()
             .padding(.leading, KinSpacing.large)
             .padding(
                 .trailing,
@@ -1033,7 +1033,7 @@ private extension CookbookDetailView {
         } label: {
             recipeCard(recipe)
         }
-        .buttonStyle(.plain)
+        .buttonStyle(.kinPressable)
         // Organizing options: press and hold the card.
         .contextMenu {
                 // Move to another section (or Unsorted).
@@ -1314,11 +1314,7 @@ private extension CookbookDetailView {
                 cornerRadius: KinRadius.large
             )
         )
-        .shadow(
-            color: .black.opacity(0.06),
-            radius: 6,
-            y: 2
-        )
+        .kinCardShadow()
         .contentShape(
             RoundedRectangle(
                 cornerRadius: KinRadius.large
@@ -1332,26 +1328,7 @@ private extension CookbookDetailView {
 private extension CookbookDetailView {
 
     var loadingState: some View {
-        VStack(
-            spacing: KinSpacing.medium
-        ) {
-            ProgressView()
-                .tint(
-                    KinColors.primary
-                )
-
-            Text("Loading cookbook...")
-                .font(
-                    KinTypography.body
-                )
-                .foregroundStyle(
-                    KinColors.secondaryText
-                )
-        }
-        .frame(
-            maxWidth: .infinity,
-            maxHeight: .infinity
-        )
+        KinLoadingView(message: "Loading cookbook...")
     }
 }
 

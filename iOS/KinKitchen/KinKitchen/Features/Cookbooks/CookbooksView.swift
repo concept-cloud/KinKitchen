@@ -169,7 +169,7 @@ private extension CookbooksView {
                 badge: badge(for: cookbook)
             )
         }
-        .buttonStyle(.plain)
+        .buttonStyle(.kinPressable)
         .accessibilityHint("Opens the cookbook")
     }
 
@@ -194,22 +194,7 @@ private extension CookbooksView {
 private extension CookbooksView {
 
     var loadingState: some View {
-        VStack(
-            spacing: KinSpacing.medium
-        ) {
-            ProgressView()
-                .tint(KinColors.primary)
-
-            Text("Loading cookbooks...")
-                .font(KinTypography.body)
-                .foregroundStyle(
-                    KinColors.secondaryText
-                )
-        }
-        .frame(
-            maxWidth: .infinity,
-            maxHeight: .infinity
-        )
+        KinLoadingView(message: "Loading cookbooks...")
     }
 }
 
@@ -218,82 +203,15 @@ private extension CookbooksView {
 private extension CookbooksView {
 
     var emptyState: some View {
-        VStack(
-            spacing: KinSpacing.medium
+        KinEmptyState(
+            icon: KinIcons.cookbooks,
+            title: "No Cookbooks Yet",
+            message: "Gather your family's favorite recipes into a cookbook, organized your way.",
+            actionTitle: "Create a Cookbook"
         ) {
-            Spacer()
-
-            ZStack {
-                Circle()
-                    .fill(
-                        KinColors.primary.opacity(0.12)
-                    )
-                    .frame(
-                        width: 96,
-                        height: 96
-                    )
-
-                Image(
-                    systemName: KinIcons.cookbooks
-                )
-                .font(
-                    .system(
-                        size: 42
-                    )
-                )
-                .foregroundStyle(
-                    KinColors.primary
-                )
-            }
-
-            Text("No Cookbooks Yet")
-                .font(KinTypography.title)
-                .foregroundStyle(
-                    KinColors.primaryText
-                )
-
-            Text(
-                "Gather your family's favorite recipes into a cookbook, organized your way."
-            )
-            .font(KinTypography.body)
-            .foregroundStyle(
-                KinColors.secondaryText
-            )
-            .multilineTextAlignment(.center)
-            .padding(
-                .horizontal,
-                KinSpacing.xxLarge
-            )
-
-            Button {
-                isShowingCreateCookbook = true
-            } label: {
-                Label(
-                    "Create a Cookbook",
-                    systemImage: KinIcons.add
-                )
-                .font(KinTypography.headline)
-                .foregroundStyle(.white)
-                .padding(
-                    .horizontal,
-                    KinSpacing.large
-                )
-                .padding(
-                    .vertical,
-                    KinSpacing.medium
-                )
-                .background(KinColors.primary)
-                .clipShape(Capsule())
-            }
-            .buttonStyle(.plain)
-            .padding(.top, KinSpacing.small)
-
-            Spacer()
+            isShowingCreateCookbook = true
         }
-        .frame(
-            maxWidth: .infinity,
-            maxHeight: .infinity
-        )
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 }
 
@@ -304,74 +222,12 @@ private extension CookbooksView {
     func errorState(
         _ message: String
     ) -> some View {
-        VStack(
-            spacing: KinSpacing.medium
-        ) {
-            Spacer()
-
-            Image(
-                systemName: "exclamationmark.triangle.fill"
-            )
-            .font(
-                .system(
-                    size: 42
-                )
-            )
-            .foregroundStyle(
-                KinColors.error
-            )
-
-            Text("Unable to Load Cookbooks")
-                .font(KinTypography.title)
-                .foregroundStyle(
-                    KinColors.primaryText
-                )
-
-            Text(message)
-                .font(KinTypography.body)
-                .foregroundStyle(
-                    KinColors.secondaryText
-                )
-                .multilineTextAlignment(.center)
-                .padding(
-                    .horizontal,
-                    KinSpacing.xxLarge
-                )
-
-            Button {
-                Task {
-                    await loadCookbooks()
-                }
-            } label: {
-                Text("Try Again")
-                    .font(KinTypography.headline)
-                    .foregroundStyle(.white)
-                    .padding(
-                        .horizontal,
-                        KinSpacing.large
-                    )
-                    .padding(
-                        .vertical,
-                        KinSpacing.medium
-                    )
-                    .background(
-                        KinColors.primary
-                    )
-                    .clipShape(
-                        RoundedRectangle(
-                            cornerRadius:
-                                KinRadius.medium
-                        )
-                    )
+        KinErrorView(message: message) {
+            Task {
+                await loadCookbooks()
             }
-            .buttonStyle(.plain)
-
-            Spacer()
         }
-        .frame(
-            maxWidth: .infinity,
-            maxHeight: .infinity
-        )
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 }
 

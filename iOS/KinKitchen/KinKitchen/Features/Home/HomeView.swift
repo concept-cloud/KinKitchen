@@ -503,11 +503,7 @@ private extension HomeView {
             .padding(KinSpacing.medium)
             .background(KinColors.surface)
             .clipShape(Capsule())
-            .shadow(
-                color: .black.opacity(0.06),
-                radius: 6,
-                y: 2
-            )
+            .kinCardShadow()
             .contentShape(Capsule())
         }
         .buttonStyle(.plain)
@@ -1188,18 +1184,14 @@ private extension HomeView {
                     cornerRadius: KinRadius.large
                 )
             )
-            .shadow(
-                color: .black.opacity(0.05),
-                radius: 6,
-                y: 2
-            )
+            .kinCardShadow()
             .contentShape(
                 RoundedRectangle(
                     cornerRadius: KinRadius.large
                 )
             )
         }
-        .buttonStyle(.plain)
+        .buttonStyle(.kinPressable)
         .accessibilityElement(
             children: .ignore
         )
@@ -1394,18 +1386,14 @@ private extension HomeView {
                     cornerRadius: KinRadius.large
                 )
             )
-            .shadow(
-                color: .black.opacity(0.06),
-                radius: 6,
-                y: 2
-            )
+            .kinCardShadow()
             .contentShape(
                 RoundedRectangle(
                     cornerRadius: KinRadius.large
                 )
             )
         }
-        .buttonStyle(.plain)
+        .buttonStyle(.kinPressable)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(
             [recipe.name, details]
@@ -1479,7 +1467,7 @@ private extension HomeView {
             )
             .frame(width: 220)
         }
-        .buttonStyle(.plain)
+        .buttonStyle(.kinPressable)
         .accessibilityHint("Opens the cookbook")
         .accessibilityAddTraits(.isButton)
     }

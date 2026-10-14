@@ -21,5 +21,6 @@ struct KinCard<Content: View>: View {
             .clipShape(
                 RoundedRectangle(cornerRadius: KinRadius.large)
             )
+            .kinCardShadow()
     }
 }

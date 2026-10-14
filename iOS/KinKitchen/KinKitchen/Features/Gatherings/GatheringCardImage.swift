@@ -69,31 +69,10 @@ struct GatheringCardImage: View {
 
                 } else {
 
-                    ZStack {
-
-                        LinearGradient(
-                            colors: [
-                                KinColors.accent.opacity(0.35),
-                                KinColors.primary.opacity(0.25)
-                            ],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        )
-
-                        Image(
-                            systemName:
-                                "fork.knife"
-                        )
-                        .font(
-                            .system(
-                                size: (size ?? 84) * 0.32,
-                                weight: .semibold
-                            )
-                        )
-                        .foregroundStyle(
-                            KinColors.primary.opacity(0.6)
-                        )
-                    }
+                    KinPhotoPlaceholder(
+                        icon: "fork.knife",
+                        iconSize: (size ?? 84) * 0.32
+                    )
                 }
             }
             .clipped()

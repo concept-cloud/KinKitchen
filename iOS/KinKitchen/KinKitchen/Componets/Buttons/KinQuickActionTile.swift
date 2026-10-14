@@ -111,18 +111,14 @@ struct KinQuickActionTile: View {
                         .padding(KinSpacing.xSmall)
                 }
             }
-            .shadow(
-                color: .black.opacity(0.06),
-                radius: 6,
-                y: 2
-            )
+            .kinCardShadow()
             .contentShape(
                 RoundedRectangle(
                     cornerRadius: KinRadius.large
                 )
             )
         }
-        .buttonStyle(.plain)
+        .buttonStyle(.kinPressable)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(
             badge.map { "\(title), \($0)" } ?? title

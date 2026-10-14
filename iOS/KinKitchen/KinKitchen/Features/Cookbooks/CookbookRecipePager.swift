@@ -197,7 +197,7 @@ struct CookbookRecipePager: View {
         .padding(.vertical, KinSpacing.xSmall)
         .background(.regularMaterial)
         .clipShape(Capsule())
-        .shadow(color: .black.opacity(0.12), radius: 8, y: 2)
+        .kinFloatingShadow()
         .padding(.bottom, KinSpacing.small)
     }
 
