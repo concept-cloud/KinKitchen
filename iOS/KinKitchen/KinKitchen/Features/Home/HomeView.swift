@@ -459,7 +459,7 @@ private extension HomeView {
 
             KinQuickActionTile(
                 title: "Table Talk",
-                icon: "bubble.left.and.bubble.right.fill",
+                icon: "cup.and.saucer.fill",
                 tint: .orange,
                 hint: "See what family and friends are cooking",
                 badge: "Soon"
