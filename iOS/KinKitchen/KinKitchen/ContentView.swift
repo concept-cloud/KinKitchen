@@ -7,6 +7,15 @@
 
 import SwiftUI
 
+/// The app's main tabs, in tab bar order.
+enum KinTab: Int {
+    case home
+    case gatherings
+    case recipes
+    case cookbooks
+    case profile
+}
+
 struct ContentView: View {
 
     @State private var selectedTab = 0
@@ -45,7 +54,11 @@ struct ContentView: View {
 
             ZStack {
 
-                HomeView()
+                HomeView(
+                    selectTab: { tab in
+                        selectedTab = tab.rawValue
+                    }
+                )
                     .opacity(selectedTab == 0 ? 1 : 0)
                     .allowsHitTesting(selectedTab == 0)
 

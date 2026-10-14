@@ -10,7 +10,10 @@ import SwiftUI
 
 struct HomeView: View {
     @Environment(\.scenePhase) private var scenePhase
-    
+
+    /// Switches the app's main tab (ContentView owns the tab bar).
+    var selectTab: (KinTab) -> Void = { _ in }
+
     @State private var showingAddRecipe = false
     
     @State private var upcomingGatherings:
@@ -36,202 +39,75 @@ struct HomeView: View {
                     alignment: .leading,
                     spacing: KinSpacing.xLarge
                 ) {
-                    
+
+                    // MARK: - Header
+
+                    homeHeader
+
                     // MARK: - Welcome
-                    
+
+                    greeting
+
+                    // MARK: - Quick Actions
+
+                    quickActionsSection
+
+                    // MARK: - Upcoming Gatherings
+
                     VStack(
                         alignment: .leading,
-                        spacing: KinSpacing.xSmall
-                    ) {
-                        
-                        Text("Welcome back,")
-                            .font(
-                                KinTypography.body
-                            )
-                            .foregroundStyle(
-                                KinColors.secondaryText
-                            )
-                        
-                        Text(
-                            firstName.isEmpty
-                            ? "Chef"
-                            : firstName
-                        )
-                        .font(
-                            KinTypography.largeTitle
-                        )
-                        .foregroundStyle(
-                            KinColors.primaryText
-                        )
-                        
-                        Text("What's cookin'?")
-                            .font(
-                                KinTypography.body
-                            )
-                            .foregroundStyle(
-                                KinColors.secondaryText
-                            )
-                    }
-                    
-                    // MARK: - Alerts
-                    
-                    KinSectionHeader(
-                        title: "Alerts",
-                        actionTitle: "View All"
-                    ) {
-                        showingAllNotifications = true
-                    }
-
-                    if unreadNotifications.isEmpty {
-
-                        KinCard {
-
-                            HStack(
-                                spacing: KinSpacing.medium
-                            ) {
-
-                                Image(
-                                    systemName: "bell"
-                                )
-                                .font(
-                                    .system(size: 20)
-                                )
-                                .foregroundStyle(
-                                    KinColors.secondaryText
-                                )
-
-                                Text(
-                                    "You're all caught up."
-                                )
-                                .font(
-                                    KinTypography.body
-                                )
-                                .foregroundStyle(
-                                    KinColors.secondaryText
-                                )
-                            }
-                            .frame(
-                                maxWidth: .infinity,
-                                alignment: .leading
-                            )
-                        }
-
-                    } else {
-
-                        VStack(
-                            spacing: KinSpacing.medium
-                        ) {
-                            ForEach(
-                                unreadNotifications.prefix(3)
-                            ) { notification in
-                                homeNotificationCard(
-                                    notification
-                                )
-                            }
-                        }
-                    }
-                    
-                    // MARK: - Upcoming Gatherings
-                    
-                    KinSectionHeader(
-                        title: "Upcoming Gatherings"
-                    )
-                    
-                    upcomingGatheringsSection
-                    
-                    
-                    // MARK: - Quick Actions
-                    
-                    KinSectionHeader(
-                        title: "Quick Actions"
-                    )
-                    
-                    HStack(
                         spacing: KinSpacing.medium
                     ) {
-                        
-                        // Add Recipe
-                        
-                        KinIconButton(
-                            icon: KinIcons.add
+
+                        KinSectionHeader(
+                            title: "Upcoming Gatherings",
+                            actionTitle: "View All"
                         ) {
-                            
-                            showingAddRecipe = true
+                            selectTab(.gatherings)
                         }
-                        
-                        
-                        // Recipes
-                        
-                        KinIconButton(
-                            icon: KinIcons.recipes
-                        ) {
-                            
-                            print(
-                                "Recipes tapped"
-                            )
-                        }
-                        
-                        
-                        // Gatherings
-                        
-                        KinIconButton(
-                            icon: KinIcons.gatherings
-                        ) {
-                            
-                            print(
-                                "Gatherings tapped"
-                            )
-                        }
-                        
+
+                        upcomingGatheringsSection
                     }
-                    
-                    
-                    // MARK: - My Collections
-                    
-                    KinSectionHeader(
-                        title: "My Collections"
-                    )
-                    
-                    KinEmptyState(
-                        icon: KinIcons.cookbooks,
-                        title: "No Collections Yet",
-                        message:
-                            "Your saved recipes and cookbooks will appear here."
-                    )
-                    
-                    
-                    // MARK: - For You
-                    
-                    KinSectionHeader(
-                        title: "For You"
-                    )
-                    
-                    KinCard {
-                        
-                        Text(
-                            "Personalized recommendations will appear here."
-                        )
-                        .font(
-                            KinTypography.body
-                        )
-                        .foregroundStyle(
-                            KinColors.secondaryText
-                        )
+
+                    // MARK: - Alerts
+
+                    VStack(
+                        alignment: .leading,
+                        spacing: KinSpacing.medium
+                    ) {
+
+                        KinSectionHeader(
+                            title: "Alerts",
+                            actionTitle: "View All"
+                        ) {
+                            showingAllNotifications = true
+                        }
+
+                        alertsSection
                     }
                 }
                 .padding(
+                    .horizontal,
                     KinSpacing.large
+                )
+                .padding(
+                    .bottom,
+                    KinSpacing.xLarge
                 )
             }
             .background(
-                KinColors.background
+                homeBackground
+            )
+            .toolbar(
+                .hidden,
+                for: .navigationBar
             )
             .task {
                 await loadHome()
             }
-            
+
             .refreshable {
-                
+
                 do {
                     notifications =
                     try await NotificationService
@@ -242,10 +118,10 @@ struct HomeView: View {
                         error.localizedDescription
                     )
                 }
-                
+
                 await loadHome()
             }
-            
+
             .onChange(of: scenePhase) {
                 if scenePhase == .active {
                     Task {
@@ -253,7 +129,7 @@ struct HomeView: View {
                     }
                 }
             }
-            
+
             // MARK: - Gathering Destination
 
             .navigationDestination(
@@ -287,26 +163,304 @@ struct HomeView: View {
                 NotificationsView()
             }
             // MARK: - Add Recipe Destination
-            
+
             .navigationDestination(
                 isPresented: $showingAddRecipe
             ) {
-                
+
                 AddRecipeView()
             }
         }
     }
     // MARK: - Unread Notifications
-    
+
     private var unreadNotifications:
     [KinNotification] {
-        
+
         notifications.filter {
             !$0.isRead
         }
     }
-    
-    
+}
+
+
+// MARK: - Layout
+
+private extension HomeView {
+
+    /// Warm wash behind the top of Home, fading into the app background.
+    var homeBackground: some View {
+
+        LinearGradient(
+            colors: [
+                KinColors.accent.opacity(0.22),
+                KinColors.background
+            ],
+            startPoint: .top,
+            endPoint: .center
+        )
+        .background(
+            KinColors.background
+        )
+        .ignoresSafeArea()
+    }
+
+
+    /// Brand at the center, notifications bell on the trailing edge.
+    var homeHeader: some View {
+
+        ZStack {
+
+            Text("Kin Kitchen")
+                .font(
+                    KinTypography.title2
+                )
+                .foregroundStyle(
+                    KinColors.primary
+                )
+                .accessibilityAddTraits(
+                    .isHeader
+                )
+
+            HStack {
+
+                Spacer()
+
+                notificationsBell
+            }
+        }
+        .padding(
+            .top,
+            KinSpacing.small
+        )
+    }
+
+
+    var notificationsBell: some View {
+
+        let count =
+            unreadNotifications.count
+
+        return Button {
+
+            showingAllNotifications = true
+
+        } label: {
+
+            Image(
+                systemName: "bell.fill"
+            )
+            .font(
+                .system(
+                    size: 20,
+                    weight: .semibold
+                )
+            )
+            .foregroundStyle(
+                KinColors.primary
+            )
+            .frame(
+                width: 44,
+                height: 44
+            )
+            .background(
+                KinColors.surface
+            )
+            .clipShape(
+                Circle()
+            )
+            .overlay(
+                alignment: .topTrailing
+            ) {
+
+                if count > 0 {
+
+                    Text(
+                        count > 99
+                            ? "99+"
+                            : "\(count)"
+                    )
+                    .font(
+                        .system(
+                            size: 11,
+                            weight: .bold
+                        )
+                    )
+                    .foregroundStyle(.white)
+                    .padding(
+                        .horizontal,
+                        5
+                    )
+                    .frame(
+                        minWidth: 18,
+                        minHeight: 18
+                    )
+                    .background(
+                        KinColors.primary
+                    )
+                    .clipShape(
+                        Capsule()
+                    )
+                    .offset(
+                        x: 4,
+                        y: -4
+                    )
+                }
+            }
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(
+            "Notifications"
+        )
+        .accessibilityValue(
+            count == 0
+                ? "No unread"
+                : "\(count) unread"
+        )
+    }
+
+
+    var greeting: some View {
+
+        VStack(
+            spacing: KinSpacing.xSmall
+        ) {
+
+            Text("Welcome back,")
+                .font(
+                    KinTypography.body
+                )
+                .foregroundStyle(
+                    KinColors.secondaryText
+                )
+
+            Text(
+                firstName.isEmpty
+                ? "Chef"
+                : firstName
+            )
+            .font(
+                KinTypography.largeTitle
+            )
+            .foregroundStyle(
+                KinColors.primaryText
+            )
+            .lineLimit(1)
+            .minimumScaleFactor(0.6)
+
+            Text("What's cookin' today?")
+                .font(
+                    KinTypography.body
+                )
+                .foregroundStyle(
+                    KinColors.secondaryText
+                )
+        }
+        .multilineTextAlignment(.center)
+        .frame(
+            maxWidth: .infinity
+        )
+        .accessibilityElement(
+            children: .combine
+        )
+    }
+
+
+    var quickActionsSection: some View {
+
+        HStack(
+            spacing: KinSpacing.medium
+        ) {
+
+            // Add Recipe
+
+            KinIconButton(
+                icon: KinIcons.add
+            ) {
+
+                showingAddRecipe = true
+            }
+
+
+            // Recipes
+
+            KinIconButton(
+                icon: KinIcons.recipes
+            ) {
+
+                selectTab(.recipes)
+            }
+
+
+            // Gatherings
+
+            KinIconButton(
+                icon: KinIcons.gatherings
+            ) {
+
+                selectTab(.gatherings)
+            }
+        }
+        .frame(
+            maxWidth: .infinity
+        )
+    }
+
+
+    @ViewBuilder
+    var alertsSection: some View {
+
+        if unreadNotifications.isEmpty {
+
+            KinCard {
+
+                HStack(
+                    spacing: KinSpacing.medium
+                ) {
+
+                    Image(
+                        systemName: "bell"
+                    )
+                    .font(
+                        .system(size: 20)
+                    )
+                    .foregroundStyle(
+                        KinColors.secondaryText
+                    )
+
+                    Text(
+                        "You're all caught up."
+                    )
+                    .font(
+                        KinTypography.body
+                    )
+                    .foregroundStyle(
+                        KinColors.secondaryText
+                    )
+                }
+                .frame(
+                    maxWidth: .infinity,
+                    alignment: .leading
+                )
+            }
+
+        } else {
+
+            VStack(
+                spacing: KinSpacing.medium
+            ) {
+                ForEach(
+                    unreadNotifications.prefix(3)
+                ) { notification in
+                    homeNotificationCard(
+                        notification
+                    )
+                }
+            }
+        }
+    }
+
+
     // MARK: - Notification Card
 
     private func homeNotificationCard(
