@@ -223,4 +223,49 @@ struct HomeTests {
 
         #expect(HomeSearch.uniqueById([item, item]).count == 1)
     }
+
+    // MARK: - C3.2 Seasonal themes
+
+    static func day(month: Int, day: Int = 15) -> Date {
+        calendar.date(from: DateComponents(year: 2026, month: month, day: day))!
+    }
+
+    @Test func goldenKitchenIsTheDefaultAllYear() {
+        for month in 1...12 {
+            #expect(
+                KinHomeTheme.current(
+                    choice: .goldenKitchen,
+                    on: Self.day(month: month),
+                    calendar: Self.calendar
+                ) == .goldenKitchen
+            )
+        }
+    }
+
+    @Test func seasonalFollowsTheDate() {
+        func theme(_ month: Int) -> KinHomeTheme {
+            KinHomeTheme.current(
+                choice: .seasonal,
+                on: Self.day(month: month),
+                calendar: Self.calendar
+            )
+        }
+
+        #expect(theme(4) == .spring)
+        #expect(theme(7) == .summer)
+        #expect(theme(10) == .autumn)
+        #expect(theme(1) == .winter)
+    }
+
+    @Test func seasonsChangeOnTheFirstOfTheMonth() {
+        #expect(KinHomeTheme.season(of: Self.day(month: 2, day: 28), calendar: Self.calendar) == .winter)
+        #expect(KinHomeTheme.season(of: Self.day(month: 3, day: 1), calendar: Self.calendar) == .spring)
+        #expect(KinHomeTheme.season(of: Self.day(month: 11, day: 30), calendar: Self.calendar) == .autumn)
+        #expect(KinHomeTheme.season(of: Self.day(month: 12, day: 1), calendar: Self.calendar) == .winter)
+    }
+
+    @Test func everyThemeHasItsOwnLook() {
+        let symbols = KinHomeTheme.allCases.map(\.accentSymbol)
+        #expect(Set(symbols).count == KinHomeTheme.allCases.count)
+    }
 }

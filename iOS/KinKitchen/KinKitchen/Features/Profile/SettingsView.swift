@@ -14,6 +14,9 @@ struct SettingsView: View {
     @AppStorage("kinAppearanceMode")
     private var appearanceMode = "light"
 
+    @AppStorage(KinHomeTheme.storageKey)
+    private var homeThemeChoice = KinHomeTheme.Choice.goldenKitchen.rawValue
+
     var body: some View {
 
         ScrollView {
@@ -60,6 +63,31 @@ struct SettingsView: View {
                             systemImage: "moon"
                         )
                         .tag("dark")
+                    }
+                    .pickerStyle(.segmented)
+
+                    // MARK: - Home Theme
+
+                    Text("Home Theme")
+                        .font(KinTypography.headline)
+                        .foregroundStyle(KinColors.primaryText)
+                        .padding(.top, KinSpacing.small)
+
+                    Text(
+                        homeThemeChoice == KinHomeTheme.Choice.seasonal.rawValue
+                            ? "Home changes with the seasons. Right now: \(KinHomeTheme.season(of: .now).title)."
+                            : "The warm Golden Kitchen look, all year."
+                    )
+                    .font(KinTypography.caption)
+                    .foregroundStyle(KinColors.secondaryText)
+
+                    Picker(
+                        "Home Theme",
+                        selection: $homeThemeChoice
+                    ) {
+                        ForEach(KinHomeTheme.Choice.allCases) { choice in
+                            Text(choice.title).tag(choice.rawValue)
+                        }
                     }
                     .pickerStyle(.segmented)
                 }

@@ -12,6 +12,9 @@ import Supabase
 struct HomeView: View {
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    @Environment(\.colorScheme) private var colorScheme
+    @AppStorage(KinHomeTheme.storageKey)
+    private var homeThemeChoice = KinHomeTheme.Choice.goldenKitchen.rawValue
 
     /// Switches the app's main tab (ContentView owns the tab bar).
     var selectTab: (KinTab) -> Void = { _ in }
@@ -71,10 +74,7 @@ struct HomeView: View {
                         spacing: KinSpacing.medium
                     ) {
 
-                        KinSectionHeader(
-                            title: "Upcoming Gatherings",
-                            actionTitle: "View All"
-                        ) {
+                        themedHeader("Upcoming Gatherings") {
                             selectTab(.gatherings)
                         }
 
@@ -88,10 +88,7 @@ struct HomeView: View {
                         spacing: KinSpacing.medium
                     ) {
 
-                        KinSectionHeader(
-                            title: "Recent Recipes",
-                            actionTitle: "View All"
-                        ) {
+                        themedHeader("Recent Recipes") {
                             selectTab(.recipes)
                         }
 
@@ -105,10 +102,7 @@ struct HomeView: View {
                         spacing: KinSpacing.medium
                     ) {
 
-                        KinSectionHeader(
-                            title: "Your Cookbooks",
-                            actionTitle: "View All"
-                        ) {
+                        themedHeader("Your Cookbooks") {
                             selectTab(.cookbooks)
                         }
 
@@ -122,10 +116,7 @@ struct HomeView: View {
                         spacing: KinSpacing.medium
                     ) {
 
-                        KinSectionHeader(
-                            title: "Alerts",
-                            actionTitle: "View All"
-                        ) {
+                        themedHeader("Alerts") {
                             showingAllNotifications = true
                         }
 
@@ -411,10 +402,53 @@ private extension HomeView {
 
     /// Warm wash behind the top of Home, fading into the app background.
     /// Plain page color; the hero photo provides the warmth at the top.
+    /// The page color, washed with the Home theme's tints below the
+    /// hero, plus one faint seasonal symbol in the corner.
     var homeBackground: some View {
 
-        KinColors.background
-            .ignoresSafeArea()
+        ZStack(alignment: .bottomTrailing) {
+
+            KinColors.background
+
+            homeTheme.pageGradient(
+                isDark: colorScheme == .dark
+            )
+
+            Image(systemName: homeTheme.accentSymbol)
+                .font(.system(size: 160, weight: .light))
+                .foregroundStyle(homeTheme.accent.opacity(0.08))
+                .rotationEffect(.degrees(-12))
+                .offset(x: 30, y: -60)
+                .accessibilityHidden(true)
+        }
+        .ignoresSafeArea()
+    }
+
+    /// Today's theme for the saved choice.
+    var homeTheme: KinHomeTheme {
+        KinHomeTheme.current(
+            choice: KinHomeTheme.Choice(rawValue: homeThemeChoice)
+                ?? .goldenKitchen
+        )
+    }
+
+    /// A section title with the theme's small accent beside it.
+    func themedHeader(
+        _ title: String,
+        action: @escaping () -> Void
+    ) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: KinSpacing.small) {
+            Image(systemName: homeTheme.accentSymbol)
+                .font(.system(size: 15, weight: .semibold))
+                .foregroundStyle(homeTheme.accent)
+                .accessibilityHidden(true)
+
+            KinSectionHeader(
+                title: title,
+                actionTitle: "View All",
+                action: action
+            )
+        }
     }
 
 
@@ -433,20 +467,23 @@ private extension HomeView {
             .frame(
                 maxWidth: .infinity
             )
-            .overlay {
+            // The photo itself fades out, so whatever is behind it
+            // (the page color or a seasonal wash) shows through with
+            // no seam.
+            .mask {
 
                 LinearGradient(
                     stops: [
                         .init(
-                            color: KinColors.background.opacity(0),
+                            color: .black,
                             location: Self.heroFadeStart
                         ),
                         .init(
-                            color: KinColors.background.opacity(0.75),
+                            color: .black.opacity(0.25),
                             location: 0.87
                         ),
                         .init(
-                            color: KinColors.background,
+                            color: .clear,
                             location: 1
                         )
                     ],
