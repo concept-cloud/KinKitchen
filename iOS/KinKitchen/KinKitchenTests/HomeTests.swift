@@ -184,4 +184,43 @@ struct HomeTests {
                 == nil
         )
     }
+
+    // MARK: - Home search
+
+    struct Item: Identifiable {
+        let id = UUID()
+        let name: String
+        var detail: String? = nil
+    }
+
+    static func search(_ items: [Item], _ query: String) -> [String] {
+        HomeSearch.filter(items, query: query) { [$0.name, $0.detail] }
+            .map(\.name)
+    }
+
+    @Test func searchIgnoresCaseAndAccents() {
+        let items = [Item(name: "Crème Brûlée"), Item(name: "Tacos")]
+
+        #expect(Self.search(items, "creme brulee") == ["Crème Brûlée"])
+        #expect(Self.search(items, "TACO") == ["Tacos"])
+    }
+
+    @Test func everyWordMustMatchSomewhere() {
+        let items = [
+            Item(name: "Sunday Gravy", detail: "Dinner"),
+            Item(name: "Sunday Pancakes", detail: "Breakfast")
+        ]
+
+        #expect(Self.search(items, "sunday dinner") == ["Sunday Gravy"])
+    }
+
+    @Test func blankSearchShowsNothing() {
+        #expect(Self.search([Item(name: "Tacos")], "   ").isEmpty)
+    }
+
+    @Test func duplicatesAreRemoved() {
+        let item = Item(name: "Tacos")
+
+        #expect(HomeSearch.uniqueById([item, item]).count == 1)
+    }
 }

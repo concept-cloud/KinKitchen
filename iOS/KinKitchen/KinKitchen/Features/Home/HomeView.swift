@@ -18,6 +18,7 @@ struct HomeView: View {
 
     @State private var showingAddRecipe = false
     @State private var showingAddGathering = false
+    @State private var showingSearch = false
     @State private var comingSoon: ComingSoonFeature?
     @State private var bellRings = 0
     @State private var recentRecipes: [Recipe] = []
@@ -32,7 +33,6 @@ struct HomeView: View {
     
     @State private var isLoadingGatherings = true
     
-    @State private var firstName = ""
     @State private var notifications:
     [KinNotification] = []
     @State private var selectedGatheringId: UUID?
@@ -150,19 +150,15 @@ struct HomeView: View {
             .ignoresSafeArea(
                 edges: .top
             )
-            // Clear but "visible" so the dark scheme applies and the
-            // status bar turns white over the photo.
-            .toolbarBackground(
-                Color.clear,
-                for: .navigationBar
-            )
+            // No bar background or scroll-edge haze over the photo,
+            // so its top (light or dark) shows through untinted.
             .toolbarBackgroundVisibility(
-                .visible,
+                .hidden,
                 for: .navigationBar
             )
-            .toolbarColorScheme(
-                .dark,
-                for: .navigationBar
+            .scrollEdgeEffectHidden(
+                true,
+                for: .top
             )
             .toolbar {
 
@@ -273,6 +269,14 @@ struct HomeView: View {
                     }
                 }
             }
+            // MARK: - Search Destination
+
+            .navigationDestination(
+                isPresented: $showingSearch
+            ) {
+
+                HomeSearchView()
+            }
             // MARK: - Add Gathering Destination
 
             .navigationDestination(
@@ -307,26 +311,6 @@ struct HomeView: View {
         notifications.filter {
             !$0.isRead
         }
-    }
-}
-
-
-// MARK: - Text Outline
-
-private extension View {
-
-    /// A thin dark outline plus a soft glow, so white text stays bold
-    /// and readable over any photo.
-    func kinTextOutline(
-        color: Color = .black.opacity(0.85)
-    ) -> some View {
-
-        self
-            .shadow(color: color, radius: 0, x: 1.2, y: 0)
-            .shadow(color: color, radius: 0, x: -1.2, y: 0)
-            .shadow(color: color, radius: 0, x: 0, y: 1.2)
-            .shadow(color: color, radius: 0, x: 0, y: -1.2)
-            .shadow(color: .black.opacity(0.5), radius: 6, y: 2)
     }
 }
 
@@ -389,8 +373,7 @@ private extension HomeView {
 
     /// The Kin Kitchen hero photo (light and dark versions in the
     /// HomeHero asset), full width from the top of the screen with
-    /// nothing cropped. The greeting sits in white on the table at the
-    /// bottom, and a short fade below it blends into the page.
+    /// nothing cropped, fading into the page at the bottom.
     var homeHero: some View {
 
         Image("HomeHero")
@@ -401,60 +384,85 @@ private extension HomeView {
             )
             .overlay {
 
-                ZStack {
-
-                    // Darken the table behind the greeting.
-                    LinearGradient(
-                        stops: [
-                            .init(
-                                color: .black.opacity(0),
-                                location: 0.5
-                            ),
-                            .init(
-                                color: .black.opacity(0.45),
-                                location: 0.8
-                            )
-                        ],
-                        startPoint: .top,
-                        endPoint: .bottom
-                    )
-
-                    // Blend into the page, below the text.
-                    LinearGradient(
-                        stops: [
-                            .init(
-                                color: KinColors.background.opacity(0),
-                                location: 0.85
-                            ),
-                            .init(
-                                color: KinColors.background,
-                                location: 1
-                            )
-                        ],
-                        startPoint: .top,
-                        endPoint: .bottom
-                    )
-                }
+                LinearGradient(
+                    stops: [
+                        .init(
+                            color: KinColors.background.opacity(0),
+                            location: 0.62
+                        ),
+                        .init(
+                            color: KinColors.background.opacity(0.6),
+                            location: 0.85
+                        ),
+                        .init(
+                            color: KinColors.background,
+                            location: 1
+                        )
+                    ],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
             }
+            .accessibilityElement()
+            .accessibilityLabel("Kin Kitchen")
+            .accessibilityAddTraits(.isHeader)
+            // Search sits on the table, above where the photo fades out.
             .overlay(
                 alignment: .bottom
             ) {
 
-                greeting
+                searchEntry
                     .padding(
                         .horizontal,
                         KinSpacing.large
                     )
-                    // Above the fade into the page.
                     .padding(
                         .bottom,
-                        76
+                        KinSpacing.large
                     )
             }
-            .accessibilityElement(
-                children: .contain
-            )
     }
+
+
+    /// Looks like a search field; opens the full search screen.
+    var searchEntry: some View {
+
+        Button {
+
+            showingSearch = true
+
+        } label: {
+
+            HStack(
+                spacing: KinSpacing.small
+            ) {
+
+                Image(systemName: KinIcons.search)
+                    .foregroundStyle(KinColors.secondaryText)
+
+                Text(HomeSearch.placeholder)
+                    .font(KinTypography.callout)
+                    .foregroundStyle(KinColors.secondaryText)
+                    .lineLimit(1)
+
+                Spacer(minLength: 0)
+            }
+            .padding(KinSpacing.medium)
+            .background(KinColors.surface)
+            .clipShape(Capsule())
+            .shadow(
+                color: .black.opacity(0.06),
+                radius: 6,
+                y: 2
+            )
+            .contentShape(Capsule())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Search")
+        .accessibilityHint("Searches your recipes, cookbooks, and gatherings")
+    }
+
+
 
 
     var notificationsBell: some View {
@@ -547,43 +555,6 @@ private extension HomeView {
     }
 
 
-    var greeting: some View {
-
-        VStack(
-            spacing: KinSpacing.xxSmall
-        ) {
-
-            Text("Welcome back,")
-                .font(
-                    .custom("Arvo-Bold", size: 20, relativeTo: .title3)
-                )
-
-            Text(
-                firstName.isEmpty
-                ? "Chef"
-                : firstName
-            )
-            .font(
-                .custom("Arvo-Bold", size: 40, relativeTo: .largeTitle)
-            )
-            .lineLimit(1)
-            .minimumScaleFactor(0.6)
-
-            Text("What's cookin' today?")
-                .font(
-                    .custom("Arvo-Bold", size: 20, relativeTo: .title3)
-                )
-        }
-        .foregroundStyle(.white)
-        .kinTextOutline()
-        .multilineTextAlignment(.center)
-        .frame(
-            maxWidth: .infinity
-        )
-        .accessibilityElement(
-            children: .combine
-        )
-    }
 
 
     /// Four shortcuts; wraps to two rows at accessibility text sizes.
@@ -1557,27 +1528,6 @@ private extension HomeView {
         }
 
         do {
-            let profile =
-                try await ProfileService
-                    .fetchCurrentProfile()
-
-            firstName =
-                profile.firstName?
-                    .trimmingCharacters(
-                        in: .whitespacesAndNewlines
-                    )
-                ?? ""
-
-        } catch {
-            if !(error is CancellationError) {
-                print(
-                    "HOME PROFILE LOAD ERROR:",
-                    error.localizedDescription
-                )
-            }
-        }
-
-        do {
             let gatherings =
                 try await GatheringService
                     .fetchUpcomingGatheringItems()
@@ -1775,6 +1725,7 @@ private extension HomeView {
 // MARK: - Event Dates
 
 extension HomeView {
+
 
     /// "30 min · Dinner", just one of them, or nil when neither is set.
     nonisolated static func recipeDetails(
