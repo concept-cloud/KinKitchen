@@ -127,14 +127,10 @@ struct GatheringCardImage: View {
         do {
 
             imageData =
-                try await SupabaseManager.client
-                    .storage
-                    .from(
-                        "gathering-photos"
-                    )
-                    .download(
-                        path: path
-                    )
+                try await StorageImageCache.shared.data(
+                    bucket: "gathering-photos",
+                    path: path
+                )
 
         } catch {
 

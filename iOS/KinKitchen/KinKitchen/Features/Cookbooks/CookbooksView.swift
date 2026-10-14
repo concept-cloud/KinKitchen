@@ -381,7 +381,9 @@ private extension CookbooksView {
 
     @MainActor
     func loadCookbooks() async {
-        isLoading = true
+        // Spinner only when there's nothing to show yet; otherwise
+        // refresh quietly behind the current list.
+        isLoading = cookbooks.isEmpty
         errorMessage = nil
 
         do {
@@ -399,8 +401,11 @@ private extension CookbooksView {
         } catch is CancellationError {
             isLoading = false
         } catch {
-            errorMessage =
-                error.localizedDescription
+            // A failed quiet refresh keeps the list that's showing.
+            if cookbooks.isEmpty {
+                errorMessage =
+                    error.localizedDescription
+            }
 
             isLoading = false
         }

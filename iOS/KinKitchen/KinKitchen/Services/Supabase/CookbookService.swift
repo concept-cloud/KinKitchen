@@ -780,6 +780,12 @@ enum CookbookService {
                 )
             )
 
+        // Same path as the old cover: drop the cached copy.
+        StorageImageCache.shared.remove(
+            bucket: "cookbook-covers",
+            path: path
+        )
+
         return path
     }
 
@@ -787,11 +793,10 @@ enum CookbookService {
         path: String
     ) async throws -> Data {
 
-        try await SupabaseManager.client.storage
-            .from("cookbook-covers")
-            .download(
-                path: path
-            )
+        try await StorageImageCache.shared.data(
+            bucket: "cookbook-covers",
+            path: path
+        )
     }
 
     static func replaceCookbookCover(

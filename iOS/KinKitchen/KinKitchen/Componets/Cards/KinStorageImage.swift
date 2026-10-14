@@ -76,13 +76,19 @@ struct KinStorageImage: View {
             return
         }
 
+        if let cached =
+            StorageImageCache.shared.cached(bucket: bucket, path: path) {
+            image = UIImage(data: cached)
+            return
+        }
+
         do {
 
             let data =
-                try await SupabaseManager.client
-                    .storage
-                    .from(bucket)
-                    .download(path: path)
+                try await StorageImageCache.shared.data(
+                    bucket: bucket,
+                    path: path
+                )
 
             image = UIImage(data: data)
 

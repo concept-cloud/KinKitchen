@@ -1154,6 +1154,12 @@ enum RecipeService {
                 )
             )
 
+        // Same path as the old photo: drop the cached copy.
+        StorageImageCache.shared.remove(
+            bucket: "recipe-photos",
+            path: path
+        )
+
         return path
     }
 
@@ -1162,11 +1168,10 @@ enum RecipeService {
         path: String
     ) async throws -> Data {
 
-        try await SupabaseManager.client.storage
-            .from("recipe-photos")
-            .download(
-                path: path
-            )
+        try await StorageImageCache.shared.data(
+            bucket: "recipe-photos",
+            path: path
+        )
     }
 
     // MARK: - Create Recipe Story

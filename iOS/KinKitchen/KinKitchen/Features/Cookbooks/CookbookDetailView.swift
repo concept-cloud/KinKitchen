@@ -61,8 +61,12 @@ struct CookbookDetailView: View {
         }
         .deletingOverlay(isDeletingCookbook)
         .navigationBarHidden(true)
+        // Spinner only the first time; coming back from a recipe
+        // refreshes quietly behind what's already on screen.
         .task {
-            await loadCookbook()
+            await loadCookbook(
+                showLoadingState: cookbook == nil
+            )
         }
         .refreshable {
             await loadCookbook()
@@ -1489,8 +1493,11 @@ private extension CookbookDetailView {
         } catch is CancellationError {
             isLoading = false
         } catch {
-            errorMessage =
-                error.localizedDescription
+            // A failed quiet refresh keeps the cookbook that's showing.
+            if cookbook == nil || showLoadingState {
+                errorMessage =
+                    error.localizedDescription
+            }
 
             isLoading = false
         }

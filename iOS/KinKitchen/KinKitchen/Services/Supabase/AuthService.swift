@@ -58,6 +58,9 @@ final class AuthService: ObservableObject {
     
     func signOut() async throws {
         try await SupabaseManager.client.auth.signOut()
+
+        // Photos belong to the account that loaded them.
+        StorageImageCache.shared.removeAll()
     }
 
     deinit {
