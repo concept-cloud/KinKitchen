@@ -139,4 +139,43 @@ struct CookbookLibraryTests {
         #expect(Self.layout.addingSection(added).groups.map(\.sectionId)
                 == [Self.breakfast, Self.dinner, added, nil])
     }
+
+    // MARK: - Organize filter
+
+    @Test func emptyFilterShowsEverything() {
+        let filter = OrganizeFilter()
+
+        #expect(!filter.isActive)
+        #expect(filter.matches(category: nil, sectionId: nil, isFeatured: false))
+    }
+
+    @Test func sectionFilterCanPickUnsorted() {
+        var filter = OrganizeFilter()
+        filter.section = .some(nil)
+
+        #expect(filter.matches(category: nil, sectionId: nil, isFeatured: false))
+        #expect(!filter.matches(category: nil, sectionId: Self.dinner, isFeatured: false))
+    }
+
+    @Test func categoryFilterMatchesAnyChosenCategoryIgnoringCase() {
+        var filter = OrganizeFilter()
+        filter.toggle(.dessert)
+        filter.toggle(.snack)
+
+        #expect(filter.matches(category: "dessert", sectionId: nil, isFeatured: false))
+        #expect(filter.matches(category: "Snack", sectionId: nil, isFeatured: false))
+        #expect(!filter.matches(category: "Dinner", sectionId: nil, isFeatured: false))
+        #expect(!filter.matches(category: nil, sectionId: nil, isFeatured: false))
+        #expect(filter.categoryTitle == "2 Categories")
+    }
+
+    @Test func filtersCombine() {
+        var filter = OrganizeFilter()
+        filter.section = .some(Self.dinner)
+        filter.featuredOnly = true
+
+        #expect(filter.matches(category: nil, sectionId: Self.dinner, isFeatured: true))
+        #expect(!filter.matches(category: nil, sectionId: Self.dinner, isFeatured: false))
+        #expect(!filter.matches(category: nil, sectionId: Self.breakfast, isFeatured: true))
+    }
 }

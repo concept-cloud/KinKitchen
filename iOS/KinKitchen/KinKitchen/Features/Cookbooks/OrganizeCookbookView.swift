@@ -34,7 +34,8 @@ struct OrganizeCookbookView: View {
     @State private var sections: [CookbookSection]
     @State private var layout: CookbookLayout
     @State private var selection = Set<UUID>()
-    @State private var filterText = ""
+    @State private var filter = OrganizeFilter()
+    private let featuredRecipeIds: Set<UUID>
 
     @State private var isSaving = false
     @State private var errorMessage: String?
@@ -52,6 +53,8 @@ struct OrganizeCookbookView: View {
     ) {
         self.cookbookId = cookbookId
         self.recipesById = recipesById
+        self.featuredRecipeIds =
+            Set(relationships.filter(\.isFeatured).map(\.recipeId))
         _sections = State(initialValue: sections)
         _layout = State(
             initialValue: CookbookLayout(
@@ -88,6 +91,7 @@ struct OrganizeCookbookView: View {
 
                 switch mode {
                 case .recipes:
+                    filterBar
                     recipesList
                 case .sections:
                     sectionsList
@@ -179,7 +183,7 @@ struct OrganizeCookbookView: View {
         List(selection: $selection) {
 
             if visibleRows.isEmpty {
-                Text("No recipes match “\(trimmedFilter)”.")
+                Text("No recipes match these filters.")
                     .font(KinTypography.body)
                     .foregroundStyle(KinColors.secondaryText)
                     .listRowBackground(Color.clear)
@@ -223,23 +227,14 @@ struct OrganizeCookbookView: View {
         }
         .scrollContentBackground(.hidden)
         .disabled(isSaving)
-        .searchable(
-            text: $filterText,
-            placement: .navigationBarDrawer(displayMode: .always),
-            prompt: "Filter by name or category"
-        )
         // Never move recipes you can't see.
-        .onChange(of: filterText) {
+        .onChange(of: filter) {
             selection.formIntersection(visibleRecipeIds)
         }
     }
 
-    private var trimmedFilter: String {
-        filterText.trimmingCharacters(in: .whitespacesAndNewlines)
-    }
-
     private var isFiltering: Bool {
-        !trimmedFilter.isEmpty
+        filter.isActive
     }
 
     /// All rows, or only matching recipes under their section headings
@@ -251,13 +246,134 @@ struct OrganizeCookbookView: View {
 
         return layout.groups.flatMap { group -> [CookbookLayout.Row] in
             let matches =
-                HomeSearch.filter(group.recipeIds, query: trimmedFilter) { id in
-                    [recipesById[id]?.name, recipesById[id]?.category]
+                group.recipeIds.filter { id in
+                    filter.matches(
+                        category: recipesById[id]?.category,
+                        sectionId: group.sectionId,
+                        isFeatured: featuredRecipeIds.contains(id)
+                    )
                 }
 
             return matches.isEmpty
                 ? []
                 : [.heading(group.sectionId)] + matches.map(CookbookLayout.Row.recipe)
+        }
+    }
+
+
+    // MARK: - Filter Bar
+
+    private var filterBar: some View {
+
+        ScrollView(.horizontal, showsIndicators: false) {
+
+            HStack(spacing: KinSpacing.small) {
+
+                // Section: one at a time.
+                Menu {
+                    Button {
+                        filter.section = nil
+                    } label: {
+                        checkLabel("All Sections", isOn: filter.section == nil)
+                    }
+
+                    Divider()
+
+                    ForEach(layout.groups, id: \.sectionId) { group in
+                        Button {
+                            filter.section = .some(group.sectionId)
+                        } label: {
+                            checkLabel(
+                                name(of: group.sectionId),
+                                isOn: filter.section == .some(group.sectionId)
+                            )
+                        }
+                    }
+                } label: {
+                    filterChip(
+                        filter.section.map { name(of: $0) } ?? "Section",
+                        isOn: filter.section != nil,
+                        showsMenu: true
+                    )
+                }
+
+                // Categories: any of the chosen ones.
+                Menu {
+                    ForEach(RecipeCategory.allCases) { category in
+                        Button {
+                            filter.toggle(category)
+                        } label: {
+                            checkLabel(
+                                category.rawValue,
+                                isOn: filter.categories.contains(category)
+                            )
+                        }
+                    }
+                } label: {
+                    filterChip(
+                        filter.categoryTitle,
+                        isOn: !filter.categories.isEmpty,
+                        showsMenu: true
+                    )
+                }
+
+                Button {
+                    filter.featuredOnly.toggle()
+                } label: {
+                    filterChip(
+                        "Featured",
+                        isOn: filter.featuredOnly,
+                        showsMenu: false
+                    )
+                }
+                .buttonStyle(.plain)
+                .accessibilityAddTraits(filter.featuredOnly ? .isSelected : [])
+
+                if filter.isActive {
+                    Button("Clear") {
+                        filter = OrganizeFilter()
+                    }
+                    .font(KinTypography.subheadline)
+                    .foregroundStyle(KinColors.primary)
+                }
+            }
+            .padding(.horizontal, KinSpacing.large)
+            .padding(.vertical, KinSpacing.xSmall)
+        }
+    }
+
+    private func filterChip(
+        _ title: String,
+        isOn: Bool,
+        showsMenu: Bool
+    ) -> some View {
+
+        HStack(spacing: KinSpacing.xxSmall) {
+            Text(title)
+                .lineLimit(1)
+
+            if showsMenu {
+                Image(systemName: KinIcons.dropdown)
+                    .font(.system(size: 10, weight: .bold))
+            }
+        }
+        .font(KinTypography.subheadline)
+        .foregroundStyle(isOn ? .white : KinColors.primaryText)
+        .padding(.horizontal, KinSpacing.medium)
+        .padding(.vertical, KinSpacing.small)
+        .background(isOn ? KinColors.primary : KinColors.surface)
+        .clipShape(Capsule())
+    }
+
+    @ViewBuilder
+    private func checkLabel(
+        _ title: String,
+        isOn: Bool
+    ) -> some View {
+        if isOn {
+            Label(title, systemImage: KinIcons.check)
+        } else {
+            Text(title)
         }
     }
 
@@ -539,5 +655,63 @@ struct OrganizeCookbookView: View {
                 error.localizedDescription
             )
         }
+    }
+}
+
+
+// MARK: - Organize Filter
+
+/// What the Organize recipes list shows: one section (or all), any of
+/// the chosen categories, and optionally only featured recipes.
+nonisolated struct OrganizeFilter: Equatable {
+
+    /// nil = all sections; .some(nil) = Unsorted.
+    var section: UUID?? = nil
+    var categories: Set<RecipeCategory> = []
+    var featuredOnly = false
+
+    var isActive: Bool {
+        section != nil || !categories.isEmpty || featuredOnly
+    }
+
+    var categoryTitle: String {
+        switch categories.count {
+        case 0:
+            return "Category"
+        case 1:
+            return categories.first!.rawValue
+        default:
+            return "\(categories.count) Categories"
+        }
+    }
+
+    mutating func toggle(_ category: RecipeCategory) {
+        if categories.contains(category) {
+            categories.remove(category)
+        } else {
+            categories.insert(category)
+        }
+    }
+
+    func matches(
+        category: String?,
+        sectionId: UUID?,
+        isFeatured: Bool
+    ) -> Bool {
+
+        if let section, section != sectionId {
+            return false
+        }
+
+        if !categories.isEmpty {
+            guard
+                let recipeCategory = RecipeCategory(matching: category),
+                categories.contains(recipeCategory)
+            else {
+                return false
+            }
+        }
+
+        return !featuredOnly || isFeatured
     }
 }
