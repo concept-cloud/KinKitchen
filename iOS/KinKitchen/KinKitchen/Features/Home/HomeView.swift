@@ -20,7 +20,6 @@ struct HomeView: View {
     @State private var showingAddGathering = false
     @State private var comingSoon: ComingSoonFeature?
     @State private var bellRings = 0
-    @State private var heroTopInset: CGFloat = 0
     @State private var recentRecipes: [Recipe] = []
     @State private var cookbooks: [Cookbook] = []
     @State private var hasLoadedDiscovery = false
@@ -148,18 +147,17 @@ struct HomeView: View {
             // Photo runs up under the status bar. A clear bar with a
             // dark scheme keeps the status bar light over it, and holds
             // the bell.
-            .onGeometryChange(
-                for: CGFloat.self
-            ) { proxy in
-                proxy.safeAreaInsets.top
-            } action: { inset in
-                heroTopInset = inset
-            }
             .ignoresSafeArea(
                 edges: .top
             )
+            // Clear but "visible" so the dark scheme applies and the
+            // status bar turns white over the photo.
             .toolbarBackground(
-                .hidden,
+                Color.clear,
+                for: .navigationBar
+            )
+            .toolbarBackgroundVisibility(
+                .visible,
                 for: .navigationBar
             )
             .toolbarColorScheme(
@@ -313,6 +311,26 @@ struct HomeView: View {
 }
 
 
+// MARK: - Text Outline
+
+private extension View {
+
+    /// A thin dark outline plus a soft glow, so white text stays bold
+    /// and readable over any photo.
+    func kinTextOutline(
+        color: Color = .black.opacity(0.85)
+    ) -> some View {
+
+        self
+            .shadow(color: color, radius: 0, x: 1.2, y: 0)
+            .shadow(color: color, radius: 0, x: -1.2, y: 0)
+            .shadow(color: color, radius: 0, x: 0, y: 1.2)
+            .shadow(color: color, radius: 0, x: 0, y: -1.2)
+            .shadow(color: .black.opacity(0.5), radius: 6, y: 2)
+    }
+}
+
+
 // MARK: - Coming Soon
 
 /// Quick actions whose features aren't built yet.
@@ -369,111 +387,73 @@ private extension HomeView {
     }
 
 
-    /// Height of the kitchen photo below the status bar.
-    private static let heroImageHeight: CGFloat = 400
-
-    /// Matches the dark brick at the top edge of the photo.
-    private static let heroTopColor =
-        Color(
-            red: 0.10,
-            green: 0.05,
-            blue: 0.02
-        )
-
-    /// The Kin Kitchen kitchen photo (its neon sign is the logo),
-    /// running to the top of the screen, with the greeting in white
-    /// over the bottom of the photo. A short fade below the text
-    /// blends it into the page.
+    /// The Kin Kitchen hero photo (light and dark versions in the
+    /// HomeHero asset), full width from the top of the screen with
+    /// nothing cropped. The greeting sits in white on the table at the
+    /// bottom, and a short fade below it blends into the page.
     var homeHero: some View {
 
-        VStack(
-            spacing: 0
-        ) {
+        Image("HomeHero")
+            .resizable()
+            .scaledToFit()
+            .frame(
+                maxWidth: .infinity
+            )
+            .overlay {
 
-            // Behind the status bar, so the sign starts below it.
-            Self.heroTopColor
-                .frame(
-                    height: heroTopInset
-                )
+                ZStack {
 
-            Image("HomeHero")
-                .resizable()
-                .scaledToFill()
-                .frame(
-                    height: Self.heroImageHeight
-                )
-                .frame(
-                    maxWidth: .infinity
-                )
-                .clipped()
-                .overlay {
-
-                    ZStack {
-
-                        // Blend the top edge into the strip above.
-                        LinearGradient(
-                            colors: [
-                                Self.heroTopColor,
-                                Self.heroTopColor.opacity(0)
-                            ],
-                            startPoint: .top,
-                            endPoint: UnitPoint(
-                                x: 0.5,
-                                y: 0.12
+                    // Darken the table behind the greeting.
+                    LinearGradient(
+                        stops: [
+                            .init(
+                                color: .black.opacity(0),
+                                location: 0.5
+                            ),
+                            .init(
+                                color: .black.opacity(0.45),
+                                location: 0.8
                             )
-                        )
+                        ],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
 
-                        // Darken behind the greeting.
-                        LinearGradient(
-                            stops: [
-                                .init(
-                                    color: .black.opacity(0),
-                                    location: 0.6
-                                ),
-                                .init(
-                                    color: .black.opacity(0.6),
-                                    location: 0.88
-                                )
-                            ],
-                            startPoint: .top,
-                            endPoint: .bottom
-                        )
-
-                        // Blend into the page, below the text.
-                        LinearGradient(
-                            stops: [
-                                .init(
-                                    color: KinColors.background.opacity(0),
-                                    location: 0.955
-                                ),
-                                .init(
-                                    color: KinColors.background,
-                                    location: 1
-                                )
-                            ],
-                            startPoint: .top,
-                            endPoint: .bottom
-                        )
-                    }
+                    // Blend into the page, below the text.
+                    LinearGradient(
+                        stops: [
+                            .init(
+                                color: KinColors.background.opacity(0),
+                                location: 0.85
+                            ),
+                            .init(
+                                color: KinColors.background,
+                                location: 1
+                            )
+                        ],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
                 }
-                .overlay(
-                    alignment: .bottom
-                ) {
+            }
+            .overlay(
+                alignment: .bottom
+            ) {
 
-                    greeting
-                        .padding(
-                            .horizontal,
-                            KinSpacing.large
-                        )
-                        .padding(
-                            .bottom,
-                            KinSpacing.large
-                        )
-                }
-                .accessibilityElement(
-                    children: .contain
-                )
-        }
+                greeting
+                    .padding(
+                        .horizontal,
+                        KinSpacing.large
+                    )
+                    // Above the fade into the page.
+                    .padding(
+                        .bottom,
+                        76
+                    )
+            }
+            .accessibilityElement(
+                children: .contain
+            )
     }
 
 
@@ -511,7 +491,7 @@ private extension HomeView {
                 height: 44
             )
             .background(
-                KinColors.surface
+                .white.opacity(0.92)
             )
             .clipShape(
                 Circle()
@@ -570,15 +550,12 @@ private extension HomeView {
     var greeting: some View {
 
         VStack(
-            spacing: KinSpacing.xSmall
+            spacing: KinSpacing.xxSmall
         ) {
 
             Text("Welcome back,")
                 .font(
-                    KinTypography.body
-                )
-                .foregroundStyle(
-                    .white.opacity(0.9)
+                    .custom("Arvo-Bold", size: 20, relativeTo: .title3)
                 )
 
             Text(
@@ -587,27 +564,18 @@ private extension HomeView {
                 : firstName
             )
             .font(
-                KinTypography.largeTitle
-            )
-            .foregroundStyle(
-                .white
+                .custom("Arvo-Bold", size: 40, relativeTo: .largeTitle)
             )
             .lineLimit(1)
             .minimumScaleFactor(0.6)
 
             Text("What's cookin' today?")
                 .font(
-                    KinTypography.body
-                )
-                .foregroundStyle(
-                    .white.opacity(0.9)
+                    .custom("Arvo-Bold", size: 20, relativeTo: .title3)
                 )
         }
-        .shadow(
-            color: .black.opacity(0.7),
-            radius: 4,
-            y: 1
-        )
+        .foregroundStyle(.white)
+        .kinTextOutline()
         .multilineTextAlignment(.center)
         .frame(
             maxWidth: .infinity
