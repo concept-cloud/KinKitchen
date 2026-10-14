@@ -865,7 +865,7 @@ private extension HomeView {
                 // Lets the photo show clearly on the left.
                 Color.clear
                     .frame(
-                        width: 104
+                        width: 80
                     )
 
                 VStack(
@@ -962,8 +962,9 @@ private extension HomeView {
             )
             .background {
 
-                // Photo fills the card, then fades into the card color
-                // (light or dark) behind the text.
+                // Photo fills the card and stays visible all the way
+                // across; the card color (light or dark) fades in
+                // partway behind the text so it stays readable.
                 ZStack {
 
                     GatheringCardImage(
@@ -978,16 +979,16 @@ private extension HomeView {
                                 location: 0
                             ),
                             .init(
-                                color: KinColors.surface.opacity(0),
-                                location: 0.12
+                                color: KinColors.surface.opacity(0.15),
+                                location: 0.25
                             ),
                             .init(
-                                color: KinColors.surface.opacity(0.85),
-                                location: 0.4
-                            ),
-                            .init(
-                                color: KinColors.surface,
+                                color: KinColors.surface.opacity(0.6),
                                 location: 0.55
+                            ),
+                            .init(
+                                color: KinColors.surface.opacity(0.75),
+                                location: 1
                             )
                         ],
                         startPoint: .leading,
