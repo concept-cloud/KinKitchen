@@ -18,6 +18,8 @@ struct HomeView: View {
     @State private var showingAddRecipe = false
     @State private var showingAddGathering = false
     @State private var comingSoon: ComingSoonFeature?
+    @State private var bellRings = 0
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     
     @State private var upcomingGatherings:
     [GatheringListItem] = []
@@ -308,6 +310,12 @@ private extension HomeView {
             .foregroundStyle(
                 KinColors.primary
             )
+            // Rings when Home loads with unread notifications.
+            .symbolEffect(
+                .wiggle.byLayer,
+                options: .repeat(2),
+                value: bellRings
+            )
             .frame(
                 width: 44,
                 height: 44
@@ -504,30 +512,24 @@ private extension HomeView {
 
             KinCard {
 
-                HStack(
-                    spacing: KinSpacing.medium
-                ) {
-
-                    Image(
-                        systemName: "bell"
-                    )
-                    .font(
-                        .system(size: 20)
-                    )
-                    .foregroundStyle(
-                        KinColors.secondaryText
-                    )
+                Label {
 
                     Text(
                         "You're all caught up."
                     )
-                    .font(
-                        KinTypography.body
-                    )
-                    .foregroundStyle(
-                        KinColors.secondaryText
+
+                } icon: {
+
+                    Image(
+                        systemName: "checkmark.circle"
                     )
                 }
+                .font(
+                    KinTypography.body
+                )
+                .foregroundStyle(
+                    KinColors.secondaryText
+                )
                 .frame(
                     maxWidth: .infinity,
                     alignment: .leading
@@ -536,24 +538,49 @@ private extension HomeView {
 
         } else {
 
+            // Newest unread first, in one grouped card.
             VStack(
-                spacing: KinSpacing.medium
+                spacing: 0
             ) {
+
+                let shown =
+                    Array(
+                        unreadNotifications.prefix(3)
+                    )
+
                 ForEach(
-                    unreadNotifications.prefix(3)
+                    shown
                 ) { notification in
-                    homeNotificationCard(
+
+                    homeNotificationRow(
                         notification
                     )
+
+                    if notification.id != shown.last?.id {
+
+                        Divider()
+                            .padding(
+                                .leading,
+                                60
+                            )
+                    }
                 }
             }
+            .background(
+                KinColors.surface
+            )
+            .clipShape(
+                RoundedRectangle(
+                    cornerRadius: KinRadius.large
+                )
+            )
         }
     }
 
 
-    // MARK: - Notification Card
+    // MARK: - Notification Row
 
-    private func homeNotificationCard(
+    private func homeNotificationRow(
         _ notification: KinNotification
     ) -> some View {
 
@@ -579,94 +606,118 @@ private extension HomeView {
 
         } label: {
 
-            KinCard {
+            HStack(
+                alignment: .top,
+                spacing: KinSpacing.medium
+            ) {
 
-                HStack(
-                    alignment: .top,
-                    spacing: KinSpacing.medium
+                Image(
+                    systemName:
+                        notification.type.iconName
+                )
+                .font(
+                    .system(
+                        size: 15,
+                        weight: .semibold
+                    )
+                )
+                .foregroundStyle(
+                    color
+                )
+                .frame(
+                    width: 36,
+                    height: 36
+                )
+                .background(
+                    color.opacity(0.14)
+                )
+                .clipShape(
+                    Circle()
+                )
+
+                VStack(
+                    alignment: .leading,
+                    spacing: KinSpacing.xxSmall
                 ) {
 
-                    ZStack {
+                    Text(
+                        notification.title
+                    )
+                    .font(
+                        KinTypography.headline
+                    )
+                    .foregroundStyle(
+                        KinColors.primaryText
+                    )
+                    .lineLimit(2)
 
-                        Circle()
-                            .fill(
-                                color.opacity(0.15)
-                            )
-                            .frame(
-                                width: 44,
-                                height: 44
-                            )
+                    if let message =
+                        notification.displayMessage {
 
-                        Image(
-                            systemName:
-                                notification.type.iconName
-                        )
-                        .foregroundStyle(
-                            color
-                        )
-                    }
-
-                    VStack(
-                        alignment: .leading,
-                        spacing: KinSpacing.xSmall
-                    ) {
-
-                        HStack {
-
-                            Text(
-                                notification.title
-                            )
+                        Text(message)
                             .font(
-                                KinTypography.headline
+                                KinTypography.footnote
                             )
                             .foregroundStyle(
-                                KinColors.primaryText
+                                KinColors.secondaryText
                             )
-
-                            Spacer()
-
-                            Image(systemName: "bell.fill")
-                                .font(.system(size: 20, weight: .semibold))
-                                .foregroundStyle(
-                                    KinColors.primary
-                                )
-                        }
-
-                        if let message =
-                            notification.displayMessage {
-
-                            Text(message)
-                                .font(
-                                    KinTypography.body
-                                )
-                                .foregroundStyle(
-                                    KinColors.secondaryText
-                                )
-                        }
-
-                        Text(
-                            notification.createdAt,
-                            format:
-                                .relative(
-                                    presentation:
-                                        .named
-                                )
-                        )
-                        .font(
-                            KinTypography.caption
-                        )
-                        .foregroundStyle(
-                            KinColors.secondaryText
-                        )
+                            .lineLimit(3)
                     }
+
+                    Text(
+                        notification.createdAt,
+                        format:
+                            .relative(
+                                presentation:
+                                    .named
+                            )
+                    )
+                    .font(
+                        KinTypography.caption2
+                    )
+                    .foregroundStyle(
+                        KinColors.secondaryText
+                    )
                 }
                 .frame(
                     maxWidth: .infinity,
                     alignment: .leading
                 )
+
+                // Unread dot
+                Circle()
+                    .fill(
+                        KinColors.primary
+                    )
+                    .frame(
+                        width: 9,
+                        height: 9
+                    )
+                    .padding(
+                        .top,
+                        6
+                    )
+                    .accessibilityHidden(true)
             }
+            .padding(
+                KinSpacing.medium
+            )
+            .contentShape(
+                Rectangle()
+            )
         }
         .buttonStyle(.plain)
+        .accessibilityElement(
+            children: .combine
+        )
+        .accessibilityLabel(
+            "Unread. \(notification.title)"
+        )
+        .accessibilityHint(
+            notification.gatheringId == nil
+                ? "Marks as read"
+                : "Opens the gathering"
+        )
     }
 }
 
@@ -679,7 +730,8 @@ private extension HomeView {
     var upcomingGatheringsSection:
         some View {
 
-        if isLoadingGatherings {
+        if isLoadingGatherings
+            && upcomingGatherings.isEmpty {
 
             KinCard {
 
@@ -699,37 +751,63 @@ private extension HomeView {
                         KinColors.secondaryText
                     )
                 }
+                .frame(
+                    maxWidth: .infinity,
+                    alignment: .leading
+                )
             }
 
         } else if upcomingGatherings.isEmpty {
 
             KinCard {
 
-                VStack(
-                    alignment: .leading,
-                    spacing: KinSpacing.small
+                HStack(
+                    spacing: KinSpacing.medium
                 ) {
 
-                    Text(
-                        "No upcoming gatherings"
+                    Image(
+                        systemName: "calendar.badge.plus"
                     )
                     .font(
-                        KinTypography.title3
+                        .system(
+                            size: 26,
+                            weight: .semibold
+                        )
                     )
                     .foregroundStyle(
-                        KinColors.primaryText
+                        KinColors.success
                     )
 
-                    Text(
-                        "Your upcoming community meals will appear here."
-                    )
-                    .font(
-                        KinTypography.body
-                    )
-                    .foregroundStyle(
-                        KinColors.secondaryText
-                    )
+                    VStack(
+                        alignment: .leading,
+                        spacing: KinSpacing.xSmall
+                    ) {
+
+                        Text(
+                            "Nothing planned yet"
+                        )
+                        .font(
+                            KinTypography.headline
+                        )
+                        .foregroundStyle(
+                            KinColors.primaryText
+                        )
+
+                        Text(
+                            "Tap New Event to bring everyone to the table."
+                        )
+                        .font(
+                            KinTypography.footnote
+                        )
+                        .foregroundStyle(
+                            KinColors.secondaryText
+                        )
+                    }
                 }
+                .frame(
+                    maxWidth: .infinity,
+                    alignment: .leading
+                )
             }
 
         } else {
@@ -763,8 +841,15 @@ private extension HomeView {
                 forGathering: gathering.id
             )
 
-        let unreadCount =
-            unread.count
+        let location =
+            cleaned(
+                gathering.location
+            )
+
+        let dateText =
+            HomeView.eventDateText(
+                gathering.startsAt
+            )
 
         return Button {
 
@@ -773,46 +858,24 @@ private extension HomeView {
 
         } label: {
 
-            KinCard {
+            HStack(
+                alignment: .top,
+                spacing: KinSpacing.medium
+            ) {
 
-                HStack(
-                    spacing: KinSpacing.medium
+                GatheringCardImage(
+                    path: gathering.coverImagePath,
+                    size: 84
+                )
+
+                VStack(
+                    alignment: .leading,
+                    spacing: KinSpacing.xSmall
                 ) {
 
-                    Image(
-                        systemName:
-                            gatheringIcon(
-                                for: item
-                            )
-                    )
-                    .font(
-                        .system(
-                            size: 22,
-                            weight: .semibold
-                        )
-                    )
-                    .foregroundStyle(
-                        relationshipColor(
-                            for: item
-                        )
-                    )
-                    .frame(
-                        width: 44,
-                        height: 44
-                    )
-                    .background(
-                        relationshipColor(
-                            for: item
-                        )
-                        .opacity(0.10)
-                    )
-                    .clipShape(
-                        Circle()
-                    )
-
-                    VStack(
-                        alignment: .leading,
-                        spacing: KinSpacing.xSmall
+                    HStack(
+                        alignment: .top,
+                        spacing: KinSpacing.small
                     ) {
 
                         Text(
@@ -825,101 +888,155 @@ private extension HomeView {
                             KinColors.primaryText
                         )
                         .lineLimit(2)
+                        .frame(
+                            maxWidth: .infinity,
+                            alignment: .leading
+                        )
 
-                        Text(
-                            formattedGatheringDate(
-                                gathering.startsAt
-                            )
+                        relationshipPill(
+                            for: item
+                        )
+                    }
+
+                    Label(
+                        dateText,
+                        systemImage: KinIcons.calendar
+                    )
+                    .font(
+                        KinTypography.footnote
+                    )
+                    .foregroundStyle(
+                        KinColors.secondaryText
+                    )
+
+                    if let location {
+
+                        Label(
+                            location,
+                            systemImage: "mappin"
                         )
                         .font(
-                            KinTypography.caption
+                            KinTypography.footnote
                         )
                         .foregroundStyle(
                             KinColors.secondaryText
                         )
+                        .lineLimit(1)
+                    }
 
-                        if
-                            let location =
-                                cleaned(
-                                    gathering.location
-                                )
-                        {
+                    if let latest =
+                        unread.first {
 
-                            Text(
-                                location
-                            )
-                            .font(
-                                KinTypography.caption
-                            )
-                            .foregroundStyle(
-                                KinColors.secondaryText
-                            )
-                            .lineLimit(1)
-                        }
-
-                        if let latest =
-                            unread.first {
+                        HStack(
+                            alignment: .top,
+                            spacing: KinSpacing.small
+                        ) {
 
                             KinCardNotificationLine(
                                 notification: latest
                             )
+                            .frame(
+                                maxWidth: .infinity,
+                                alignment: .leading
+                            )
+
+                            if unread.count > 1 {
+
+                                KinUnreadIndicator(
+                                    count: unread.count
+                                )
+                            }
                         }
-                    }
-                    .frame(
-                        maxWidth: .infinity,
-                        alignment: .leading
-                    )
-
-                    VStack(
-                        alignment: .trailing,
-                        spacing: KinSpacing.small
-                    ) {
-
-                        if unreadCount > 0 {
-
-                            KinUnreadIndicator(
-                                count: unreadCount
-                            )
-                        }
-
-                        Text(
-                            item.relationship
-                                .displayName
-                        )
-                        .font(
-                            KinTypography.caption
-                        )
-                        .foregroundStyle(
-                            relationshipColor(
-                                for: item
-                            )
-                        )
                         .padding(
-                            .horizontal,
-                            KinSpacing.small
-                        )
-                        .padding(
-                            .vertical,
-                            KinSpacing.xSmall
-                        )
-                        .background(
-                            relationshipColor(
-                                for: item
-                            )
-                            .opacity(0.10)
-                        )
-                        .clipShape(
-                            Capsule()
+                            .top,
+                            KinSpacing.xxSmall
                         )
                     }
-                    .fixedSize(
-                        horizontal: true,
-                        vertical: false
-                    )
                 }
             }
+            .padding(
+                KinSpacing.medium
+            )
+            .background(
+                KinColors.surface
+            )
+            .clipShape(
+                RoundedRectangle(
+                    cornerRadius: KinRadius.large
+                )
+            )
+            .shadow(
+                color: .black.opacity(0.05),
+                radius: 6,
+                y: 2
+            )
+            .contentShape(
+                RoundedRectangle(
+                    cornerRadius: KinRadius.large
+                )
+            )
         }
         .buttonStyle(.plain)
+        .accessibilityElement(
+            children: .ignore
+        )
+        .accessibilityLabel(
+            [
+                gathering.name,
+                item.relationship.displayName,
+                dateText,
+                location,
+                unread.isEmpty
+                    ? nil
+                    : "\(unread.count) new update\(unread.count == 1 ? "" : "s")"
+            ]
+            .compactMap { $0 }
+            .joined(separator: ", ")
+        )
+        .accessibilityHint(
+            "Opens the gathering"
+        )
+        .accessibilityAddTraits(
+            .isButton
+        )
+    }
+
+
+    func relationshipPill(
+        for item: GatheringListItem
+    ) -> some View {
+
+        let color =
+            relationshipColor(
+                for: item
+            )
+
+        return Text(
+            item.relationship
+                .displayName
+        )
+        .font(
+            .system(
+                size: 12,
+                weight: .bold
+            )
+        )
+        .foregroundStyle(.white)
+        .padding(
+            .horizontal,
+            KinSpacing.small
+        )
+        .padding(
+            .vertical,
+            KinSpacing.xSmall
+        )
+        .background(
+            color
+        )
+        .clipShape(
+            Capsule()
+        )
+        .fixedSize()
     }
 }
 
@@ -989,6 +1106,10 @@ private extension HomeView {
         }
 
         isLoadingGatherings = false
+
+        if !unreadNotifications.isEmpty && !reduceMotion {
+            bellRings += 1
+        }
     }
 
     // MARK: - Mark Read
@@ -1035,42 +1156,11 @@ private extension HomeView {
             return KinColors.primary
 
         case .going:
-            return .green
+            return KinColors.success
 
         case .invited:
             return KinColors.warning
         }
-    }
-
-
-    func gatheringIcon(
-        for item: GatheringListItem
-    ) -> String {
-
-        switch item.relationship {
-
-        case .hosting:
-            return "house.fill"
-
-        case .going:
-            return "person.3.fill"
-
-        case .invited:
-            return "envelope.fill"
-        }
-    }
-
-
-    func formattedGatheringDate(
-        _ date: Date
-    ) -> String {
-
-        date.formatted(
-            .dateTime
-                .weekday(.wide)
-                .hour()
-                .minute()
-        )
     }
 
 
@@ -1092,6 +1182,72 @@ private extension HomeView {
         return cleanedValue.isEmpty
             ? nil
             : cleanedValue
+    }
+}
+
+
+// MARK: - Event Dates
+
+extension HomeView {
+
+    /// "Today · 6:00 PM", "Tomorrow · …", "Sunday · …" within the
+    /// week, otherwise "Sun, Oct 26 · 6:00 PM", so far-off events are
+    /// never mistaken for this week's.
+    nonisolated static func eventDateText(
+        _ date: Date,
+        now: Date = .now,
+        calendar: Calendar = .current
+    ) -> String {
+
+        let time =
+            date.formatted(
+                date: .omitted,
+                time: .shortened
+            )
+
+        let startOfToday =
+            calendar.startOfDay(
+                for: now
+            )
+
+        let days =
+            calendar.dateComponents(
+                [.day],
+                from: startOfToday,
+                to: calendar.startOfDay(
+                    for: date
+                )
+            )
+            .day ?? 0
+
+        let day: String
+
+        switch days {
+
+        case 0:
+            day = "Today"
+
+        case 1:
+            day = "Tomorrow"
+
+        case 2...6:
+            day =
+                date.formatted(
+                    .dateTime
+                        .weekday(.wide)
+                )
+
+        default:
+            day =
+                date.formatted(
+                    .dateTime
+                        .weekday(.abbreviated)
+                        .month(.abbreviated)
+                        .day()
+                )
+        }
+
+        return "\(day) · \(time)"
     }
 }
 
