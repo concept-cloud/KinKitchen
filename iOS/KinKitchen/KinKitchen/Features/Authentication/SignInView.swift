@@ -21,6 +21,10 @@ struct SignInView: View {
         ScrollView {
             VStack(spacing: KinSpacing.xLarge) {
 
+                // Official logo, same as the rest of the app.
+                KinLogo(height: 150)
+                    .padding(.top, KinSpacing.large)
+
                 Text("Welcome Back")
                     .font(KinTypography.largeTitle)
                     .foregroundStyle(KinColors.primaryText)
@@ -51,8 +55,7 @@ struct SignInView: View {
                 }
 
                 KinPrimaryButton(
-                    title: isSigningIn ? "Signing In..." : "Sign In",
-                    color: KinColors.success
+                    title: isSigningIn ? "Signing In..." : "Sign In"
                 ) {
                     Task {
                         await signIn()
@@ -61,8 +64,7 @@ struct SignInView: View {
                 .disabled(isSigningIn)
                 
                 KinSecondaryButton(
-                    title: "Don't have an account? Sign Up",
-                    color: KinColors.success
+                    title: "Don't have an account? Sign Up"
                 ) {
                     isShowingSignUp = true
                 }

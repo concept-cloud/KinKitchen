@@ -21,6 +21,10 @@ struct SignUpView: View {
     var body: some View {
         ScrollView {
             VStack(spacing: KinSpacing.xLarge) {
+                // Official logo, same as the rest of the app.
+                KinLogo(height: 150)
+                    .padding(.top, KinSpacing.large)
+
                 Text("Create Account")
                     .font(KinTypography.largeTitle)
                     .foregroundStyle(KinColors.primaryText)
@@ -63,8 +67,7 @@ struct SignUpView: View {
                 }
 
                 KinPrimaryButton(
-                    title: isCreatingAccount ? "Creating Account..." : "Create Account",
-                    color: KinColors.success
+                    title: isCreatingAccount ? "Creating Account..." : "Create Account"
                 ) {
                     Task {
                         await createAccount()
@@ -73,8 +76,7 @@ struct SignUpView: View {
                 .disabled(isCreatingAccount)
 
                 KinSecondaryButton(
-                    title: "Already have an account? Sign In",
-                    color: KinColors.success
+                    title: "Already have an account? Sign In"
                 ) {
                     dismiss()
                 }
