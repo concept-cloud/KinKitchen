@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import Supabase
 
 
 struct HomeView: View {
@@ -19,6 +20,12 @@ struct HomeView: View {
     @State private var showingAddGathering = false
     @State private var comingSoon: ComingSoonFeature?
     @State private var bellRings = 0
+    @State private var heroTopInset: CGFloat = 0
+    @State private var recentRecipes: [Recipe] = []
+    @State private var cookbooks: [Cookbook] = []
+    @State private var hasLoadedDiscovery = false
+    @State private var selectedRecipeId: UUID?
+    @State private var selectedCookbookId: UUID?
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     
     @State private var upcomingGatherings:
@@ -39,19 +46,19 @@ struct HomeView: View {
         NavigationStack {
             
             ScrollView {
-                
+
+                VStack(
+                    spacing: 0
+                ) {
+
+                // MARK: - Hero & Welcome
+
+                homeHero
+
                 VStack(
                     alignment: .leading,
                     spacing: KinSpacing.xLarge
                 ) {
-
-                    // MARK: - Header
-
-                    homeHeader
-
-                    // MARK: - Welcome
-
-                    greeting
 
                     // MARK: - Quick Actions
 
@@ -72,6 +79,40 @@ struct HomeView: View {
                         }
 
                         upcomingGatheringsSection
+                    }
+
+                    // MARK: - Recent Recipes
+
+                    VStack(
+                        alignment: .leading,
+                        spacing: KinSpacing.medium
+                    ) {
+
+                        KinSectionHeader(
+                            title: "Recent Recipes",
+                            actionTitle: "View All"
+                        ) {
+                            selectTab(.recipes)
+                        }
+
+                        recentRecipesSection
+                    }
+
+                    // MARK: - Your Cookbooks
+
+                    VStack(
+                        alignment: .leading,
+                        spacing: KinSpacing.medium
+                    ) {
+
+                        KinSectionHeader(
+                            title: "Your Cookbooks",
+                            actionTitle: "View All"
+                        ) {
+                            selectTab(.cookbooks)
+                        }
+
+                        cookbooksSection
                     }
 
                     // MARK: - Alerts
@@ -99,14 +140,41 @@ struct HomeView: View {
                     .bottom,
                     KinSpacing.xLarge
                 )
+                }
             }
             .background(
                 homeBackground
             )
-            .toolbar(
+            // Photo runs up under the status bar. A clear bar with a
+            // dark scheme keeps the status bar light over it, and holds
+            // the bell.
+            .onGeometryChange(
+                for: CGFloat.self
+            ) { proxy in
+                proxy.safeAreaInsets.top
+            } action: { inset in
+                heroTopInset = inset
+            }
+            .ignoresSafeArea(
+                edges: .top
+            )
+            .toolbarBackground(
                 .hidden,
                 for: .navigationBar
             )
+            .toolbarColorScheme(
+                .dark,
+                for: .navigationBar
+            )
+            .toolbar {
+
+                ToolbarItem(
+                    placement: .topBarTrailing
+                ) {
+                    notificationsBell
+                }
+                .sharedBackgroundVisibility(.hidden)
+            }
             .task {
                 await loadHome()
             }
@@ -166,6 +234,46 @@ struct HomeView: View {
             ) {
 
                 NotificationsView()
+            }
+            // MARK: - Recipe & Cookbook Destinations
+
+            .navigationDestination(
+                item: $selectedRecipeId
+            ) { recipeId in
+
+                RecipeDetailView(
+                    recipeId: recipeId
+                )
+            }
+            .navigationDestination(
+                item: $selectedCookbookId
+            ) { cookbookId in
+
+                CookbookDetailView(
+                    cookbookId: cookbookId
+                )
+            }
+            // Recents and cookbooks may have changed while away.
+            .onChange(of: selectedRecipeId) {
+                if selectedRecipeId == nil {
+                    Task {
+                        await loadDiscovery()
+                    }
+                }
+            }
+            .onChange(of: selectedCookbookId) {
+                if selectedCookbookId == nil {
+                    Task {
+                        await loadDiscovery()
+                    }
+                }
+            }
+            .onChange(of: showingAddRecipe) {
+                if !showingAddRecipe {
+                    Task {
+                        await loadDiscovery()
+                    }
+                }
             }
             // MARK: - Add Gathering Destination
 
@@ -261,29 +369,111 @@ private extension HomeView {
     }
 
 
-    /// Logo at the center, notifications bell on the trailing edge.
-    var homeHeader: some View {
+    /// Height of the kitchen photo below the status bar.
+    private static let heroImageHeight: CGFloat = 400
 
-        ZStack(
-            alignment: .top
+    /// Matches the dark brick at the top edge of the photo.
+    private static let heroTopColor =
+        Color(
+            red: 0.10,
+            green: 0.05,
+            blue: 0.02
+        )
+
+    /// The Kin Kitchen kitchen photo (its neon sign is the logo),
+    /// running to the top of the screen, with the greeting in white
+    /// over the bottom of the photo. A short fade below the text
+    /// blends it into the page.
+    var homeHero: some View {
+
+        VStack(
+            spacing: 0
         ) {
 
-            KinLogo()
+            // Behind the status bar, so the sign starts below it.
+            Self.heroTopColor
+                .frame(
+                    height: heroTopInset
+                )
+
+            Image("HomeHero")
+                .resizable()
+                .scaledToFill()
+                .frame(
+                    height: Self.heroImageHeight
+                )
                 .frame(
                     maxWidth: .infinity
                 )
+                .clipped()
+                .overlay {
 
-            HStack {
+                    ZStack {
 
-                Spacer()
+                        // Blend the top edge into the strip above.
+                        LinearGradient(
+                            colors: [
+                                Self.heroTopColor,
+                                Self.heroTopColor.opacity(0)
+                            ],
+                            startPoint: .top,
+                            endPoint: UnitPoint(
+                                x: 0.5,
+                                y: 0.12
+                            )
+                        )
 
-                notificationsBell
-            }
+                        // Darken behind the greeting.
+                        LinearGradient(
+                            stops: [
+                                .init(
+                                    color: .black.opacity(0),
+                                    location: 0.6
+                                ),
+                                .init(
+                                    color: .black.opacity(0.6),
+                                    location: 0.88
+                                )
+                            ],
+                            startPoint: .top,
+                            endPoint: .bottom
+                        )
+
+                        // Blend into the page, below the text.
+                        LinearGradient(
+                            stops: [
+                                .init(
+                                    color: KinColors.background.opacity(0),
+                                    location: 0.955
+                                ),
+                                .init(
+                                    color: KinColors.background,
+                                    location: 1
+                                )
+                            ],
+                            startPoint: .top,
+                            endPoint: .bottom
+                        )
+                    }
+                }
+                .overlay(
+                    alignment: .bottom
+                ) {
+
+                    greeting
+                        .padding(
+                            .horizontal,
+                            KinSpacing.large
+                        )
+                        .padding(
+                            .bottom,
+                            KinSpacing.large
+                        )
+                }
+                .accessibilityElement(
+                    children: .contain
+                )
         }
-        .padding(
-            .top,
-            KinSpacing.small
-        )
     }
 
 
@@ -388,7 +578,7 @@ private extension HomeView {
                     KinTypography.body
                 )
                 .foregroundStyle(
-                    KinColors.secondaryText
+                    .white.opacity(0.9)
                 )
 
             Text(
@@ -400,7 +590,7 @@ private extension HomeView {
                 KinTypography.largeTitle
             )
             .foregroundStyle(
-                KinColors.primaryText
+                .white
             )
             .lineLimit(1)
             .minimumScaleFactor(0.6)
@@ -410,9 +600,14 @@ private extension HomeView {
                     KinTypography.body
                 )
                 .foregroundStyle(
-                    KinColors.secondaryText
+                    .white.opacity(0.9)
                 )
         }
+        .shadow(
+            color: .black.opacity(0.7),
+            radius: 4,
+            y: 1
+        )
         .multilineTextAlignment(.center)
         .frame(
             maxWidth: .infinity
@@ -1077,6 +1272,298 @@ private extension HomeView {
 }
 
 
+// MARK: - Recent Recipes & Cookbooks
+
+private extension HomeView {
+
+    @ViewBuilder
+    var recentRecipesSection: some View {
+
+        if !hasLoadedDiscovery {
+
+            ProgressView()
+                .frame(
+                    maxWidth: .infinity,
+                    minHeight: 120
+                )
+
+        } else if recentRecipes.isEmpty {
+
+            homeEmptyPrompt(
+                icon: KinIcons.recipes,
+                title: "Your recipes will show up here",
+                message: "Add a family favorite to get started.",
+                buttonTitle: "Add a Recipe"
+            ) {
+                showingAddRecipe = true
+            }
+
+        } else {
+
+            ScrollView(
+                .horizontal,
+                showsIndicators: false
+            ) {
+
+                LazyHStack(
+                    alignment: .top,
+                    spacing: KinSpacing.medium
+                ) {
+
+                    ForEach(recentRecipes) { recipe in
+
+                        recipeTile(recipe)
+                    }
+                }
+                .padding(
+                    .vertical,
+                    KinSpacing.xSmall
+                )
+            }
+            .scrollClipDisabled()
+        }
+    }
+
+
+    func recipeTile(
+        _ recipe: Recipe
+    ) -> some View {
+
+        let details =
+            HomeView.recipeDetails(
+                minutes: recipe.totalTimeMinutes,
+                formattedTime: recipe.formattedTotalTime,
+                category: recipe.category
+            )
+
+        return Button {
+
+            selectedRecipeId = recipe.id
+
+        } label: {
+
+            VStack(
+                alignment: .leading,
+                spacing: KinSpacing.xSmall
+            ) {
+
+                KinStorageImage(
+                    bucket: "recipe-photos",
+                    path: recipe.photoPath
+                )
+                .frame(
+                    width: 124,
+                    height: 124
+                )
+                .clipShape(
+                    RoundedRectangle(
+                        cornerRadius: KinRadius.medium
+                    )
+                )
+
+                Text(recipe.name)
+                    .font(KinTypography.footnote)
+                    .fontWeight(.semibold)
+                    .foregroundStyle(KinColors.primaryText)
+                    .lineLimit(
+                        2,
+                        reservesSpace: true
+                    )
+
+                if let details {
+
+                    Text(details)
+                        .font(KinTypography.caption2)
+                        .foregroundStyle(KinColors.secondaryText)
+                        .lineLimit(1)
+                }
+            }
+            .frame(
+                width: 124,
+                alignment: .leading
+            )
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(
+            [recipe.name, details]
+                .compactMap { $0 }
+                .joined(separator: ", ")
+        )
+        .accessibilityHint("Opens the recipe")
+        .accessibilityAddTraits(.isButton)
+    }
+
+
+    @ViewBuilder
+    var cookbooksSection: some View {
+
+        if !hasLoadedDiscovery {
+
+            EmptyView()
+
+        } else if cookbooks.isEmpty {
+
+            homeEmptyPrompt(
+                icon: KinIcons.cookbooks,
+                title: "Gather your favorites",
+                message: "Make a cookbook for the recipes your family loves most.",
+                buttonTitle: "Go to Cookbooks"
+            ) {
+                selectTab(.cookbooks)
+            }
+
+        } else {
+
+            ScrollView(
+                .horizontal,
+                showsIndicators: false
+            ) {
+
+                LazyHStack(
+                    spacing: KinSpacing.medium
+                ) {
+
+                    ForEach(cookbooks) { cookbook in
+
+                        cookbookCard(cookbook)
+                    }
+                }
+                .padding(
+                    .vertical,
+                    KinSpacing.xSmall
+                )
+            }
+            .scrollClipDisabled()
+        }
+    }
+
+
+    /// Cover photo with the title written over it, like a book cover.
+    func cookbookCard(
+        _ cookbook: Cookbook
+    ) -> some View {
+
+        Button {
+
+            selectedCookbookId = cookbook.id
+
+        } label: {
+
+            KinStorageImage(
+                bucket: "cookbook-covers",
+                path: cookbook.coverPath,
+                placeholderIcon: KinIcons.cookbooks
+            )
+            .overlay(
+                alignment: .bottomLeading
+            ) {
+
+                ZStack(
+                    alignment: .bottomLeading
+                ) {
+
+                    LinearGradient(
+                        colors: [
+                            .black.opacity(0),
+                            .black.opacity(0.7)
+                        ],
+                        startPoint: .center,
+                        endPoint: .bottom
+                    )
+
+                    Text(cookbook.name)
+                        .font(KinTypography.title3)
+                        .foregroundStyle(.white)
+                        .lineLimit(2)
+                        .shadow(
+                            color: .black.opacity(0.4),
+                            radius: 3,
+                            y: 1
+                        )
+                        .padding(KinSpacing.medium)
+                }
+            }
+            .frame(
+                width: 220,
+                height: 140
+            )
+            .clipShape(
+                RoundedRectangle(
+                    cornerRadius: KinRadius.large
+                )
+            )
+            .shadow(
+                color: .black.opacity(0.08),
+                radius: 6,
+                y: 2
+            )
+        }
+        .buttonStyle(.plain)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("\(cookbook.name), cookbook")
+        .accessibilityHint("Opens the cookbook")
+        .accessibilityAddTraits(.isButton)
+    }
+
+
+    func homeEmptyPrompt(
+        icon: String,
+        title: String,
+        message: String,
+        buttonTitle: String,
+        action: @escaping () -> Void
+    ) -> some View {
+
+        KinCard {
+
+            HStack(
+                alignment: .top,
+                spacing: KinSpacing.medium
+            ) {
+
+                Image(systemName: icon)
+                    .font(
+                        .system(
+                            size: 24,
+                            weight: .semibold
+                        )
+                    )
+                    .foregroundStyle(KinColors.primary)
+                    .accessibilityHidden(true)
+
+                VStack(
+                    alignment: .leading,
+                    spacing: KinSpacing.xSmall
+                ) {
+
+                    Text(title)
+                        .font(KinTypography.headline)
+                        .foregroundStyle(KinColors.primaryText)
+
+                    Text(message)
+                        .font(KinTypography.footnote)
+                        .foregroundStyle(KinColors.secondaryText)
+
+                    Button(
+                        buttonTitle,
+                        action: action
+                    )
+                    .font(KinTypography.subheadline)
+                    .foregroundStyle(KinColors.primary)
+                    .padding(.top, KinSpacing.xSmall)
+                }
+            }
+            .frame(
+                maxWidth: .infinity,
+                alignment: .leading
+            )
+        }
+    }
+}
+
+
 // MARK: - Home Data
 
 private extension HomeView {
@@ -1144,6 +1631,76 @@ private extension HomeView {
         isLoadingGatherings = false
 
         ringBellIfUnread()
+
+        await loadDiscovery()
+    }
+
+    // MARK: - Load Recipes & Cookbooks
+
+    /// Recently opened recipes (then the user's newest) and their
+    /// cookbooks. Everything loads through Supabase, so RLS decides
+    /// what's visible: nothing unauthorized can appear.
+    @MainActor
+    func loadDiscovery() async {
+
+        defer {
+            hasLoadedDiscovery = true
+        }
+
+        do {
+
+            let own =
+                try await RecipeService
+                    .fetchCurrentUserRecipes()
+
+            var viewedIds: [UUID] = []
+
+            if let userId =
+                SupabaseManager.client.auth.currentUser?.id {
+
+                viewedIds =
+                    RecentRecipesStore()
+                        .recipeIds(for: userId)
+            }
+
+            let viewed =
+                try await RecipeService
+                    .fetchRecipes(ids: viewedIds)
+
+            recentRecipes =
+                RecentRecipesStore.merged(
+                    viewedIds: viewedIds,
+                    viewed: viewed,
+                    own: own,
+                    limit: 10
+                )
+
+        } catch {
+            if !(error is CancellationError) {
+                print(
+                    "HOME RECIPES LOAD ERROR:",
+                    error.localizedDescription
+                )
+            }
+        }
+
+        do {
+
+            cookbooks =
+                Array(
+                    try await CookbookService
+                        .fetchCurrentUserCookbooks()
+                        .prefix(6)
+                )
+
+        } catch {
+            if !(error is CancellationError) {
+                print(
+                    "HOME COOKBOOKS LOAD ERROR:",
+                    error.localizedDescription
+                )
+            }
+        }
     }
 
     // MARK: - Bell
@@ -1250,6 +1807,31 @@ private extension HomeView {
 // MARK: - Event Dates
 
 extension HomeView {
+
+    /// "30 min · Dinner", just one of them, or nil when neither is set.
+    nonisolated static func recipeDetails(
+        minutes: Int,
+        formattedTime: String,
+        category: String?
+    ) -> String? {
+
+        let category =
+            category?.trimmingCharacters(
+                in: .whitespacesAndNewlines
+            )
+
+        let parts =
+            [
+                minutes > 0 ? formattedTime : nil,
+                (category?.isEmpty ?? true) ? nil : category
+            ]
+            .compactMap { $0 }
+
+        return parts.isEmpty
+            ? nil
+            : parts.joined(separator: " · ")
+    }
+
 
     /// "Today · 6:00 PM", "Tomorrow · …", "Sunday · …" within the
     /// week, otherwise "Sun, Oct 26 · 6:00 PM", so far-off events are

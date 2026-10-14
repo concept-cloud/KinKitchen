@@ -77,4 +77,111 @@ struct HomeTests {
     @Test func includesTheTime() {
         #expect(Self.text(Self.date(daysFromNow: 0, hour: 18)).contains("6:00"))
     }
+
+    // MARK: - C1.5 Recent recipes
+
+    static func recipe(
+        _ name: String,
+        id: UUID = UUID(),
+        archived: Bool = false
+    ) throws -> Recipe {
+
+        let archivedField =
+            archived
+                ? ", \"archived_at\": \"2026-10-11T12:00:00Z\""
+                : ""
+
+        let json = """
+        {
+        "id": "\(id.uuidString)",
+        "owner_id": "\(UUID().uuidString)",
+        "name": "\(name)",
+        "created_at": "2026-10-11T00:00:00Z",
+        "updated_at": "2026-10-11T00:00:00Z"\(archivedField)
+        }
+        """
+
+        return try JSONDecoder().decode(
+            Recipe.self,
+            from: Data(json.utf8)
+        )
+    }
+
+    @Test func viewingMovesARecipeToTheFrontWithoutDuplicates() {
+        let a = UUID(), b = UUID(), c = UUID()
+
+        #expect(
+            RecentRecipesStore.recording(b, in: [a, b, c]) == [b, a, c]
+        )
+    }
+
+    @Test func recentListIsCapped() {
+        let ids = (0..<RecentRecipesStore.maxCount).map { _ in UUID() }
+        let updated = RecentRecipesStore.recording(UUID(), in: ids)
+
+        #expect(updated.count == RecentRecipesStore.maxCount)
+        #expect(!updated.contains(ids.last!))
+    }
+
+    @Test func recentlyViewedComeFirstThenOwnRecipes() throws {
+        let viewed = try Self.recipe("Shared Gravy")
+        let ownOld = try Self.recipe("Meatballs")
+        let ownViewed = try Self.recipe("Lasagna")
+
+        let result =
+            RecentRecipesStore.merged(
+                viewedIds: [ownViewed.id, viewed.id],
+                viewed: [viewed, ownViewed],
+                own: [ownOld, ownViewed],
+                limit: 10
+            )
+
+        #expect(result.map(\.name) == ["Lasagna", "Shared Gravy", "Meatballs"])
+    }
+
+    @Test func recipesNoLongerAccessibleAreSkipped() throws {
+        // A viewed ID that Supabase didn't return (deleted or unshared)
+        // and one the owner archived must not appear.
+        let gone = UUID()
+        let archived = try Self.recipe("Old Stew", archived: true)
+        let own = try Self.recipe("Tacos")
+
+        let result =
+            RecentRecipesStore.merged(
+                viewedIds: [gone, archived.id],
+                viewed: [archived],
+                own: [own],
+                limit: 10
+            )
+
+        #expect(result.map(\.name) == ["Tacos"])
+    }
+
+    @Test func mergedRespectsTheLimit() throws {
+        let own = try (0..<15).map { try Self.recipe("Recipe \($0)") }
+
+        #expect(
+            RecentRecipesStore.merged(
+                viewedIds: [],
+                viewed: [],
+                own: own,
+                limit: 10
+            ).count == 10
+        )
+    }
+
+    @Test func recipeDetailsCombineTimeAndCategory() {
+        #expect(
+            HomeView.recipeDetails(minutes: 30, formattedTime: "30 min", category: "Dinner")
+                == "30 min · Dinner"
+        )
+        #expect(
+            HomeView.recipeDetails(minutes: 0, formattedTime: "0 min", category: "Dessert")
+                == "Dessert"
+        )
+        #expect(
+            HomeView.recipeDetails(minutes: 0, formattedTime: "0 min", category: "  ")
+                == nil
+        )
+    }
 }

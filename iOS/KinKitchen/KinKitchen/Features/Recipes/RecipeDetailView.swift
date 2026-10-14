@@ -116,6 +116,19 @@ struct RecipeDetailView: View {
         .navigationBarHidden(true)
         .task {
             await loadRecipe()
+
+            // Remember it for Home's Recent Recipes.
+            if
+                detail != nil,
+                let userId =
+                    SupabaseManager.client.auth.currentUser?.id
+            {
+                RecentRecipesStore()
+                    .recordView(
+                        of: recipeId,
+                        by: userId
+                    )
+            }
         }
         .sheet(
             isPresented: $showingAddNote
