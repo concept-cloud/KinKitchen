@@ -228,9 +228,13 @@ struct CookbookDetailView: View {
             )
         ) {
             if let selectedRecipeId {
-                RecipeDetailView(
-                    recipeId: selectedRecipeId,
-                    onBack: {
+                // Turn pages through the open section's recipes,
+                // in saved order, starting with the one tapped.
+                CookbookRecipePager(
+                    sectionTitle: title(for: currentPage),
+                    recipeIds: recipes(on: currentPage).map(\.id),
+                    startingAt: selectedRecipeId,
+                    onClose: {
                         self.selectedRecipeId = nil
                     }
                 )

@@ -180,4 +180,30 @@ struct CookbookLibraryTests {
         #expect(!filter.matches(category: nil, sectionId: Self.breakfast, isFeatured: true))
         #expect(filter.activeCount == 2)
     }
+
+    // MARK: - C2.3 Recipe pages
+
+    @Test func pagesFollowSavedOrderAndShowPosition() {
+        let ids = [Self.pancakes, Self.oats, Self.gravy]
+        let middle = RecipePagePosition(ids: ids, current: Self.oats)
+
+        #expect(middle.text == "2 of 3")
+        #expect(middle.previous == Self.pancakes)
+        #expect(middle.next == Self.gravy)
+    }
+
+    @Test func firstAndLastRecipesStopAtTheSectionEdges() {
+        let ids = [Self.pancakes, Self.oats]
+
+        #expect(RecipePagePosition(ids: ids, current: Self.pancakes).previous == nil)
+        #expect(RecipePagePosition(ids: ids, current: Self.oats).next == nil)
+    }
+
+    @Test func singleRecipeHasNowhereToGo() {
+        let only = RecipePagePosition(ids: [Self.gravy], current: Self.gravy)
+
+        #expect(only.previous == nil)
+        #expect(only.next == nil)
+        #expect(only.text == "1 of 1")
+    }
 }
