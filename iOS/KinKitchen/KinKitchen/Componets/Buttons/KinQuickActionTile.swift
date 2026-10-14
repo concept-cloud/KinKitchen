@@ -53,12 +53,13 @@ struct KinQuickActionTile: View {
                     .fontWeight(.semibold)
                     .foregroundStyle(KinColors.primaryText)
                     .multilineTextAlignment(.center)
-                    .lineLimit(2)
-                    .minimumScaleFactor(0.85)
-                    .fixedSize(
-                        horizontal: false,
-                        vertical: true
+                    // Always two lines tall, so one- and two-line
+                    // labels make tiles the same size.
+                    .lineLimit(
+                        2,
+                        reservesSpace: true
                     )
+                    .minimumScaleFactor(0.85)
             }
             .padding(
                 .vertical,
