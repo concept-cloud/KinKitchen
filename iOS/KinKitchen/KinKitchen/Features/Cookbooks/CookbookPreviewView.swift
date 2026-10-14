@@ -130,6 +130,9 @@ struct CookbookPreviewView: View {
 
             topBar
         }
+        .safeAreaInset(edge: .bottom) {
+            pageProgress
+        }
         .onChange(of: mode) {
             pageIndex = 0
         }
@@ -200,32 +203,20 @@ private extension CookbookPreviewView {
 
     var topBar: some View {
 
-        VStack(spacing: KinSpacing.small) {
+        HStack(spacing: KinSpacing.medium) {
 
-            HStack {
-                Button {
-                    dismiss()
-                } label: {
-                    Image(systemName: "xmark")
-                        .font(.system(size: 16, weight: .bold))
-                        .foregroundStyle(KinColors.primaryText)
-                        .frame(width: 40, height: 40)
-                        .background(KinColors.surface)
-                        .clipShape(Circle())
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel("Close Preview")
-
-                Spacer()
-
-                Text("Page \(pageIndex + 1) of \(pages.count)")
-                    .font(KinTypography.caption)
-                    .foregroundStyle(KinColors.secondaryText)
-                    .padding(.horizontal, KinSpacing.medium)
-                    .padding(.vertical, KinSpacing.xSmall)
-                    .background(KinColors.surface)
-                    .clipShape(Capsule())
+            Button {
+                dismiss()
+            } label: {
+                Image(systemName: "xmark")
+                    .font(.system(size: 15, weight: .bold))
+                    .foregroundStyle(KinColors.primaryText)
+                    .frame(width: 36, height: 36)
+                    .background(.regularMaterial)
+                    .clipShape(Circle())
             }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Close Preview")
 
             Picker("Preview", selection: $mode) {
                 ForEach(CookbookPreviewMode.allCases) { mode in
@@ -235,86 +226,155 @@ private extension CookbookPreviewView {
             .pickerStyle(.segmented)
         }
         .padding(.horizontal, KinSpacing.large)
-        .padding(.top, KinSpacing.small)
-        .padding(.bottom, KinSpacing.small)
-        .background(KinColors.background.opacity(0.95))
+        .padding(.vertical, KinSpacing.small)
+    }
+
+    /// A thin progress line plus "5 / 24", like the edge of a book.
+    var pageProgress: some View {
+
+        VStack(spacing: KinSpacing.xSmall) {
+
+            GeometryReader { proxy in
+                ZStack(alignment: .leading) {
+                    Capsule()
+                        .fill(KinColors.secondaryText.opacity(0.2))
+                    Capsule()
+                        .fill(KinColors.primary)
+                        .frame(
+                            width: proxy.size.width
+                                * CGFloat(pageIndex + 1)
+                                / CGFloat(max(pages.count, 1))
+                        )
+                }
+            }
+            .frame(height: 3)
+
+            Text("\(pageIndex + 1) / \(pages.count)")
+                .font(KinTypography.caption2)
+                .foregroundStyle(KinColors.secondaryText)
+                .monospacedDigit()
+        }
+        .padding(.horizontal, KinSpacing.xxLarge)
+        .padding(.vertical, KinSpacing.small)
+        .background(KinColors.background.opacity(0.92))
+        .animation(.easeInOut(duration: 0.2), value: pageIndex)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Page \(pageIndex + 1) of \(pages.count)")
     }
 
     /// Room for the top bar above each page's content.
-    static let topInset: CGFloat = 112
+    static let topInset: CGFloat = 60
 }
 
 // MARK: - Cover Page
 
 private extension CookbookPreviewView {
 
+    /// A real book cover: the photo fills the page, the title is set
+    /// over it, and a darker spine runs down the left edge.
     var coverPage: some View {
 
-        ScrollView {
+        ZStack {
 
-            VStack(spacing: KinSpacing.xLarge) {
-
-                ZStack(alignment: .topTrailing) {
-                    ZStack {
-                        RoundedRectangle(cornerRadius: KinRadius.large)
-                            .fill(KinColors.primary.opacity(0.12))
-
-                        if let coverImage {
-                            Image(uiImage: coverImage)
-                                .resizable()
-                                .scaledToFill()
-                        } else {
-                            Image(systemName: KinIcons.cookbooks)
-                                .font(.system(size: 72, weight: .semibold))
-                                .foregroundStyle(KinColors.primary)
-                        }
+            if let coverImage {
+                Color.clear
+                    .overlay {
+                        Image(uiImage: coverImage)
+                            .resizable()
+                            .scaledToFill()
                     }
-                    .frame(maxWidth: .infinity)
-                    .frame(height: 340)
-                    .clipShape(
-                        RoundedRectangle(cornerRadius: KinRadius.large)
-                    )
-
-                    Text(cookbook.displayPrice)
-                        .font(KinTypography.headline)
-                        .foregroundStyle(.white)
-                        .padding(.horizontal, KinSpacing.medium)
-                        .padding(.vertical, KinSpacing.xSmall)
-                        .background(KinColors.primary)
-                        .clipShape(Capsule())
-                        .padding(KinSpacing.medium)
+                    .clipped()
+            } else {
+                LinearGradient(
+                    colors: [KinColors.primary, KinColors.primary.opacity(0.7)],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+                .overlay {
+                    Image(systemName: KinIcons.cookbooks)
+                        .font(.system(size: 90, weight: .semibold))
+                        .foregroundStyle(.white.opacity(0.25))
                 }
-                .shadow(color: .black.opacity(0.12), radius: 12, y: 6)
-
-                VStack(spacing: KinSpacing.medium) {
-
-                    Text(cookbook.name)
-                        .font(KinTypography.largeTitle)
-                        .foregroundStyle(KinColors.primaryText)
-                        .multilineTextAlignment(.center)
-
-                    if let description = cookbook.description,
-                       !description.isEmpty {
-                        Text(description)
-                            .font(KinTypography.body)
-                            .foregroundStyle(KinColors.secondaryText)
-                            .multilineTextAlignment(.center)
-                    }
-
-                    Text(summary)
-                        .font(KinTypography.caption)
-                        .foregroundStyle(KinColors.secondaryText)
-                        .multilineTextAlignment(.center)
-                }
-
-                Label("Swipe to turn the page", systemImage: "hand.draw")
-                    .font(KinTypography.caption)
-                    .foregroundStyle(KinColors.secondaryText)
             }
-            .padding(.horizontal, KinSpacing.large)
-            .padding(.top, Self.topInset)
+
+            LinearGradient(
+                stops: [
+                    .init(color: .black.opacity(0.35), location: 0),
+                    .init(color: .black.opacity(0), location: 0.3),
+                    .init(color: .black.opacity(0.1), location: 0.5),
+                    .init(color: .black.opacity(0.8), location: 1)
+                ],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+
+            // Book spine.
+            HStack(spacing: 0) {
+                LinearGradient(
+                    colors: [.black.opacity(0.45), .black.opacity(0.1)],
+                    startPoint: .leading,
+                    endPoint: .trailing
+                )
+                .frame(width: 22)
+
+                Rectangle()
+                    .fill(.white.opacity(0.18))
+                    .frame(width: 1)
+
+                Spacer()
+            }
+        }
+        .ignoresSafeArea()
+        .overlay(alignment: .bottomLeading) {
+
+            VStack(alignment: .leading, spacing: KinSpacing.small) {
+
+                Text("A KIN KITCHEN COOKBOOK")
+                    .font(.system(size: 12, weight: .bold))
+                    .tracking(2)
+                    .foregroundStyle(.white.opacity(0.85))
+
+                Text(cookbook.name)
+                    .font(.custom("Arvo-Bold", size: 40, relativeTo: .largeTitle))
+                    .foregroundStyle(.white)
+                    .lineLimit(3)
+                    .minimumScaleFactor(0.6)
+
+                if let description = cookbook.description,
+                   !description.isEmpty {
+                    Text(description)
+                        .font(KinTypography.body)
+                        .foregroundStyle(.white.opacity(0.9))
+                        .lineLimit(3)
+                }
+
+                Text(summary)
+                    .font(KinTypography.footnote)
+                    .foregroundStyle(.white.opacity(0.85))
+                    .padding(.top, KinSpacing.xSmall)
+
+                Label("Swipe to open", systemImage: "hand.draw")
+                    .font(KinTypography.caption)
+                    .foregroundStyle(.white.opacity(0.75))
+                    .padding(.top, KinSpacing.medium)
+            }
+            .shadow(color: .black.opacity(0.4), radius: 4, y: 1)
+            .padding(.leading, KinSpacing.xLarge + 22)
+            .padding(.trailing, KinSpacing.xLarge)
             .padding(.bottom, KinSpacing.xxLarge)
         }
+        .overlay(alignment: .topTrailing) {
+            Text(cookbook.displayPrice)
+                .font(KinTypography.headline)
+                .foregroundStyle(.white)
+                .padding(.horizontal, KinSpacing.medium)
+                .padding(.vertical, KinSpacing.xSmall)
+                .background(KinColors.primary)
+                .clipShape(Capsule())
+                .padding(.top, Self.topInset + KinSpacing.medium)
+                .padding(.trailing, KinSpacing.large)
+        }
+        .accessibilityElement(children: .combine)
     }
 
     var summary: String {
@@ -377,16 +437,20 @@ private extension CookbookPreviewView {
         index: Int
     ) -> some View {
 
-        VStack(alignment: .leading, spacing: KinSpacing.small) {
+        let color = CookbookSectionRail.color(at: index)
+
+        return VStack(alignment: .leading, spacing: KinSpacing.small) {
 
             Button {
                 jump(to: .chapter(index))
             } label: {
-                HStack(alignment: .firstTextBaseline) {
-                    Text("\(index + 1)")
-                        .font(KinTypography.headline)
-                        .foregroundStyle(KinColors.primary)
-                        .frame(width: 24, alignment: .leading)
+                HStack(spacing: KinSpacing.medium) {
+                    Image(systemName: CookbookSectionRail.icon(for: chapter.title))
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundStyle(.white)
+                        .frame(width: 36, height: 36)
+                        .background(color)
+                        .clipShape(RoundedRectangle(cornerRadius: KinRadius.small))
 
                     Text(chapter.title)
                         .font(KinTypography.title3)
@@ -394,6 +458,8 @@ private extension CookbookPreviewView {
                         .multilineTextAlignment(.leading)
 
                     Spacer(minLength: 0)
+
+                    pageNumber(of: .chapter(index))
                 }
                 .contentShape(Rectangle())
             }
@@ -401,37 +467,42 @@ private extension CookbookPreviewView {
 
             ForEach(chapter.recipes) { recipe in
                 let inFull = showsInFull(recipe, in: chapter)
+                let page = Page.recipe(chapter: index, recipeId: recipe.id)
 
                 Button {
-                    jump(to: .recipe(chapter: index, recipeId: recipe.id))
+                    jump(to: page)
                 } label: {
                     HStack(spacing: KinSpacing.small) {
-                        Image(
-                            systemName:
-                                chapter.isFeatured(recipe)
-                                    ? "star.fill"
-                                    : inFull ? "circle.fill" : "lock.fill"
-                        )
-                        .font(.system(size: chapter.isFeatured(recipe) ? 11 : 6))
-                        .foregroundStyle(
-                            chapter.isFeatured(recipe)
-                                ? KinColors.warning
-                                : KinColors.secondaryText
-                        )
-                        .frame(width: 16)
+                        if chapter.isFeatured(recipe) {
+                            Image(systemName: "star.fill")
+                                .font(.system(size: 10))
+                                .foregroundStyle(KinColors.warning)
+                                .frame(width: 14)
+                        } else if !inFull {
+                            Image(systemName: KinIcons.lock)
+                                .font(.system(size: 10))
+                                .foregroundStyle(KinColors.secondaryText)
+                                .frame(width: 14)
+                        } else {
+                            Color.clear.frame(width: 14, height: 1)
+                        }
 
                         Text(recipe.name)
                             .font(KinTypography.body)
                             .foregroundStyle(
-                                inFull
-                                    ? KinColors.primaryText
-                                    : KinColors.secondaryText
+                                inFull ? KinColors.primaryText : KinColors.secondaryText
                             )
-                            .multilineTextAlignment(.leading)
+                            .lineLimit(1)
 
-                        Spacer(minLength: 0)
+                        // Dotted leader to the page number, like a
+                        // printed table of contents.
+                        DottedLeader()
+
+                        if inFull {
+                            pageNumber(of: page)
+                        }
                     }
-                    .padding(.leading, 24)
+                    .padding(.leading, 36 + KinSpacing.medium - 14 - KinSpacing.small)
                     .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
@@ -441,9 +512,23 @@ private extension CookbookPreviewView {
         .padding(KinSpacing.large)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(KinColors.surface)
-        .clipShape(
-            RoundedRectangle(cornerRadius: KinRadius.large)
-        )
+        .overlay(alignment: .leading) {
+            // Section color down the edge, like a divider tab.
+            UnevenRoundedRectangle(
+                topLeadingRadius: KinRadius.large,
+                bottomLeadingRadius: KinRadius.large
+            )
+            .fill(color)
+            .frame(width: 5)
+        }
+        .clipShape(RoundedRectangle(cornerRadius: KinRadius.large))
+    }
+
+    func pageNumber(of page: Page) -> some View {
+        Text(pageIndex(of: page).map { "\($0 + 1)" } ?? "")
+            .font(KinTypography.footnote)
+            .foregroundStyle(KinColors.secondaryText)
+            .monospacedDigit()
     }
 
     func jump(to page: Page) {
@@ -460,32 +545,48 @@ private extension CookbookPreviewView {
 
 private extension CookbookPreviewView {
 
+    /// A full-color divider page, like the tabbed dividers in a
+    /// recipe binder, listing what's in the section.
     func chapterPage(
         _ chapter: CookbookPreviewChapter
     ) -> some View {
 
-        let chapterIndex =
-            chapters.firstIndex(of: chapter) ?? 0
+        let chapterIndex = chapters.firstIndex(of: chapter) ?? 0
+        let color = CookbookSectionRail.color(at: chapterIndex)
 
         return ScrollView {
 
             VStack(alignment: .leading, spacing: KinSpacing.large) {
 
-                VStack(alignment: .leading, spacing: KinSpacing.xSmall) {
-                    Text(chapter.title)
-                        .font(KinTypography.largeTitle)
-                        .foregroundStyle(KinColors.primaryText)
+                VStack(alignment: .leading, spacing: KinSpacing.small) {
 
-                    Rectangle()
-                        .fill(KinColors.primary)
-                        .frame(width: 48, height: 3)
-                        .clipShape(Capsule())
+                    Image(systemName: CookbookSectionRail.icon(for: chapter.title))
+                        .font(.system(size: 44, weight: .semibold))
+                        .foregroundStyle(.white.opacity(0.9))
+
+                    Text("SECTION \(chapterIndex + 1)")
+                        .font(.system(size: 12, weight: .bold))
+                        .tracking(2)
+                        .foregroundStyle(.white.opacity(0.8))
+
+                    Text(chapter.title)
+                        .font(.custom("Arvo-Bold", size: 38, relativeTo: .largeTitle))
+                        .foregroundStyle(.white)
+                        .lineLimit(3)
+                        .minimumScaleFactor(0.6)
+
+                    Text(KinCookbookCoverCard.recipeCountText(chapter.recipes.count) ?? "")
+                        .font(KinTypography.subheadline)
+                        .foregroundStyle(.white.opacity(0.85))
                 }
+                .padding(.top, KinSpacing.xxLarge)
+                .accessibilityElement(children: .combine)
+                .accessibilityAddTraits(.isHeader)
 
                 if chapter.recipes.isEmpty {
                     Text("No recipes in this section yet.")
                         .font(KinTypography.body)
-                        .foregroundStyle(KinColors.secondaryText)
+                        .foregroundStyle(.white.opacity(0.85))
                 } else {
                     ForEach(chapter.recipes) { recipe in
                         let inFull = showsInFull(recipe, in: chapter)
@@ -513,6 +614,14 @@ private extension CookbookPreviewView {
             .padding(.top, Self.topInset)
             .padding(.bottom, KinSpacing.xxLarge)
         }
+        .background(
+            LinearGradient(
+                colors: [color, color.opacity(0.75)],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+            .ignoresSafeArea()
+        )
     }
 }
 
@@ -597,47 +706,61 @@ private struct CookbookRecipePage: View {
 
         ScrollView {
 
-            VStack(alignment: .leading, spacing: KinSpacing.xLarge) {
+            VStack(spacing: 0) {
 
-                VStack(alignment: .leading, spacing: KinSpacing.small) {
+                // Photo across the top of the page.
+                CookbookRecipePhoto(
+                    path: recipe.photoPath,
+                    size: nil
+                )
+                .frame(height: 280)
 
-                    Text(chapterTitle.uppercased())
-                        .font(KinTypography.caption)
-                        .foregroundStyle(KinColors.primary)
+                VStack(alignment: .leading, spacing: KinSpacing.xLarge) {
 
-                    Text(recipe.name)
-                        .font(KinTypography.largeTitle)
-                        .foregroundStyle(KinColors.primaryText)
+                    VStack(alignment: .leading, spacing: KinSpacing.small) {
 
-                    if !metadata.isEmpty {
-                        Text(metadata)
-                            .font(KinTypography.footnote)
+                        Text(chapterTitle.uppercased())
+                            .font(.system(size: 12, weight: .bold))
+                            .tracking(1.5)
+                            .foregroundStyle(KinColors.primary)
+
+                        Text(recipe.name)
+                            .font(KinTypography.largeTitle)
+                            .foregroundStyle(KinColors.primaryText)
+
+                        if !metadata.isEmpty {
+                            Text(metadata)
+                                .font(KinTypography.footnote)
+                                .foregroundStyle(KinColors.secondaryText)
+                        }
+                    }
+
+                    if let description = cleaned(recipe.description) {
+                        Text(description)
+                            .font(KinTypography.body)
+                            .italic()
                             .foregroundStyle(KinColors.secondaryText)
                     }
-                }
 
-                if recipe.photoPath?.isEmpty == false {
-                    CookbookRecipePhoto(
-                        path: recipe.photoPath,
-                        size: nil
+                    ingredientsSection
+
+                    instructionsSection
+
+                    storySection
+                }
+                .padding(KinSpacing.large)
+                .padding(.bottom, KinSpacing.xxLarge)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(
+                    UnevenRoundedRectangle(
+                        topLeadingRadius: KinRadius.xLarge,
+                        topTrailingRadius: KinRadius.xLarge
                     )
-                }
-
-                if let description = cleaned(recipe.description) {
-                    Text(description)
-                        .font(KinTypography.body)
-                        .foregroundStyle(KinColors.secondaryText)
-                }
-
-                ingredientsSection
-
-                instructionsSection
-
-                storySection
+                    .fill(CookbookReadingPage.paper)
+                    .shadow(color: .black.opacity(0.08), radius: 10, y: -2)
+                )
+                .offset(y: -28)
             }
-            .padding(.horizontal, KinSpacing.large)
-            .padding(.top, CookbookPreviewView.topInset)
-            .padding(.bottom, KinSpacing.xxLarge)
         }
     }
 
@@ -713,11 +836,13 @@ private struct CookbookRecipePage: View {
                     Array(steps.enumerated()),
                     id: \.offset
                 ) { index, step in
-                    HStack(alignment: .firstTextBaseline, spacing: KinSpacing.medium) {
+                    HStack(alignment: .top, spacing: KinSpacing.medium) {
                         Text("\(index + 1)")
                             .font(KinTypography.headline)
-                            .foregroundStyle(KinColors.primary)
-                            .frame(width: 22, alignment: .leading)
+                            .foregroundStyle(.white)
+                            .frame(width: 28, height: 28)
+                            .background(KinColors.primary)
+                            .clipShape(Circle())
 
                         Text(step)
                             .font(KinTypography.body)
@@ -841,10 +966,12 @@ private struct CookbookRecipePhoto: View {
                     .foregroundStyle(KinColors.primary)
             }
         }
-        .frame(width: size, height: size ?? 220)
+        .frame(width: size, height: size ?? 280)
         .frame(maxWidth: size == nil ? .infinity : nil)
         .clipShape(
-            RoundedRectangle(cornerRadius: KinRadius.medium)
+            RoundedRectangle(
+                cornerRadius: size == nil ? 0 : KinRadius.medium
+            )
         )
         .task(id: path) {
             await loadPhoto()
@@ -885,5 +1012,29 @@ private extension Recipe {
         }
 
         return parts.joined(separator: " · ")
+    }
+}
+
+
+// MARK: - Dotted Leader
+
+/// "Sunday Gravy ........ 7" dots between a title and its page number.
+private struct DottedLeader: View {
+
+    var body: some View {
+        GeometryReader { proxy in
+            Path { path in
+                let y = proxy.size.height * 0.7
+                path.move(to: CGPoint(x: 0, y: y))
+                path.addLine(to: CGPoint(x: proxy.size.width, y: y))
+            }
+            .stroke(
+                KinColors.secondaryText.opacity(0.5),
+                style: StrokeStyle(lineWidth: 1, dash: [1, 4])
+            )
+        }
+        .frame(height: 14)
+        .frame(minWidth: 12)
+        .accessibilityHidden(true)
     }
 }
