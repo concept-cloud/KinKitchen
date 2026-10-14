@@ -308,52 +308,54 @@ private extension CookbookDetailView {
                 spacing: KinSpacing.medium,
                 pinnedViews: [.sectionHeaders]
             ) {
+                cookbookHero(cookbook)
+
                 VStack(
                     alignment: .leading,
                     spacing: KinSpacing.medium
                 ) {
-                    header(cookbook)
+                    if let sectionErrorMessage {
+                        Text(sectionErrorMessage)
+                            .font(KinTypography.caption)
+                            .foregroundStyle(KinColors.error)
+                            .padding(.horizontal, KinSpacing.large)
+                    }
 
-                    cookbookInformation(cookbook)
-                }
-                .padding(
-                    .horizontal,
-                    KinSpacing.large
-                )
-
-                if let sectionErrorMessage {
-                    Text(sectionErrorMessage)
-                        .font(KinTypography.caption)
-                        .foregroundStyle(KinColors.error)
+                    if recipes.isEmpty && sections.isEmpty {
+                        VStack(spacing: KinSpacing.medium) {
+                            emptyRecipesState
+                            newSectionButton
+                        }
                         .padding(.horizontal, KinSpacing.large)
-                }
-
-                if recipes.isEmpty && sections.isEmpty {
-                    VStack(spacing: KinSpacing.medium) {
-                        emptyRecipesState
-                        newSectionButton
+                    } else {
+                        ZStack(alignment: .top) {
+                            pageView(currentPage)
+                                .id(currentPage)
+                                .transition(pageTransition)
+                        }
+                        .clipped()
+                        .contentShape(Rectangle())
+                        .simultaneousGesture(pageSwipe)
                     }
-                    .padding(.horizontal, KinSpacing.large)
-                } else {
-                    ZStack(alignment: .top) {
-                        pageView(currentPage)
-                            .id(currentPage)
-                            .transition(pageTransition)
-                    }
-                    .clipped()
-                    .contentShape(Rectangle())
-                    .simultaneousGesture(pageSwipe)
                 }
+                // Leave room for the section tabs on the right.
+                .padding(
+                    .trailing,
+                    showsSectionRail ? CookbookSectionRail.width : 0
+                )
             }
             .padding(
                 .bottom,
                 KinSpacing.xxLarge
             )
-            // Leave room for the section tabs on the right.
-            .padding(
-                .trailing,
-                showsSectionRail ? CookbookSectionRail.width : 0
-            )
+        }
+        .ignoresSafeArea(edges: .top)
+        // Back and menu float over the cover.
+        .overlay(
+            alignment: .top
+        ) {
+            header(cookbook)
+                .padding(.horizontal, KinSpacing.large)
         }
         // The thumb index stays put while the page scrolls under
         // the header, so it's always within reach.
@@ -554,20 +556,7 @@ private extension CookbookDetailView {
                 }
             }
 
-            cookbookCover(cookbook)
-
-            Text(cookbook.name)
-                .font(
-                    KinTypography.largeTitle
-                )
-                .foregroundStyle(
-                    KinColors.primaryText
-                )
         }
-        .padding(
-            .top,
-            KinSpacing.large
-        )
     }
 }
 
@@ -575,82 +564,103 @@ private extension CookbookDetailView {
 
 private extension CookbookDetailView {
 
-    func cookbookCover(
+    static let heroHeight: CGFloat = 330
+
+    /// The cover fills the top of the screen, edge to edge, with the
+    /// title, description and recipe count over a dark fade. The
+    /// section tabs sit on top of it.
+    func cookbookHero(
         _ cookbook: Cookbook
     ) -> some View {
 
         ZStack {
 
-            RoundedRectangle(
-                cornerRadius: KinRadius.medium
-            )
-            .fill(
-                KinColors.primary.opacity(0.12)
-            )
-
             if let coverImage {
 
-                Image(
-                    uiImage: coverImage
-                )
-                .resizable()
-                .scaledToFill()
-
-            } else if isUpdatingCover {
-
-                ProgressView()
-                    .tint(
-                        KinColors.primary
-                    )
+                Color.clear
+                    .overlay {
+                        Image(uiImage: coverImage)
+                            .resizable()
+                            .scaledToFill()
+                    }
+                    .clipped()
 
             } else {
 
-                Image(
-                    systemName: KinIcons.cookbooks
+                LinearGradient(
+                    colors: [
+                        KinColors.accent.opacity(0.55),
+                        KinColors.primary.opacity(0.55)
+                    ],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
                 )
-                .font(
-                    .system(
-                        size: 54,
-                        weight: .semibold
-                    )
-                )
-                .foregroundStyle(
-                    KinColors.primary
-                )
+                .overlay {
+                    Image(systemName: KinIcons.cookbooks)
+                        .font(.system(size: 64, weight: .semibold))
+                        .foregroundStyle(.white.opacity(0.5))
+                }
             }
-        }
-        .frame(
-            maxWidth: .infinity
-        )
-        .frame(
-            height: 150
-        )
-        .clipShape(
-            RoundedRectangle(
-                cornerRadius: KinRadius.medium
+
+            if isUpdatingCover {
+                ProgressView()
+                    .tint(.white)
+            }
+
+            // Top: keeps the clock and buttons readable.
+            // Bottom: keeps the title readable.
+            LinearGradient(
+                stops: [
+                    .init(color: KinColors.background.opacity(0.75), location: 0),
+                    .init(color: KinColors.background.opacity(0), location: 0.3),
+                    .init(color: .black.opacity(0), location: 0.45),
+                    .init(color: .black.opacity(0.7), location: 1)
+                ],
+                startPoint: .top,
+                endPoint: .bottom
             )
-        )
-    }
-}
-
-// MARK: - Cookbook Information
-
-private extension CookbookDetailView {
-
-    @ViewBuilder
-    func cookbookInformation(
-        _ cookbook: Cookbook
-    ) -> some View {
-        if let description = cookbook.description,
-           !description.isEmpty {
-            Text(description)
-                .font(
-                    KinTypography.body
-                )
-                .foregroundStyle(
-                    KinColors.secondaryText
-                )
         }
+        .frame(height: Self.heroHeight)
+        .frame(maxWidth: .infinity)
+        .overlay(
+            alignment: .bottomLeading
+        ) {
+            VStack(
+                alignment: .leading,
+                spacing: KinSpacing.xSmall
+            ) {
+                Text(cookbook.name)
+                    .font(KinTypography.largeTitle)
+                    .lineLimit(2)
+                    .minimumScaleFactor(0.7)
+
+                if let description = cookbook.description,
+                   !description.isEmpty {
+                    Text(description)
+                        .font(KinTypography.callout)
+                        .opacity(0.9)
+                        .lineLimit(2)
+                }
+
+                if let count =
+                    KinCookbookCoverCard.recipeCountText(recipes.count) {
+                    Text(count)
+                        .font(KinTypography.subheadline)
+                        .opacity(0.9)
+                }
+            }
+            .foregroundStyle(.white)
+            .shadow(color: .black.opacity(0.5), radius: 4, y: 1)
+            .padding(.leading, KinSpacing.large)
+            .padding(
+                .trailing,
+                KinSpacing.large
+                    + (showsSectionRail ? CookbookSectionRail.width : 0)
+            )
+            .padding(.bottom, KinSpacing.large)
+        }
+        .accessibilityElement(children: .combine)
+        .accessibilityAddTraits(.isHeader)
     }
 }
 
