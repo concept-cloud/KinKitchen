@@ -335,26 +335,57 @@ private extension CookbookDetailView {
                     }
                     .padding(.horizontal, KinSpacing.large)
                 } else {
-                    // Tabs stick to the top while the page scrolls.
-                    Section {
-                        ZStack(alignment: .top) {
-                            pageView(currentPage)
-                                .id(currentPage)
-                                .transition(pageTransition)
-                        }
-                        .clipped()
-                        .contentShape(Rectangle())
-                        .simultaneousGesture(pageSwipe)
-                    } header: {
-                        sectionTabs
-                            .padding(.vertical, KinSpacing.small)
-                            .background(KinColors.background)
+                    ZStack(alignment: .top) {
+                        pageView(currentPage)
+                            .id(currentPage)
+                            .transition(pageTransition)
                     }
+                    .clipped()
+                    .contentShape(Rectangle())
+                    .simultaneousGesture(pageSwipe)
                 }
             }
             .padding(
                 .bottom,
                 KinSpacing.xxLarge
+            )
+            // Leave room for the section tabs on the right.
+            .padding(
+                .trailing,
+                showsSectionRail ? CookbookSectionRail.width : 0
+            )
+        }
+        // The thumb index stays put while the page scrolls under
+        // the header, so it's always within reach.
+        .overlay(
+            alignment: .topTrailing
+        ) {
+            if showsSectionRail {
+                CookbookSectionRail(
+                    tabs: railTabs,
+                    selectedId: pageSelection.wrappedValue,
+                    onSelect: { page in
+                        pageSelection.wrappedValue = page
+                    }
+                )
+                .padding(.top, 72)
+                .padding(.bottom, KinSpacing.large)
+                .ignoresSafeArea(edges: .trailing)
+            }
+        }
+    }
+
+    /// Tabs appear once the cookbook has sections of its own.
+    var showsSectionRail: Bool {
+        !sections.isEmpty
+    }
+
+    var railTabs: [CookbookSectionRail.Tab] {
+        pages.map { page in
+            CookbookSectionRail.Tab(
+                id: page,
+                title: title(for: page),
+                recipeCount: recipes(on: page).count
             )
         }
     }
@@ -792,79 +823,6 @@ private extension CookbookDetailView {
             return recipes(inSection: id)
         case .unsorted:
             return unsortedRecipes
-        }
-    }
-
-    // MARK: - Section Tabs
-
-    var sectionTabs: some View {
-        ScrollViewReader { proxy in
-            ScrollView(
-                .horizontal,
-                showsIndicators: false
-            ) {
-                HStack(spacing: KinSpacing.small) {
-                    ForEach(pages, id: \.self) { page in
-                        let isSelected =
-                            pageSelection.wrappedValue == page
-
-                        Button {
-                            pageSelection.wrappedValue = page
-                        } label: {
-                            HStack(spacing: KinSpacing.xSmall) {
-                                Text(title(for: page))
-                                    .lineLimit(1)
-
-                                Text("\(recipes(on: page).count)")
-                                    .opacity(0.7)
-                            }
-                            .font(KinTypography.subheadline)
-                            .foregroundStyle(
-                                isSelected
-                                    ? .white
-                                    : KinColors.primaryText
-                            )
-                            .padding(.horizontal, KinSpacing.medium)
-                            .padding(.vertical, KinSpacing.small)
-                            .background(
-                                isSelected
-                                    ? KinColors.primary
-                                    : KinColors.surface
-                            )
-                            .clipShape(Capsule())
-                        }
-                        .buttonStyle(.plain)
-                        .id(page)
-                        .accessibilityAddTraits(
-                            isSelected ? .isSelected : []
-                        )
-                    }
-
-                    Button {
-                        sectionNameDraft = ""
-                        isShowingNewSection = true
-                    } label: {
-                        Image(systemName: "plus")
-                            .font(.system(size: 14, weight: .bold))
-                            .foregroundStyle(KinColors.primary)
-                            .frame(width: 36, height: 36)
-                            .background(
-                                KinColors.primary.opacity(0.12)
-                            )
-                            .clipShape(Circle())
-                    }
-                    .buttonStyle(.plain)
-                    .disabled(isSavingSection)
-                    .accessibilityLabel("New Section")
-                }
-                .padding(.horizontal, KinSpacing.large)
-            }
-            // Keep the selected tab in view while swiping pages.
-            .onChange(of: pageSelection.wrappedValue) { _, page in
-                withAnimation {
-                    proxy.scrollTo(page, anchor: .center)
-                }
-            }
         }
     }
 
