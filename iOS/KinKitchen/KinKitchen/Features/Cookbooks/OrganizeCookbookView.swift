@@ -34,6 +34,7 @@ struct OrganizeCookbookView: View {
     @State private var sections: [CookbookSection]
     @State private var layout: CookbookLayout
     @State private var selection = Set<UUID>()
+    @State private var filterText = ""
 
     @State private var isSaving = false
     @State private var errorMessage: String?
@@ -177,7 +178,15 @@ struct OrganizeCookbookView: View {
 
         List(selection: $selection) {
 
-            ForEach(layout.rows) { row in
+            if visibleRows.isEmpty {
+                Text("No recipes match “\(trimmedFilter)”.")
+                    .font(KinTypography.body)
+                    .foregroundStyle(KinColors.secondaryText)
+                    .listRowBackground(Color.clear)
+                    .selectionDisabled()
+            }
+
+            ForEach(visibleRows) { row in
 
                 switch row {
 
@@ -195,9 +204,15 @@ struct OrganizeCookbookView: View {
                 case .recipe(let recipeId):
                     recipeRow(recipeId)
                         .tag(recipeId)
+                        // Drag positions only make sense in the full list.
+                        .moveDisabled(isFiltering)
                 }
             }
             .onMove { offsets, destination in
+                guard !isFiltering else {
+                    return
+                }
+
                 let updated =
                     layout.moving(
                         rowsAt: offsets,
@@ -208,6 +223,51 @@ struct OrganizeCookbookView: View {
         }
         .scrollContentBackground(.hidden)
         .disabled(isSaving)
+        .searchable(
+            text: $filterText,
+            placement: .navigationBarDrawer(displayMode: .always),
+            prompt: "Filter by name or category"
+        )
+        // Never move recipes you can't see.
+        .onChange(of: filterText) {
+            selection.formIntersection(visibleRecipeIds)
+        }
+    }
+
+    private var trimmedFilter: String {
+        filterText.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private var isFiltering: Bool {
+        !trimmedFilter.isEmpty
+    }
+
+    /// All rows, or only matching recipes under their section headings
+    /// (sections with no matches are hidden).
+    private var visibleRows: [CookbookLayout.Row] {
+        guard isFiltering else {
+            return layout.rows
+        }
+
+        return layout.groups.flatMap { group -> [CookbookLayout.Row] in
+            let matches =
+                HomeSearch.filter(group.recipeIds, query: trimmedFilter) { id in
+                    [recipesById[id]?.name, recipesById[id]?.category]
+                }
+
+            return matches.isEmpty
+                ? []
+                : [.heading(group.sectionId)] + matches.map(CookbookLayout.Row.recipe)
+        }
+    }
+
+    private var visibleRecipeIds: [UUID] {
+        visibleRows.compactMap { row in
+            if case .recipe(let id) = row {
+                return id
+            }
+            return nil
+        }
     }
 
     private func recipeRow(
@@ -243,7 +303,9 @@ struct OrganizeCookbookView: View {
             selection.isEmpty ? "Select All" : "Clear"
         ) {
             if selection.isEmpty {
-                selection = Set(layout.groups.flatMap(\.recipeIds))
+                // Only what's showing, so "filter, select all, move"
+                // works in one go.
+                selection = Set(visibleRecipeIds)
             } else {
                 selection.removeAll()
             }
