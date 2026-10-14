@@ -17,6 +17,7 @@ struct HomeView: View {
 
     @State private var showingAddRecipe = false
     @State private var showingAddGathering = false
+    @State private var comingSoon: ComingSoonFeature?
     
     @State private var upcomingGatherings:
     [GatheringListItem] = []
@@ -197,6 +198,40 @@ struct HomeView: View {
 
         notifications.filter {
             !$0.isRead
+        }
+    }
+}
+
+
+// MARK: - Coming Soon
+
+/// Quick actions whose features aren't built yet.
+private enum ComingSoonFeature {
+
+    case tableTalk
+    case scanRecipe
+
+    var title: String {
+
+        switch self {
+
+        case .tableTalk:
+            return "Table Talk Is Coming Soon"
+
+        case .scanRecipe:
+            return "Scan Recipe Is Coming Soon"
+        }
+    }
+
+    var message: String {
+
+        switch self {
+
+        case .tableTalk:
+            return "A place to share what you're cooking and see what your family and friends are making."
+
+        case .scanRecipe:
+            return "Snap a photo of a recipe card or cookbook page to add it to your recipes."
         }
     }
 }
@@ -413,34 +448,51 @@ private extension HomeView {
             }
 
             KinQuickActionTile(
-                title: "New Gathering",
+                title: "New Event",
                 icon: KinIcons.gatherings,
                 tint: KinColors.success,
-                hint: "Plans a new gathering"
+                hint: "Plans a new event"
             ) {
 
                 showingAddGathering = true
             }
 
             KinQuickActionTile(
-                title: "My Cookbooks",
-                icon: "book.fill",
+                title: "Table Talk",
+                icon: "bubble.left.and.bubble.right.fill",
                 tint: .orange,
-                hint: "Opens the Cookbooks tab"
+                hint: "See what family and friends are cooking",
+                badge: "Soon"
             ) {
 
-                selectTab(.cookbooks)
+                comingSoon = .tableTalk
             }
 
             KinQuickActionTile(
-                title: "Recipes",
-                icon: KinIcons.recipes,
+                title: "Scan Recipe",
+                icon: KinIcons.camera,
                 tint: .blue,
-                hint: "Opens the Recipes tab"
+                hint: "Add a recipe from a photo",
+                badge: "Soon"
             ) {
 
-                selectTab(.recipes)
+                comingSoon = .scanRecipe
             }
+        }
+        .alert(
+            comingSoon?.title ?? "",
+            isPresented: Binding(
+                get: { comingSoon != nil },
+                set: { if !$0 { comingSoon = nil } }
+            ),
+            presenting: comingSoon
+        ) { _ in
+
+            Button("OK", role: .cancel) {}
+
+        } message: { feature in
+
+            Text(feature.message)
         }
     }
 

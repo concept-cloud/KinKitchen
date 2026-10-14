@@ -14,6 +14,8 @@ struct KinQuickActionTile: View {
     let icon: String
     let tint: Color
     var hint: String? = nil
+    /// Small label in the corner, e.g. "Soon".
+    var badge: String? = nil
     let action: () -> Void
 
     @ScaledMetric(relativeTo: .title2)
@@ -80,6 +82,35 @@ struct KinQuickActionTile: View {
                     cornerRadius: KinRadius.large
                 )
             )
+            .overlay(
+                alignment: .topTrailing
+            ) {
+
+                if let badge {
+
+                    Text(badge)
+                        .font(
+                            .system(
+                                size: 9,
+                                weight: .bold
+                            )
+                        )
+                        .foregroundStyle(tint)
+                        .padding(
+                            .horizontal,
+                            KinSpacing.xSmall
+                        )
+                        .padding(
+                            .vertical,
+                            KinSpacing.xxSmall
+                        )
+                        .background(
+                            tint.opacity(0.14)
+                        )
+                        .clipShape(Capsule())
+                        .padding(KinSpacing.xSmall)
+                }
+            }
             .shadow(
                 color: .black.opacity(0.06),
                 radius: 6,
@@ -93,7 +124,9 @@ struct KinQuickActionTile: View {
         }
         .buttonStyle(.plain)
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel(title)
+        .accessibilityLabel(
+            badge.map { "\(title), \($0)" } ?? title
+        )
         .accessibilityHint(hint ?? "")
         .accessibilityAddTraits(.isButton)
     }
