@@ -206,20 +206,16 @@ private extension HomeView {
     }
 
 
-    /// Brand at the center, notifications bell on the trailing edge.
+    /// Logo at the center, notifications bell on the trailing edge.
     var homeHeader: some View {
 
-        ZStack {
+        ZStack(
+            alignment: .top
+        ) {
 
-            Text("Kin Kitchen")
-                .font(
-                    KinTypography.title2
-                )
-                .foregroundStyle(
-                    KinColors.primary
-                )
-                .accessibilityAddTraits(
-                    .isHeader
+            KinLogo()
+                .frame(
+                    maxWidth: .infinity
                 )
 
             HStack {
