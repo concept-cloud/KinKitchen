@@ -1339,9 +1339,14 @@ private extension HomeView {
 
                 Spacer(minLength: 0)
             }
+            // Same size for every card; grows only for larger text.
             .frame(
                 width: Self.recipeCardWidth,
-                height: 182
+                alignment: .top
+            )
+            .frame(
+                minHeight: 182,
+                alignment: .top
             )
             .background(KinColors.surface)
             .clipShape(
