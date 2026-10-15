@@ -367,11 +367,11 @@ struct RecipesView: View {
                                         recipe
                                     )
                                 }
-                                .buttonStyle(.plain)
+                                .buttonStyle(.kinPressable)
                                 savedStatusButton(
                                     for: recipe
                                 )
-                                .padding(KinSpacing.medium)
+                                .padding(KinSpacing.small)
                             }
                         }
                     }
@@ -704,112 +704,48 @@ struct RecipesView: View {
     private func recipeCard(
         _ recipe: Recipe
     ) -> some View {
-        KinCard {
-            HStack(
-                spacing: KinSpacing.medium
-            ) {
-                // MARK: - Image / Placeholder
-                ZStack {
-                    RoundedRectangle(
-                        cornerRadius: KinRadius.medium
-                    )
-                    .fill(KinColors.background)
-                    if let data = recipePhotoData[recipe.id],
-                       let image = UIImage(data: data) {
-                        Image(uiImage: image)
-                            .resizable()
-                            .scaledToFill()
-                            .frame(width: 100, height: 100)
-                            .clipped()
-                            .clipShape(
-                                RoundedRectangle(
-                                    cornerRadius: KinRadius.medium
-                                )
-                            )
-                    } else {
-                        Image(
-                            systemName:
-                                placeholderIcon(
-                                    for: recipe
-                                )
-                        )
-                        .font(.title)
-                        .foregroundStyle(
-                            KinColors.primary
-                        )
-                    }
-                }
-                .frame(width: 100, height: 100)
-                .task(id: recipe.photoPath) {
-                    await loadRecipePhoto(
-                        for: recipe
-                    )
-                }
-                // MARK: - Recipe Info
-                VStack(
-                    alignment: .leading,
-                    spacing: KinSpacing.small
-                ) {
-                    Text(recipe.name)
-                        .font(
-                            KinTypography.title3
-                        )
-                        .foregroundStyle(
-                            KinColors.primaryText
-                        )
-                        .multilineTextAlignment(
-                            .leading
-                        )
-                        .lineLimit(2)
-                    Text(
-                        recipeMetadata(
-                            recipe
-                        )
-                    )
-                    .font(
-                        KinTypography.caption
-                    )
-                    .foregroundStyle(
-                        KinColors.secondaryText
-                    )
-                    if let senders =
-                        senderNames(for: recipe) {
-                        Label(
-                            "Shared by \(senders)",
-                            systemImage: "person.fill"
-                        )
-                        .font(KinTypography.caption)
-                        .foregroundStyle(KinColors.primary)
-                        .lineLimit(1)
-                    }
-                    if let author =
-                        authorLine(for: recipe) {
-                        Label(
-                            author,
-                            systemImage: "pencil.line"
-                        )
-                        .font(KinTypography.caption)
-                        .foregroundStyle(KinColors.secondaryText)
-                        .lineLimit(2)
-                    }
-                    restrictionLabels(
-                        for: recipe
-                    )
-                    allergenLabel(
-                        for: recipe
-                    )
-                    profileConflictLabel(
-                        for: recipe
-                    )
-                }
-                Spacer()
-                // Room for the saved-status button, which sits
-                // over the card so it can be tapped on its own.
-                if isShared(recipe) {
-                    Color.clear
-                        .frame(width: 44)
-                }
+        KinRecipeCard(
+            name: recipe.name,
+            category: recipe.category,
+            totalTime: recipe.formattedTotalTime,
+            photo: recipePhotoData[recipe.id]
+                .flatMap(UIImage.init(data:)),
+            placeholderIcon: placeholderIcon(for: recipe)
+        ) {
+            if let senders =
+                senderNames(for: recipe) {
+                Label(
+                    "Shared by \(senders)",
+                    systemImage: "person.fill"
+                )
+                .font(KinTypography.caption)
+                .foregroundStyle(KinColors.primary)
+                .lineLimit(1)
             }
+            if let author =
+                authorLine(for: recipe) {
+                Label(
+                    author,
+                    systemImage: "pencil.line"
+                )
+                .font(KinTypography.caption)
+                .foregroundStyle(KinColors.secondaryText)
+                .lineLimit(2)
+            }
+            restrictionLabels(
+                for: recipe
+            )
+            allergenLabel(
+                for: recipe
+            )
+            profileConflictLabel(
+                for: recipe
+            )
+        }
+        .task(id: recipe.photoPath) {
+            await loadRecipePhoto(
+                for: recipe
+            )
         }
     }
     // MARK: - Saved / Shared Status
@@ -844,11 +780,11 @@ struct RecipesView: View {
                     await toggleSaved(recipe)
                 }
             } label: {
-                VStack(spacing: KinSpacing.xxSmall) {
+                // Sits on the photo, so it gets its own backing.
+                Group {
                     if savingRecipeIds.contains(recipe.id) {
                         ProgressView()
-                            .tint(KinColors.primary)
-                            .frame(height: 24)
+                            .tint(.white)
                     } else {
                         Image(
                             systemName:
@@ -856,15 +792,20 @@ struct RecipesView: View {
                                     ? "bookmark.fill"
                                     : "bookmark"
                         )
-                        .font(.title2)
-                        .frame(height: 24)
+                        .font(.system(size: 17, weight: .semibold))
+                        .foregroundStyle(.white)
+                        .contentTransition(.symbolEffect(.replace))
                     }
-                    Text(saved ? "Saved" : "Save")
-                        .font(KinTypography.caption2)
                 }
-                .foregroundStyle(KinColors.primary)
-                .frame(width: 44, height: 50)
-                .contentShape(Rectangle())
+                .frame(width: 40, height: 40)
+                .background(
+                    saved
+                        ? KinColors.primary
+                        : .black.opacity(0.4),
+                    in: Circle()
+                )
+                .frame(width: 44, height: 44)
+                .contentShape(Circle())
             }
             .buttonStyle(.plain)
             .disabled(savingRecipeIds.contains(recipe.id))
@@ -1065,31 +1006,6 @@ struct RecipesView: View {
         }
     }
 
-    // MARK: - Metadata
-    private func recipeMetadata(
-        _ recipe: Recipe
-    ) -> String {
-        let category =
-            recipe.category?
-                .trimmingCharacters(
-                    in: .whitespacesAndNewlines
-                )
-        let time =
-            recipe.formattedTotalTime
-        if let category,
-           !category.isEmpty,
-           time != "—" {
-            return "\(category) • \(time)"
-        }
-        if let category,
-           !category.isEmpty {
-            return category
-        }
-        if time != "—" {
-            return time
-        }
-        return "Recipe"
-    }
     // MARK: - Placeholder Icon
     private func placeholderIcon(
         for recipe: Recipe
