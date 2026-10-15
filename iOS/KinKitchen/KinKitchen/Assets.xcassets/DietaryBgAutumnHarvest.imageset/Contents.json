@@ -1,0 +1,22 @@
+{
+  "images": [
+    {
+      "filename": "autumn_harvest_light.jpg",
+      "idiom": "universal"
+    },
+    {
+      "appearances": [
+        {
+          "appearance": "luminosity",
+          "value": "dark"
+        }
+      ],
+      "filename": "autumn_harvest_dark.jpg",
+      "idiom": "universal"
+    }
+  ],
+  "info": {
+    "author": "xcode",
+    "version": 1
+  }
+}

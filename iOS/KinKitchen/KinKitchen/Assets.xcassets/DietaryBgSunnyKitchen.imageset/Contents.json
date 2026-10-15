@@ -1,0 +1,22 @@
+{
+  "images": [
+    {
+      "filename": "sunny_kitchen_light.jpg",
+      "idiom": "universal"
+    },
+    {
+      "appearances": [
+        {
+          "appearance": "luminosity",
+          "value": "dark"
+        }
+      ],
+      "filename": "sunny_kitchen_dark.jpg",
+      "idiom": "universal"
+    }
+  ],
+  "info": {
+    "author": "xcode",
+    "version": 1
+  }
+}

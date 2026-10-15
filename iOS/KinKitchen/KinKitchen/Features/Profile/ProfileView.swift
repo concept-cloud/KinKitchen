@@ -29,6 +29,7 @@ struct ProfileView: View {
     @State private var isEditingDietaryProfile = false
     @State private var isShowingSettings = false
     @State private var isShowingNotifications = false
+    @State private var isShowingAppInfo = false
 
     var body: some View {
 
@@ -172,6 +173,11 @@ struct ProfileView: View {
                 isPresented: $isShowingSettings
             ) {
                 SettingsView()
+            }
+            .navigationDestination(
+                isPresented: $isShowingAppInfo
+            ) {
+                AppInfoView()
             }
         }
         .toolbarBackground(
@@ -456,23 +462,6 @@ struct ProfileView: View {
                 isEditingDietaryProfile = true
             }
 
-            // Future Profile Destinations
-
-            placeholderNavigationRow(
-                title: "My Recipes",
-                systemImage: "book.closed"
-            )
-
-            placeholderNavigationRow(
-                title: "My Cookbooks",
-                systemImage: "books.vertical"
-            )
-
-            placeholderNavigationRow(
-                title: "Saved Recipes",
-                systemImage: "bookmark"
-            )
-
             profileNavigationRow(
                            title: "Notifications",
                            systemImage: "bell"
@@ -489,10 +478,12 @@ struct ProfileView: View {
                 isShowingSettings = true
             }
 
-            placeholderNavigationRow(
+            profileNavigationRow(
                 title: "App Info",
                 systemImage: "info.circle"
-            )
+            ) {
+                isShowingAppInfo = true
+            }
         }
     }
 
@@ -552,49 +543,19 @@ struct ProfileView: View {
             .clipShape(
                 RoundedRectangle(
                     cornerRadius:
-                        KinRadius.medium
+                        KinRadius.large
+                )
+            )
+            .kinCardShadow()
+            .contentShape(
+                RoundedRectangle(
+                    cornerRadius: KinRadius.large
                 )
             )
         }
-        .buttonStyle(.plain)
+        .buttonStyle(.kinPressable)
     }
     
-    // MARK: - Placeholder Navigation Row
-
-    private func placeholderNavigationRow(
-        title: String,
-        systemImage: String
-    ) -> some View {
-
-        HStack(
-            spacing: KinSpacing.medium
-        ) {
-
-            Image(systemName: systemImage)
-                .font(.body)
-                .foregroundStyle(KinColors.primary)
-                .frame(width: 24)
-
-            Text(title)
-                .font(KinTypography.body)
-                .foregroundStyle(KinColors.primaryText)
-
-            Spacer()
-
-            Text("Coming Soon")
-                .font(KinTypography.caption)
-                .foregroundStyle(KinColors.secondaryText)
-        }
-        .padding(KinSpacing.medium)
-        .frame(maxWidth: .infinity)
-        .background(KinColors.surface)
-        .clipShape(
-            RoundedRectangle(
-                cornerRadius: KinRadius.medium
-            )
-        )
-    }
-
     // MARK: - Sign Out
 
     private var signOutButton: some View {

@@ -7,6 +7,7 @@
 
 import Foundation
 import Testing
+import UIKit
 @testable import KinKitchen
 
 /// C1: Home screen redesign.
@@ -267,5 +268,60 @@ struct HomeTests {
     @Test func everyThemeHasItsOwnLook() {
         let symbols = KinHomeTheme.allCases.map(\.accentSymbol)
         #expect(Set(symbols).count == KinHomeTheme.allCases.count)
+    }
+
+    // MARK: - Profile: App Info
+
+    @Test func appInfoReadsTheBundleVersionAndBuild() {
+        let info = AppBuildInfo()
+
+        #expect(!info.version.isEmpty)
+        #expect(!info.build.isEmpty)
+        #expect(info.releaseStatus.hasPrefix("Pre-release"))
+    }
+}
+
+
+// MARK: - Dietary Profile Text
+
+struct DietaryProfileTextTests {
+
+    @Test func allergenCountIsHiddenAtZeroAndPluralized() {
+        #expect(DietaryProfileText.allergenCount(0) == nil)
+        #expect(DietaryProfileText.allergenCount(1) == "1 allergen")
+        #expect(DietaryProfileText.allergenCount(4) == "4 allergens")
+    }
+
+    @Test func lastUpdatedSpellsOutTheMonth() {
+        let date = Calendar(identifier: .gregorian).date(
+            from: DateComponents(year: 2026, month: 9, day: 11, hour: 12)
+        )!
+        #expect(
+            DietaryProfileText.lastUpdated(date, locale: Locale(identifier: "en_US"))
+                == "Last updated September 11, 2026"
+        )
+        #expect(DietaryProfileText.lastUpdated(nil) == "Last updated unavailable")
+    }
+}
+
+
+// MARK: - Dietary Background
+
+struct DietaryBackgroundTests {
+
+    @Test func savedChoiceFallsBackToSunnyKitchen() {
+        #expect(KinDietaryBackground.saved("eveningAmbience") == .eveningAmbience)
+        #expect(KinDietaryBackground.saved("gone") == .sunnyKitchen)
+        #expect(KinDietaryBackground.saved("") == .sunnyKitchen)
+    }
+
+    @Test func everyBackgroundHasItsImageInTheBundle() {
+        for background in KinDietaryBackground.allCases {
+            #expect(background.imageName.hasPrefix("DietaryBg"))
+            #expect(
+                UIImage(named: background.imageName) != nil,
+                "Missing asset \(background.imageName)"
+            )
+        }
     }
 }

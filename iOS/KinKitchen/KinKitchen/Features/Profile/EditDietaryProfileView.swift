@@ -27,87 +27,130 @@ struct EditDietaryProfileView: View {
     @State private var isSaving = false
     @State private var errorMessage: String?
 
+    private var hasChanges: Bool {
+        selectedAllergenIds != originalAllergenIds
+            || selectedRestrictionIds != originalRestrictionIds
+            || selectedPreferenceIds != originalPreferenceIds
+    }
+
     var body: some View {
-            ScrollView {
-                VStack(alignment: .leading, spacing: KinSpacing.xLarge) {
 
-                    if isLoading {
+        DietaryHeroPage(
+            title: "Edit Dietary Profile",
+            eyebrow: "YOUR FOOD PROFILE",
+            headline: "Tell us how you eat.",
+            message: "Tap to choose. Kin Kitchen uses this to flag recipes for you."
+        ) {
 
-                        KinLoadingView()
+            if isLoading {
 
-                    } else {
+                KinLoadingView()
+                    .padding(.top, KinSpacing.xLarge)
 
-                        dietarySection(
-                            title: "Allergens",
-                            items: allergens,
-                            selectedIds: $selectedAllergenIds
+            } else {
+
+                dietarySection(
+                    .allergens,
+                    subtitle: "Ingredients to flag in recipes.",
+                    badge: DietaryProfileText.allergenCount(selectedAllergenIds.count),
+                    items: allergens,
+                    selectedIds: $selectedAllergenIds
+                )
+
+                dietarySection(
+                    .restrictions,
+                    subtitle: "Foods you don't eat.",
+                    items: restrictions,
+                    selectedIds: $selectedRestrictionIds
+                )
+
+                dietarySection(
+                    .preferences,
+                    subtitle: "Your preferred eating style.",
+                    items: preferences,
+                    selectedIds: $selectedPreferenceIds
+                )
+
+                if let errorMessage {
+                    Text(errorMessage)
+                        .font(KinTypography.body)
+                        .foregroundStyle(KinColors.error)
+                        .frame(
+                            maxWidth: .infinity,
+                            alignment: .leading
                         )
+                }
+            }
 
-                        dietarySection(
-                            title: "Dietary Restrictions",
-                            items: restrictions,
-                            selectedIds: $selectedRestrictionIds
-                        )
+        } trailing: {
+            EmptyView()
+        }
+        // Save stays in reach while scrolling the lists.
+        .safeAreaInset(edge: .bottom) {
 
-                        dietarySection(
-                            title: "Dietary Preferences",
-                            items: preferences,
-                            selectedIds: $selectedPreferenceIds
-                        )
+            if !isLoading {
 
-                        if let errorMessage {
-                            Text(errorMessage)
-                                .font(KinTypography.body)
-                                .foregroundStyle(KinColors.error)
-                        }
-
-                        KinPrimaryButton(
-                            title: isSaving ? "Saving..." : "Save Changes",
-                            color: KinColors.success
-                        ) {
-                            Task {
-                                await saveChanges()
-                            }
-                        }
-                        .disabled(isSaving)
+                KinPrimaryButton(
+                    title: isSaving ? "Saving..." : "Save Changes",
+                    color: KinColors.success
+                ) {
+                    Task {
+                        await saveChanges()
                     }
                 }
-                .padding(KinSpacing.xLarge)
+                .disabled(isSaving || !hasChanges)
+                .opacity(hasChanges ? 1 : 0.5)
+                .padding(.horizontal, KinSpacing.large)
+                .padding(.vertical, KinSpacing.small)
+                .background(KinColors.background.opacity(0.9))
             }
-            .background(KinColors.background)
-            .navigationTitle("Edit Dietary Profile")
-            .navigationBarTitleDisplayMode(.inline)
-            .task {
-                await loadDietaryInformation()
-            }
+        }
+        .sensoryFeedback(
+            .selection,
+            trigger: selectedAllergenIds.count
+                + selectedRestrictionIds.count
+                + selectedPreferenceIds.count
+        )
+        .task {
+            await loadDietaryInformation()
+        }
     }
 
     private func dietarySection<Item: Identifiable>(
-        title: String,
+        _ section: DietarySection,
+        subtitle: String,
+        badge: String? = nil,
         items: [Item],
         selectedIds: Binding<Set<UUID>>
     ) -> some View where Item.ID == UUID {
 
-        VStack(alignment: .leading, spacing: KinSpacing.medium) {
-
-            Text(title)
-                .font(KinTypography.title)
-                .foregroundStyle(KinColors.primaryText)
+        DietaryCard(
+            section: section,
+            subtitle: subtitle,
+            badge: badge
+        ) {
 
             KinFlowLayout(spacing: KinSpacing.small) {
                 ForEach(items) { item in
+
+                    let isSelected =
+                        selectedIds.wrappedValue.contains(item.id)
+
                     Button {
                         toggle(
                             id: item.id,
                             selectedIds: selectedIds
                         )
                     } label: {
-                        KinChip(
+                        DietaryChip(
                             title: itemName(item),
-                            isSelected: selectedIds.wrappedValue.contains(item.id)
+                            tint: section.tint,
+                            isSelected: isSelected,
+                            showsCheck: true
                         )
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(.kinPressable)
+                    .accessibilityAddTraits(isSelected ? .isSelected : [])
                 }
             }
         }

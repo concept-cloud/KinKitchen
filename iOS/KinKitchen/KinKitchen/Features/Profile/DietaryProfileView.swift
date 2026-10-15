@@ -24,106 +24,76 @@ struct DietaryProfileView: View {
 
     var body: some View {
 
-        ScrollView {
+        DietaryHeroPage(
+            title: "Dietary Profile",
+            eyebrow: "YOUR FOOD PROFILE",
+            headline: "Made for you.",
+            message: "Your preferences help Kin Kitchen highlight recipes that fit your needs."
+        ) {
 
-            VStack(
-                alignment: .leading,
-                spacing: KinSpacing.xLarge
-            ) {
+            if isLoading {
 
-                if isLoading {
+                KinLoadingView()
+                    .padding(.top, KinSpacing.xLarge)
 
-                    KinLoadingView()
+            } else {
 
-                } else {
-                    
-                    
-                    // MARK: - Last Updated
+                summaryCard(
+                    .allergens,
+                    subtitle: "These ingredients will be flagged in recipes.",
+                    badge: DietaryProfileText.allergenCount(allergens.count),
+                    items: allergens.map(\.name)
+                )
 
-                    HStack(
-                        alignment: .center,
-                        spacing: KinSpacing.medium
-                    ) {
+                summaryCard(
+                    .restrictions,
+                    subtitle: "Foods you don't eat.",
+                    items: restrictions.map(\.name)
+                )
 
-                        if let lastUpdated {
+                summaryCard(
+                    .preferences,
+                    subtitle: "Your preferred eating style.",
+                    items: preferences.map(\.name)
+                )
 
-                            Text("Last updated \(lastUpdated, format: .dateTime.month(.abbreviated).day().year())")
-                                .font(KinTypography.subheadline)
-                                .foregroundStyle(KinColors.primary)
+                disclaimer
 
-                        } else {
+                if let errorMessage {
 
-                            Text("Last updated unavailable")
-                                .font(KinTypography.subheadline)
-                                .foregroundStyle(KinColors.primary)
-                        }
-
-                        Spacer()
-                        
-                        Button {
-
-                            isEditingDietaryProfile = true
-
-                        } label: {
-
-                            HStack(
-                                spacing: KinSpacing.small
-                            ) {
-
-                                Image(systemName: "pencil")
-
-                                Text("Edit")
-                            }
-                            .font(KinTypography.subheadline)
-                            .foregroundStyle(KinColors.primary)
-                        }
-                        .buttonStyle(.plain)
-
-                    }
-
-                    // MARK: - Allergens
-
-                    dietarySection(
-                        title: "Allergens",
-                        items: allergens.map(\.name),
-                        emptyMessage: "No allergens selected."
-                    )
-
-                    // MARK: - Dietary Restrictions
-
-                    dietarySection(
-                        title: "Dietary Restrictions",
-                        items: restrictions.map(\.name),
-                        emptyMessage: "No dietary restrictions selected."
-                    )
-
-                    // MARK: - Dietary Preferences
-
-                    dietarySection(
-                        title: "Dietary Preferences",
-                        items: preferences.map(\.name),
-                        emptyMessage: "No dietary preferences selected."
-                    )
-
-                    // MARK: - Error
-
-                    if let errorMessage {
-
-                        Text(errorMessage)
-                            .font(KinTypography.body)
-                            .foregroundStyle(KinColors.error)
-                            .frame(
-                                maxWidth: .infinity,
-                                alignment: .leading
-                            )
-                    }
+                    Text(errorMessage)
+                        .font(KinTypography.body)
+                        .foregroundStyle(KinColors.error)
+                        .frame(
+                            maxWidth: .infinity,
+                            alignment: .leading
+                        )
                 }
+
+                Text(DietaryProfileText.lastUpdated(lastUpdated))
+                    .font(KinTypography.footnote)
+                    .foregroundStyle(KinColors.secondaryText)
+                    .padding(.top, KinSpacing.small)
             }
-            .padding(KinSpacing.xLarge)
+
+        } trailing: {
+
+            Button {
+
+                isEditingDietaryProfile = true
+
+            } label: {
+
+                Label(
+                    "Edit",
+                    systemImage: KinIcons.edit
+                )
+                .labelStyle(.titleAndIcon)
+                .font(KinTypography.subheadline)
+            }
+            .tint(KinColors.primary)
+            .disabled(isLoading)
         }
-        .background(KinColors.background)
-        .navigationTitle("Dietary Profile")
-        .navigationBarTitleDisplayMode(.inline)
 
         // MARK: - Load Dietary Information
 
@@ -157,31 +127,24 @@ struct DietaryProfileView: View {
         }
     }
 
-    // MARK: - Dietary Section
 
-    @ViewBuilder
-    private func dietarySection(
-        title: String,
-        items: [String],
-        emptyMessage: String
+    // MARK: - Summary Card
+
+    /// Read-only card: the chosen items, or a note when there are none.
+    private func summaryCard(
+        _ section: DietarySection,
+        subtitle: String,
+        badge: String? = nil,
+        items: [String]
     ) -> some View {
 
-        VStack(
-            alignment: .leading,
-            spacing: KinSpacing.medium
+        DietaryCard(
+            section: section,
+            subtitle: items.isEmpty ? section.emptyMessage : subtitle,
+            badge: badge
         ) {
 
-            Text(title)
-                .font(KinTypography.title)
-                .foregroundStyle(KinColors.primaryText)
-
-            if items.isEmpty {
-
-                Text(emptyMessage)
-                    .font(KinTypography.body)
-                    .foregroundStyle(KinColors.secondaryText)
-
-            } else {
+            if !items.isEmpty {
 
                 KinFlowLayout(
                     spacing: KinSpacing.small
@@ -192,17 +155,47 @@ struct DietaryProfileView: View {
                         id: \.self
                     ) { item in
 
-                        KinChip(
+                        DietaryChip(
                             title: item,
-                            isSelected: true
+                            tint: section.tint
                         )
                     }
                 }
             }
         }
+        .accessibilityElement(children: .combine)
+    }
+
+
+    // MARK: - Disclaimer
+
+    private var disclaimer: some View {
+
+        HStack(
+            alignment: .top,
+            spacing: KinSpacing.medium
+        ) {
+
+            Image(systemName: KinIcons.info)
+                .font(.system(size: 20))
+                .foregroundStyle(KinColors.secondaryText)
+                .accessibilityHidden(true)
+
+            Text("Kin Kitchen highlights potential ingredient conflicts based on your profile. Always verify ingredients and preparation when managing food allergies.")
+                .font(KinTypography.footnote)
+                .foregroundStyle(KinColors.secondaryText)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .padding(KinSpacing.large)
         .frame(
             maxWidth: .infinity,
             alignment: .leading
+        )
+        .background(
+            KinColors.surface.opacity(0.6),
+            in: RoundedRectangle(
+                cornerRadius: KinRadius.large
+            )
         )
     }
 
@@ -295,5 +288,34 @@ struct DietaryProfileView: View {
 
     NavigationStack {
         DietaryProfileView()
+    }
+}
+
+
+// MARK: - Text
+
+nonisolated enum DietaryProfileText {
+
+    /// "1 allergen", "4 allergens"; nil when there are none.
+    static func allergenCount(_ count: Int) -> String? {
+        switch count {
+        case 0: return nil
+        case 1: return "1 allergen"
+        default: return "\(count) allergens"
+        }
+    }
+
+    /// "Last updated September 11, 2026"
+    static func lastUpdated(
+        _ date: Date?,
+        locale: Locale = .current
+    ) -> String {
+        guard let date else {
+            return "Last updated unavailable"
+        }
+        return "Last updated "
+            + date.formatted(
+                .dateTime.month(.wide).day().year().locale(locale)
+            )
     }
 }
