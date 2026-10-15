@@ -139,13 +139,16 @@ struct KinKeyboardTextField: UIViewRepresentable {
         var parent: KinKeyboardTextField
         weak var field: UITextField?
 
-        /// Rows × 42 pt keys, 6 pt gaps, 22 pt padding. Quantity has
-        /// 6 rows; units have tabs, 3 rows of units and the actions.
+        /// Rows × 44 pt keys with 8 pt gaps, plus the grabber and
+        /// padding. Quantity has 6 rows; units have tabs, 3 rows of
+        /// units and the actions.
         static func keyboardHeight(
             for keyboard: Keyboard
         ) -> CGFloat {
             let rows: CGFloat = keyboard == .quantity ? 6 : 5
-            return rows * 42 + (rows - 1) * 6 + 22
+            return rows * KeypadMetrics.keyHeight
+                + (rows - 1) * KeypadMetrics.spacing
+                + KeypadMetrics.chromeHeight
         }
 
         init(parent: KinKeyboardTextField) {
@@ -187,25 +190,42 @@ struct KinKeyboardTextField: UIViewRepresentable {
                 )
             }
 
-            let host = UIHostingController(rootView: pad)
+            let host = UIHostingController(rootView: KeyboardSheet { pad })
             host.view.backgroundColor = .clear
             // The keyboard already sits above the home indicator; don't
             // let SwiftUI push the keys up for it again.
             host.safeAreaRegions = []
 
-            // Six rows of keys; iOS adds the home-indicator space below.
+            // Our own sheet instead of the system keyboard background,
+            // so the rounded top shows the page behind it.
             let input =
-                UIInputView(
-                    frame: CGRect(x: 0, y: 0, width: 0, height: Self.keyboardHeight(for: parent.keyboard)),
-                    inputViewStyle: .keyboard
+                KeyboardContainer(
+                    frame: CGRect(
+                        x: 0,
+                        y: 0,
+                        width: 0,
+                        height: Self.keyboardHeight(for: parent.keyboard)
+                    )
                 )
+            input.backgroundColor = .clear
+
+            // The sheet color continues under the home indicator.
+            let filler = UIView()
+            filler.backgroundColor = UIColor(KinColors.paper)
+            filler.translatesAutoresizingMaskIntoConstraints = false
+            input.addSubview(filler)
+
             host.view.translatesAutoresizingMaskIntoConstraints = false
             input.addSubview(host.view)
             NSLayoutConstraint.activate([
                 host.view.leadingAnchor.constraint(equalTo: input.leadingAnchor),
                 host.view.trailingAnchor.constraint(equalTo: input.trailingAnchor),
                 host.view.topAnchor.constraint(equalTo: input.topAnchor),
-                host.view.bottomAnchor.constraint(equalTo: input.safeAreaLayoutGuide.bottomAnchor)
+                host.view.bottomAnchor.constraint(equalTo: input.safeAreaLayoutGuide.bottomAnchor),
+                filler.leadingAnchor.constraint(equalTo: input.leadingAnchor),
+                filler.trailingAnchor.constraint(equalTo: input.trailingAnchor),
+                filler.topAnchor.constraint(equalTo: host.view.bottomAnchor, constant: -1),
+                filler.bottomAnchor.constraint(equalTo: input.bottomAnchor)
             ])
 
             field.inputView = input
@@ -264,8 +284,50 @@ struct KinKeyboardTextField: UIViewRepresentable {
     }
 }
 
-extension UIInputView: @retroactive UIInputViewAudioFeedback {
-    public var enableInputClicksWhenVisible: Bool { true }
+/// Holds a measure keyboard. Lets the keys play the keyboard click.
+private final class KeyboardContainer: UIView, UIInputViewAudioFeedback {
+    var enableInputClicksWhenVisible: Bool { true }
+}
+
+
+// MARK: - Sheet
+
+private enum KeypadMetrics {
+    static let keyHeight: CGFloat = 44
+    static let spacing: CGFloat = 8
+    static let cornerRadius: CGFloat = 12
+    /// Grabber (8 + 5 + 10) and bottom padding (8).
+    static let chromeHeight: CGFloat = 31
+}
+
+/// The cream sheet the keys sit on: rounded top, grabber, soft shadow.
+private struct KeyboardSheet<Content: View>: View {
+
+    @ViewBuilder var content: Content
+
+    var body: some View {
+        VStack(spacing: 0) {
+            Capsule()
+                .fill(KinColors.secondaryText.opacity(0.35))
+                .frame(width: 40, height: 5)
+                .padding(.top, 8)
+                .padding(.bottom, 10)
+                .accessibilityHidden(true)
+
+            content
+                .padding(.horizontal, KinSpacing.medium)
+                .padding(.bottom, 8)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+        .background(
+            UnevenRoundedRectangle(
+                topLeadingRadius: KinRadius.xLarge,
+                topTrailingRadius: KinRadius.xLarge
+            )
+            .fill(KinColors.paper)
+            .shadow(color: .black.opacity(0.1), radius: 10, y: -2)
+        )
+    }
 }
 
 
@@ -416,10 +478,10 @@ private struct QuantityKeypad: View {
 
     var body: some View {
 
-        VStack(spacing: 6) {
+        VStack(spacing: KeypadMetrics.spacing) {
 
             // Fractions across the top.
-            HStack(spacing: 6) {
+            HStack(spacing: KeypadMetrics.spacing) {
                 ForEach(fractions, id: \.value) { fraction in
                     KeypadKey(
                         label: fraction.label,
@@ -432,7 +494,7 @@ private struct QuantityKeypad: View {
             }
 
             ForEach([[1, 2, 3], [4, 5, 6], [7, 8, 9]], id: \.self) { row in
-                HStack(spacing: 6) {
+                HStack(spacing: KeypadMetrics.spacing) {
                     ForEach(row, id: \.self) { digit in
                         KeypadKey(label: "\(digit)") {
                             onKey(.digit(digit))
@@ -441,7 +503,7 @@ private struct QuantityKeypad: View {
                 }
             }
 
-            HStack(spacing: 6) {
+            HStack(spacing: KeypadMetrics.spacing) {
                 KeypadKey(label: ".") {
                     onKey(.decimal)
                 }
@@ -453,7 +515,7 @@ private struct QuantityKeypad: View {
 
                 KeypadKey(
                     systemImage: "delete.left",
-                    style: .action
+                    style: .accent
                 ) {
                     onKey(.delete)
                 }
@@ -462,16 +524,13 @@ private struct QuantityKeypad: View {
 
             KeypadKey(
                 label: "Next: Unit",
+                trailingImage: KinIcons.forward,
                 style: .primary
             ) {
                 onNext()
             }
         }
-        .padding(.horizontal, 6)
-        // The system keyboard background starts a little below the
-        // top of the view.
-        .padding(.top, 18)
-        .padding(.bottom, 4)
+
     }
 }
 
@@ -505,20 +564,20 @@ private struct UnitKeypad: View {
 
     private let columns =
         Array(
-            repeating: GridItem(.flexible(), spacing: 6),
+            repeating: GridItem(.flexible(), spacing: KeypadMetrics.spacing),
             count: 4
         )
 
     var body: some View {
 
-        VStack(spacing: 6) {
+        VStack(spacing: KeypadMetrics.spacing) {
 
             // Tabs
-            HStack(spacing: 6) {
+            HStack(spacing: KeypadMetrics.spacing) {
                 ForEach(MeasureKeyboardText.UnitGroup.allCases) { option in
                     KeypadKey(
                         label: option.rawValue,
-                        style: group == option ? .primary : .action
+                        style: group == option ? .primary : .tab
                     ) {
                         group = option
                     }
@@ -528,7 +587,7 @@ private struct UnitKeypad: View {
 
             // Always three rows tall, so the keys below don't jump
             // when switching tabs.
-            LazyVGrid(columns: columns, spacing: 6) {
+            LazyVGrid(columns: columns, spacing: KeypadMetrics.spacing) {
                 ForEach(group.units, id: \.self) { unit in
                     KeypadKey(label: unit) {
                         onUnit(unit)
@@ -543,17 +602,20 @@ private struct UnitKeypad: View {
                     .accessibilityLabel("No unit")
                 }
             }
-            .frame(height: 3 * 42 + 2 * 6, alignment: .top)
+            .frame(
+                height: 3 * KeypadMetrics.keyHeight + 2 * KeypadMetrics.spacing,
+                alignment: .top
+            )
 
-            HStack(spacing: 6) {
-                KeypadKey(label: "Clear", style: .action) {
+            HStack(spacing: KeypadMetrics.spacing) {
+                KeypadKey(label: "Clear", style: .accent) {
                     onClear()
                 }
 
                 KeypadKey(
                     label: "Type",
                     systemImage: "keyboard",
-                    style: .action
+                    style: .accent
                 ) {
                     onTypeOwn()
                 }
@@ -564,11 +626,7 @@ private struct UnitKeypad: View {
                 }
             }
         }
-        .padding(.horizontal, 6)
-        // The system keyboard background starts a little below the
-        // top of the view.
-        .padding(.top, 18)
-        .padding(.bottom, 4)
+
         .sensoryFeedback(.selection, trigger: group)
     }
 }
@@ -579,14 +637,19 @@ private struct UnitKeypad: View {
 private struct KeypadKey: View {
 
     enum Style {
+        /// Cream keys: numbers and units.
         case plain
+        /// Soft pink with red text: fractions, delete, Clear, Type.
         case accent
-        case action
+        /// Soft pink with dark text: tabs that aren't selected.
+        case tab
+        /// Red: Next, Done, the selected tab.
         case primary
     }
 
     var label: String? = nil
     var systemImage: String? = nil
+    var trailingImage: String? = nil
     var style: Style = .plain
     let action: () -> Void
 
@@ -595,7 +658,7 @@ private struct KeypadKey: View {
     var body: some View {
 
         Button(action: action) {
-            HStack(spacing: 4) {
+            HStack(spacing: 6) {
                 if let systemImage {
                     Image(systemName: systemImage)
                 }
@@ -604,26 +667,38 @@ private struct KeypadKey: View {
                         .lineLimit(1)
                         .minimumScaleFactor(0.7)
                 }
+                if let trailingImage {
+                    Image(systemName: trailingImage)
+                        .font(.system(size: 14, weight: .bold))
+                }
             }
             .font(font)
             .foregroundStyle(foreground)
             .frame(maxWidth: .infinity)
-            .frame(height: 42)
-            .background(background)
-            .clipShape(RoundedRectangle(cornerRadius: 8))
-            .shadow(color: .black.opacity(0.25), radius: 0, y: 1)
+            .frame(height: KeypadMetrics.keyHeight)
+            .background(
+                background,
+                in: RoundedRectangle(cornerRadius: KeypadMetrics.cornerRadius)
+            )
+            .shadow(
+                color: .black.opacity(style == .plain ? 0.07 : 0),
+                radius: 2,
+                y: 1
+            )
         }
         .buttonStyle(KeyPressStyle())
     }
 
     private var font: Font {
         switch style {
+        case .accent where label == nil:
+            return .system(size: 20, weight: .semibold)
         case .accent:
-            return .system(size: 22, weight: .medium)
+            return .system(size: 20, weight: .medium)
         case .primary:
             return KinTypography.headline
-        default:
-            return .system(size: 20, weight: .regular)
+        case .plain, .tab:
+            return .system(size: 21, weight: .regular)
         }
     }
 
@@ -633,8 +708,8 @@ private struct KeypadKey: View {
             return .white
         case .accent:
             return KinColors.primary
-        default:
-            return Color(.label)
+        case .plain, .tab:
+            return KinColors.primaryText
         }
     }
 
@@ -642,15 +717,12 @@ private struct KeypadKey: View {
         switch style {
         case .primary:
             return KinColors.primary
-        case .action:
-            // The darker keys on the system keyboard.
+        case .accent, .tab:
+            return KinColors.primary.opacity(colorScheme == .dark ? 0.22 : 0.1)
+        case .plain:
             return colorScheme == .dark
-                ? Color(white: 0.27)
-                : Color(red: 0.67, green: 0.70, blue: 0.74)
-        default:
-            return colorScheme == .dark
-                ? Color(white: 0.42)
-                : .white
+                ? Color.white.opacity(0.08)
+                : Color(red: 1.0, green: 0.995, blue: 0.98)
         }
     }
 }
@@ -659,6 +731,8 @@ private struct KeyPressStyle: ButtonStyle {
 
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .opacity(configuration.isPressed ? 0.6 : 1)
+            .scaleEffect(configuration.isPressed ? 0.95 : 1)
+            .opacity(configuration.isPressed ? 0.75 : 1)
+            .animation(.easeOut(duration: 0.08), value: configuration.isPressed)
     }
 }
