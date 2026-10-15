@@ -107,7 +107,7 @@ struct EditRecipeView: View {
         .deleteConfirmation(
             "Delete \"\(recipeName.isEmpty ? "Recipe" : recipeName)\"?",
             isPresented: $showingDeleteConfirmation,
-            message: "This permanently deletes the recipe, its photo, ratings and stories, and removes it from your cookbooks. If it was served at a past gathering or others have made versions of it, it's kept for them and removed from your recipes instead. This can't be undone."
+            message: "This permanently deletes the recipe, its photo, ratings and stories, and removes it from your cookbooks. If it was served at a past event or others have made versions of it, it's kept for them and removed from your recipes instead. This can't be undone."
         ) {
             Task {
                 await deleteRecipe()

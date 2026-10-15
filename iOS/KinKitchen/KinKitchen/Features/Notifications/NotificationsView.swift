@@ -435,7 +435,7 @@ struct NotificationsView: View {
             icon: "bell",
             title: "No Notifications",
             message:
-                "Your gathering notifications and past alerts will appear here."
+                "Your event notifications and past alerts will appear here."
         )
         .frame(
             maxWidth: .infinity,

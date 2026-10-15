@@ -116,7 +116,7 @@ private extension AddGatheringView {
             Spacer()
 
             Text(
-                "Add Gathering"
+                "Add Event"
             )
             .font(
                 KinTypography.title
@@ -244,7 +244,7 @@ private extension AddGatheringView {
                         )
 
                         Text(
-                            "Add Gathering Photo"
+                            "Add Event Photo"
                         )
                         .font(
                             KinTypography.headline
@@ -254,7 +254,7 @@ private extension AddGatheringView {
                         )
 
                         Text(
-                            "Choose a photo for your gathering"
+                            "Choose a photo for your event"
                         )
                         .font(
                             KinTypography.caption
@@ -297,11 +297,11 @@ private extension AddGatheringView {
         ) {
 
             fieldLabel(
-                "Gathering Name"
+                "Event Name"
             )
 
             KinTextField(
-                title: "Gathering Name",
+                title: "Event Name",
                 text: $name
             )
 
@@ -778,7 +778,7 @@ private extension AddGatheringView {
             title:
                 isSaving
                 ? "Creating..."
-                : "Create Gathering"
+                : "Create Event"
         ) {
 
             Task {
@@ -816,7 +816,7 @@ private extension AddGatheringView {
         guard !cleanName.isEmpty else {
 
             errorMessage =
-                "Please enter a gathering name."
+                "Please enter an event name."
 
             return
         }
@@ -880,7 +880,7 @@ private extension AddGatheringView {
         } catch {
 
             errorMessage =
-                "Unable to create gathering. Please try again."
+                "Unable to create event. Please try again."
 
             print(
                 "CREATE GATHERING ERROR:",
@@ -1074,7 +1074,7 @@ private enum GatheringPhotoError:
         case .invalidImage:
 
             return
-                "The selected gathering photo could not be processed."
+                "The selected event photo could not be processed."
         }
     }
 }

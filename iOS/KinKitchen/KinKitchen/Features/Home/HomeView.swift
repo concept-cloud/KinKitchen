@@ -74,7 +74,7 @@ struct HomeView: View {
                         spacing: KinSpacing.medium
                     ) {
 
-                        themedHeader("Upcoming Gatherings") {
+                        themedHeader("Upcoming Events") {
                             selectTab(.gatherings)
                         }
 
@@ -545,7 +545,7 @@ private extension HomeView {
         }
         .buttonStyle(.plain)
         .accessibilityLabel("Search")
-        .accessibilityHint("Searches your recipes, cookbooks, and gatherings")
+        .accessibilityHint("Searches your recipes, cookbooks, and events")
     }
 
 
@@ -936,7 +936,7 @@ private extension HomeView {
         .accessibilityHint(
             notification.gatheringId == nil
                 ? "Marks as read"
-                : "Opens the gathering"
+                : "Opens the event"
         )
     }
 }
@@ -962,7 +962,7 @@ private extension HomeView {
                     ProgressView()
 
                     Text(
-                        "Loading gatherings..."
+                        "Loading events..."
                     )
                     .font(
                         KinTypography.body
@@ -1053,243 +1053,24 @@ private extension HomeView {
         _ item: GatheringListItem
     ) -> some View {
 
-        let gathering =
-            item.gathering
-
-        let unread =
-            notifications.unread(
-                forGathering: gathering.id
-            )
-
-        let location =
-            cleaned(
-                gathering.location
-            )
-
-        let dateText =
-            HomeView.eventDateText(
-                gathering.startsAt
-            )
-
-        return Button {
+        Button {
 
             selectedGatheringId =
-                gathering.id
+                item.gathering.id
 
         } label: {
 
-            HStack(
-                spacing: 0
-            ) {
-
-                VStack(
-                    alignment: .leading,
-                    spacing: KinSpacing.xSmall
-                ) {
-
-                    HStack(
-                        alignment: .top,
-                        spacing: KinSpacing.small
-                    ) {
-
-                        Text(
-                            gathering.name
-                        )
-                        .font(
-                            KinTypography.headline
-                        )
-                        .foregroundStyle(
-                            KinColors.primaryText
-                        )
-                        .lineLimit(2)
-                        .frame(
-                            maxWidth: .infinity,
-                            alignment: .leading
-                        )
-
-                        relationshipPill(
-                            for: item
-                        )
-                    }
-
-                    Label(
-                        dateText,
-                        systemImage: KinIcons.calendar
-                    )
-                    .font(
-                        KinTypography.footnote
-                    )
-                    .foregroundStyle(
-                        KinColors.secondaryText
-                    )
-
-                    if let location {
-
-                        Label(
-                            location,
-                            systemImage: "mappin"
-                        )
-                        .font(
-                            KinTypography.footnote
-                        )
-                        .foregroundStyle(
-                            KinColors.secondaryText
-                        )
-                        .lineLimit(1)
-                    }
-
-                    if let latest =
-                        unread.first {
-
-                        HStack(
-                            alignment: .top,
-                            spacing: KinSpacing.small
-                        ) {
-
-                            KinCardNotificationLine(
-                                notification: latest
-                            )
-                            .frame(
-                                maxWidth: .infinity,
-                                alignment: .leading
-                            )
-
-                            if unread.count > 1 {
-
-                                KinUnreadIndicator(
-                                    count: unread.count
-                                )
-                            }
-                        }
-                        .padding(
-                            .top,
-                            KinSpacing.xxSmall
-                        )
-                    }
-                }
-                .padding(
-                    KinSpacing.medium
-                )
-                // A soft halo in the card color keeps text crisp
-                // where it runs over the photo.
-                .shadow(
-                    color: KinColors.surface,
-                    radius: 3
-                )
-            }
-            .frame(
-                minHeight: 132
-            )
-            .background {
-
-                // Photo fills the card. The card color (light or dark)
-                // sits behind the text on the left and fades out to
-                // the right so the photo shows through.
-                ZStack {
-
-                    GatheringCardImage(
-                        path: gathering.coverImagePath,
-                        size: nil
-                    )
-
-                    LinearGradient(
-                        stops: [
-                            .init(
-                                color: KinColors.surface.opacity(0.92),
-                                location: 0
-                            ),
-                            .init(
-                                color: KinColors.surface.opacity(0.82),
-                                location: 0.45
-                            ),
-                            .init(
-                                color: KinColors.surface.opacity(0.35),
-                                location: 0.75
-                            ),
-                            .init(
-                                color: KinColors.surface.opacity(0.1),
-                                location: 1
-                            )
-                        ],
-                        startPoint: .leading,
-                        endPoint: .trailing
-                    )
-                }
-            }
-            .clipShape(
-                RoundedRectangle(
-                    cornerRadius: KinRadius.large
-                )
-            )
-            .kinCardShadow()
-            .contentShape(
-                RoundedRectangle(
-                    cornerRadius: KinRadius.large
+            KinEventCard(
+                item: item,
+                unread: notifications.unread(
+                    forGathering: item.gathering.id
                 )
             )
         }
         .buttonStyle(.kinPressable)
-        .accessibilityElement(
-            children: .ignore
-        )
-        .accessibilityLabel(
-            [
-                gathering.name,
-                item.relationship.displayName,
-                dateText,
-                location,
-                unread.isEmpty
-                    ? nil
-                    : "\(unread.count) new update\(unread.count == 1 ? "" : "s")"
-            ]
-            .compactMap { $0 }
-            .joined(separator: ", ")
-        )
-        .accessibilityHint(
-            "Opens the gathering"
-        )
-        .accessibilityAddTraits(
-            .isButton
-        )
     }
 
 
-    func relationshipPill(
-        for item: GatheringListItem
-    ) -> some View {
-
-        let color =
-            relationshipColor(
-                for: item
-            )
-
-        return Text(
-            item.relationship
-                .displayName
-        )
-        .font(
-            .system(
-                size: 12,
-                weight: .bold
-            )
-        )
-        .foregroundStyle(.white)
-        .padding(
-            .horizontal,
-            KinSpacing.small
-        )
-        .padding(
-            .vertical,
-            KinSpacing.xSmall
-        )
-        .background(
-            color
-        )
-        .clipShape(
-            Capsule()
-        )
-        .fixedSize()
-    }
 }
 
 
@@ -1745,43 +1526,8 @@ private extension HomeView {
 
 private extension HomeView {
 
-    func relationshipColor(
-        for item: GatheringListItem
-    ) -> Color {
-
-        switch item.relationship {
-
-        case .hosting:
-            return KinColors.primary
-
-        case .going:
-            return KinColors.success
-
-        case .invited:
-            return KinColors.warning
-        }
-    }
 
 
-    func cleaned(
-        _ value: String?
-    ) -> String? {
-
-        guard let value else {
-
-            return nil
-        }
-
-        let cleanedValue =
-            value.trimmingCharacters(
-                in:
-                    .whitespacesAndNewlines
-            )
-
-        return cleanedValue.isEmpty
-            ? nil
-            : cleanedValue
-    }
 }
 
 

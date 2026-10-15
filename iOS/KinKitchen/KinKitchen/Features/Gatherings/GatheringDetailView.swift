@@ -90,7 +90,7 @@ struct GatheringDetailView: View {
 
                 errorView(
                     message:
-                        "Unable to load this gathering."
+                        "Unable to load this event."
                 )
             }
         }
@@ -123,9 +123,9 @@ struct GatheringDetailView: View {
             }
         }
         .deleteConfirmation(
-            "Delete \"\(gathering?.name ?? "Gathering")\"?",
+            "Delete \"\(gathering?.name ?? "Event")\"?",
             isPresented: $showDeleteConfirmation,
-            message: "This permanently deletes the cancelled gathering, its guest list, dishes and claims. Recipes are not deleted. This can't be undone."
+            message: "This permanently deletes the cancelled event, its guest list, dishes and claims. Recipes are not deleted. This can't be undone."
         ) {
             Task {
                 await deleteCancelledGathering()
@@ -291,7 +291,7 @@ private extension GatheringDetailView {
         ZStack {
 
             Text(
-                "Gathering"
+                "Event"
             )
             .font(
                 KinTypography.navigationTitle
@@ -657,15 +657,15 @@ private extension GatheringDetailView {
             ) {
                 Text(
                     isCancelled
-                        ? "Cancelled Gathering"
-                        : "Completed Gathering"
+                        ? "Cancelled Event"
+                        : "Completed Event"
                 )
                 .font(KinTypography.headline)
                 .foregroundStyle(KinColors.primaryText)
 
                 Text(
                     isCancelled
-                        ? "This gathering was cancelled. Guests, dishes and recipes can be viewed but not changed."
+                        ? "This event was cancelled. Guests, dishes and recipes can be viewed but not changed."
                         : "Kept in History for reference. Guests, dishes and recipes can be viewed but not changed."
                 )
                 .font(KinTypography.caption)
@@ -713,7 +713,7 @@ private extension GatheringDetailView {
                         Text("Deleting...")
                     } else {
                         Image(systemName: "trash")
-                        Text("Delete Gathering")
+                        Text("Delete Event")
                     }
 
                     Spacer()
@@ -861,7 +861,7 @@ private extension GatheringDetailView {
             } else if hostNotes.isEmpty {
 
                 Text(
-                    "Jot down what this gathering was missing so the next one goes even better."
+                    "Jot down what this event was missing so the next one goes even better."
                 )
                 .font(KinTypography.body)
                 .foregroundStyle(KinColors.secondaryText)
@@ -996,7 +996,7 @@ private extension GatheringDetailView {
             .buttonStyle(.plain)
             .disabled(isCompleting)
             .confirmationDialog(
-                "Mark this gathering as completed?",
+                "Mark this event as completed?",
                 isPresented: $showingCompleteConfirmation,
                 titleVisibility: .visible
             ) {
@@ -1008,7 +1008,7 @@ private extension GatheringDetailView {
                 Button("Cancel", role: .cancel) {}
             } message: {
                 Text(
-                    "It moves to Gathering History. Guests, dishes and claims are kept."
+                    "It moves to Event History. Guests, dishes and claims are kept."
                 )
             }
 
@@ -1044,7 +1044,7 @@ private extension GatheringDetailView {
                     )
         } catch {
             completeErrorMessage =
-                "The gathering couldn't be marked completed. Please try again."
+                "The event couldn't be marked completed. Please try again."
 
             print(
                 "GATHERING COMPLETE ERROR:",
@@ -1418,7 +1418,7 @@ private extension GatheringDetailView {
                         KinColors.primaryText
                     )
 
-                Text("Gathering Host")
+                Text("Event Host")
                     .font(
                         KinTypography.footnote
                     )
@@ -1898,9 +1898,9 @@ private extension GatheringDetailView {
             futureTab(
                 icon:
                     "bubble.left.and.bubble.right",
-                title: "Gathering Chat",
+                title: "Event Chat",
                 message:
-                    "Gathering chat will be available here."
+                    "Event chat will be available here."
             )
         }
     }
@@ -2115,7 +2115,7 @@ private extension GatheringDetailView {
 
             Text(
                 isHistoricalGathering
-                    ? "This gathering didn't have any dish sign-ups."
+                    ? "This event didn't have any dish sign-ups."
                     : "Dish sign-ups will appear here."
             )
                 .font(KinTypography.footnote)
@@ -2557,7 +2557,7 @@ private extension GatheringDetailView {
                 )
 
             Text(
-                "Gathering supplies will appear here."
+                "Event supplies will appear here."
             )
             .font(
                 KinTypography.footnote
@@ -2908,7 +2908,7 @@ private extension GatheringDetailView {
                 )
 
             Text(
-                "Loading gathering..."
+                "Loading event..."
             )
             .font(
                 KinTypography.body
@@ -3123,8 +3123,8 @@ private extension GatheringDetailView {
                 // PGRST116: no row, so it was deleted (or the user can
                 // no longer see it), e.g. opened from an old screen.
                 (error as? PostgrestError)?.code == "PGRST116"
-                    ? "This gathering is no longer available. It may have been deleted by the host."
-                    : "Unable to load gathering. Please try again."
+                    ? "This event is no longer available. It may have been deleted by the host."
+                    : "Unable to load event. Please try again."
 
             print(
                 "GATHERING DETAIL ERROR:",

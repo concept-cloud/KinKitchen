@@ -92,7 +92,7 @@ private extension GatheringsView {
         HStack {
 
             Text(
-                "Gatherings"
+                "Events"
             )
             .font(
                 KinTypography.largeTitle
@@ -137,7 +137,7 @@ private extension GatheringsView {
                 .plain
             )
             .accessibilityLabel(
-                "Add Gathering"
+                "Add Event"
             )
         }
         .padding(
@@ -278,11 +278,14 @@ private extension GatheringsView {
                         value: item.gathering.id
                     ) {
 
-                        gatheringCard(
-                            item
+                        KinEventCard(
+                            item: item,
+                            unread: notifications.unread(
+                                forGathering: item.gathering.id
+                            )
                         )
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(.kinPressable)
                 }
             }
             .padding(
@@ -301,284 +304,6 @@ private extension GatheringsView {
 }
 
 
-// MARK: - Gathering Card
-
-private extension GatheringsView {
-
-    func gatheringCard(
-        _ item: GatheringListItem
-    ) -> some View {
-
-        let gathering =
-            item.gathering
-
-        let unread =
-            notifications.unread(
-                forGathering: gathering.id
-            )
-
-        let unreadCount =
-            unread.count
-
-        return HStack(
-            spacing: KinSpacing.medium
-        ) {
-
-            GatheringCardImage(
-                path: gathering.coverImagePath
-            )
-
-            VStack(
-                alignment: .leading,
-                spacing: KinSpacing.xSmall
-            ) {
-
-                Text(
-                    gathering.name
-                )
-                .font(
-                    KinTypography.title3
-                )
-                .foregroundStyle(
-                    KinColors.primaryText
-                )
-                .multilineTextAlignment(
-                    .leading
-                )
-                .lineLimit(2)
-                .fixedSize(
-                    horizontal: false,
-                    vertical: true
-                )
-                .layoutPriority(1)
-
-                Text(
-                    gathering.isHistorical()
-                        ? gathering.startsAt.formatted(
-                            date: .abbreviated,
-                            time: .shortened
-                        )
-                        : formattedDateTime(
-                            gathering.startsAt
-                        )
-                )
-                .font(
-                    KinTypography.caption
-                )
-                .foregroundStyle(
-                    KinColors.secondaryText
-                )
-
-                if gathering.isHistorical()
-                    || gathering.status == .cancelled {
-                    historyStatusBadge(
-                        gathering
-                    )
-                }
-
-                if let location =
-                    cleaned(
-                        gathering.location
-                    ) {
-
-                    Text(
-                        location
-                    )
-                    .font(
-                        KinTypography.caption
-                    )
-                    .foregroundStyle(
-                        KinColors.secondaryText
-                    )
-                    .lineLimit(1)
-                }
-
-                if let latest =
-                    unread.first {
-
-                    KinCardNotificationLine(
-                        notification: latest
-                    )
-                }
-            }
-            .frame(
-                maxWidth: .infinity,
-                alignment: .leading
-            )
-
-            VStack(
-                alignment: .center,
-                spacing: KinSpacing.xSmall
-            ) {
-
-                if unreadCount > 0 {
-
-                    KinUnreadIndicator(
-                        count: unreadCount
-                    )
-                }
-
-                Image(
-                    systemName:
-                        cardIcon(
-                            for: item
-                        )
-                )
-                .font(
-                    .system(
-                        size: 20,
-                        weight: .semibold
-                    )
-                )
-                .foregroundStyle(
-                    relationshipColor(
-                        for: item
-                    )
-                )
-
-                Text(
-                    relationshipLabel(
-                        for: item
-                    )
-                )
-                .font(
-                    KinTypography.caption
-                )
-                .foregroundStyle(
-                    relationshipColor(
-                        for: item
-                    )
-                )
-                .padding(
-                    .horizontal,
-                    KinSpacing.small
-                )
-                .padding(
-                    .vertical,
-                    KinSpacing.xSmall
-                )
-                .background(
-                    relationshipColor(
-                        for: item
-                    )
-                    .opacity(0.10)
-                )
-                .clipShape(
-                    Capsule()
-                )
-
-                Image(
-                    systemName:
-                        "chevron.right"
-                )
-                .font(
-                    .caption
-                )
-                .foregroundStyle(
-                    KinColors.secondaryText
-                )
-            }
-            .fixedSize(
-                horizontal: true,
-                vertical: false
-            )
-        }
-        .padding(
-            KinSpacing.large
-        )
-        .background(
-            KinColors.surface
-        )
-        .clipShape(
-            RoundedRectangle(
-                cornerRadius:
-                    KinRadius.large
-            )
-        )
-    }
-
-
-    /// Past tense once the gathering is in history.
-    func relationshipLabel(
-        for item: GatheringListItem
-    ) -> String {
-
-        guard item.gathering.isHistorical() else {
-            return item.relationship.displayName
-        }
-
-        switch item.relationship {
-        case .hosting:
-            return "Hosted"
-        case .going:
-            return "Attended"
-        case .invited:
-            return "Invited"
-        }
-    }
-
-
-    func historyStatusBadge(
-        _ gathering: Gathering
-    ) -> some View {
-
-        let isCancelled =
-            gathering.status == .cancelled
-
-        return Label(
-            isCancelled ? "Cancelled" : "Completed",
-            systemImage:
-                isCancelled
-                    ? "xmark.circle"
-                    : "checkmark.circle"
-        )
-        .font(
-            KinTypography.caption
-        )
-        .foregroundStyle(
-            isCancelled
-                ? KinColors.error
-                : KinColors.success
-        )
-    }
-
-
-    private func relationshipColor(
-        for item: GatheringListItem
-    ) -> Color {
-
-        switch item.relationship {
-
-        case .hosting:
-            return KinColors.primary
-
-        case .going:
-            return .green
-
-        case .invited:
-            return KinColors.warning
-        }
-    }
-
-
-    func cardIcon(
-        for item: GatheringListItem
-    ) -> String {
-
-        switch item.relationship {
-
-        case .hosting:
-            return "house.fill"
-
-        case .invited:
-            return "envelope.fill"
-
-        case .going:
-            return "person.3.fill"
-        }
-    }
-}
-
 // MARK: - Loading
 
 private extension GatheringsView {
@@ -593,7 +318,7 @@ private extension GatheringsView {
             ProgressView()
 
             Text(
-                "Loading gatherings..."
+                "Loading events..."
             )
             .font(
                 KinTypography.body
@@ -674,13 +399,13 @@ private extension GatheringsView {
         switch selectedTab {
 
         case .upcoming:
-            return "No Upcoming Gatherings"
+            return "No Upcoming Events"
 
         case .hosting:
             return "Nothing You're Hosting"
 
         case .history:
-            return "No Gathering History Yet"
+            return "No Event History Yet"
         }
     }
 
@@ -690,13 +415,13 @@ private extension GatheringsView {
         switch selectedTab {
 
         case .upcoming:
-            return "Your upcoming gatherings will appear here."
+            return "Your upcoming events will appear here."
 
         case .hosting:
-            return "Gatherings you host will appear here."
+            return "Events you host will appear here."
 
         case .history:
-            return "Completed gatherings you hosted or attended will appear here, with their guests and dishes."
+            return "Completed events you hosted or attended will appear here, with their guests and dishes."
         }
     }
 }
@@ -730,7 +455,7 @@ private extension GatheringsView {
 
 
             Text(
-                "Unable to Load Gatherings"
+                "Unable to Load Events"
             )
             .font(
                 KinTypography.title2
@@ -878,46 +603,6 @@ private extension GatheringsView {
                 )
             }
         }
-    }
-}
-
-
-// MARK: - Formatting
-
-private extension GatheringsView {
-
-    func formattedDateTime(
-        _ date: Date
-    ) -> String {
-
-        date.formatted(
-            .dateTime
-                .weekday(
-                    .wide
-                )
-                .hour()
-                .minute()
-        )
-    }
-
-
-    func cleaned(
-        _ value: String?
-    ) -> String? {
-
-        guard let value else {
-            return nil
-        }
-
-        let cleanValue =
-            value.trimmingCharacters(
-                in:
-                    .whitespacesAndNewlines
-            )
-
-        return cleanValue.isEmpty
-            ? nil
-            : cleanValue
     }
 }
 

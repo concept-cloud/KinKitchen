@@ -89,7 +89,7 @@ struct HomeSearchView: View {
 
             hint(
                 icon: KinIcons.search,
-                text: "Search your recipes, cookbooks, and gatherings."
+                text: "Search your recipes, cookbooks, and events."
             )
 
         } else if isLoading {
@@ -146,7 +146,7 @@ struct HomeSearchView: View {
 
                 if !matchedGatherings.isEmpty {
 
-                    Section("Gatherings") {
+                    Section("Events") {
 
                         ForEach(matchedGatherings) { item in
 
@@ -296,7 +296,7 @@ struct HomeSearchView: View {
 /// Search rules shared by Home and its tests.
 nonisolated enum HomeSearch {
 
-    static let placeholder = "Search recipes, cookbooks, or gatherings"
+    static let placeholder = "Search recipes, cookbooks, or events"
 
     /// Items where any field contains every word of the query,
     /// ignoring case and accents. An empty query matches nothing.

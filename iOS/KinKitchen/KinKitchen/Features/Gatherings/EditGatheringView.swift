@@ -183,12 +183,12 @@ struct EditGatheringView: View {
         ) {
 
             Button(
-                "Keep Gathering",
+                "Keep Event",
                 role: .cancel
             ) {}
 
             Button(
-                "Cancel Gathering",
+                "Cancel Event",
                 role: .destructive
             ) {
 
@@ -208,7 +208,7 @@ struct EditGatheringView: View {
             "Delete \"\(gathering.name)\"?",
             isPresented:
                 $showDeleteConfirmation,
-            message: "This permanently deletes the gathering, its guest list, dishes and claims. Guests will be told it was removed. Recipes are not deleted. This can't be undone."
+            message: "This permanently deletes the event, its guest list, dishes and claims. Guests will be told it was removed. Recipes are not deleted. This can't be undone."
         ) {
 
             Task {
@@ -235,7 +235,7 @@ private extension EditGatheringView {
         ZStack {
 
             Text(
-                "Edit Gathering"
+                "Edit Event"
             )
             .font(
                 KinTypography.title
@@ -438,7 +438,7 @@ private extension EditGatheringView {
             )
 
             Text(
-                "Add Gathering Photo"
+                "Add Event Photo"
             )
             .font(
                 KinTypography.headline
@@ -448,7 +448,7 @@ private extension EditGatheringView {
             )
 
             Text(
-                "Choose a photo for your gathering"
+                "Choose a photo for your event"
             )
             .font(
                 KinTypography.caption
@@ -481,7 +481,7 @@ private extension EditGatheringView {
             )
 
             Text(
-                "Add Gathering Photo"
+                "Add Event Photo"
             )
             .font(
                 KinTypography.headline
@@ -491,7 +491,7 @@ private extension EditGatheringView {
             )
 
             Text(
-                "Choose a photo for your gathering"
+                "Choose a photo for your event"
             )
             .font(
                 KinTypography.caption
@@ -518,12 +518,12 @@ private extension EditGatheringView {
             // MARK: Name
 
             fieldLabel(
-                "Gathering Name"
+                "Event Name"
             )
 
             KinTextField(
                 title:
-                    "Gathering Name",
+                    "Event Name",
                 text:
                     $name
             )
@@ -1104,7 +1104,7 @@ private extension EditGatheringView {
     var startedNotice: some View {
 
         Label(
-            "This gathering has started, so it can't be cancelled or deleted. It will be kept in Gathering History.",
+            "This event has started, so it can't be cancelled or deleted. It will be kept in Event History.",
             systemImage: "clock.arrow.circlepath"
         )
         .font(
@@ -1145,7 +1145,7 @@ private extension EditGatheringView {
 
 
             Text(
-                "Cancelling a gathering removes it from active gatherings but preserves its record."
+                "Cancelling an event removes it from active events but preserves its record."
             )
             .font(
                 KinTypography.caption
@@ -1186,7 +1186,7 @@ private extension EditGatheringView {
                         )
 
                         Text(
-                            "Cancel Gathering"
+                            "Cancel Event"
                         )
                     }
 
@@ -1234,7 +1234,7 @@ private extension EditGatheringView {
 
 
             Text(
-                "Deleting removes the gathering and its guest list, dishes and claims for good. Your recipes are not affected."
+                "Deleting removes the event and its guest list, dishes and claims for good. Your recipes are not affected."
             )
             .font(
                 KinTypography.caption
@@ -1275,7 +1275,7 @@ private extension EditGatheringView {
                         )
 
                         Text(
-                            "Delete Gathering"
+                            "Delete Event"
                         )
                     }
 
@@ -1337,7 +1337,7 @@ private extension EditGatheringView {
         guard !cleanName.isEmpty else {
 
             errorMessage =
-                "Please enter a gathering name."
+                "Please enter an event name."
 
             return
         }
@@ -1421,7 +1421,7 @@ private extension EditGatheringView {
         } catch {
 
             errorMessage =
-                "Unable to save gathering changes. Please try again."
+                "Unable to save event changes. Please try again."
 
 
             print(
@@ -1469,7 +1469,7 @@ private extension EditGatheringView {
             errorMessage =
                 GatheringService.friendlyMessage(
                     for: error,
-                    fallback: "Unable to cancel this gathering. Please try again."
+                    fallback: "Unable to cancel this event. Please try again."
                 )
 
 
@@ -1852,7 +1852,7 @@ private enum EditGatheringPhotoError:
         case .invalidImage:
 
             return
-                "The selected gathering photo could not be processed."
+                "The selected event photo could not be processed."
         }
     }
 }

@@ -28,7 +28,7 @@ struct ContentView: View {
         ),
 
         KinTabBarItem(
-            title: "Gatherings",
+            title: "Events",
             icon: KinIcons.gatherings
         ),
 

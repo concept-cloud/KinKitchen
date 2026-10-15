@@ -270,7 +270,7 @@ private extension GatheringNeedDetailView {
 
                     Text(
                         isStandaloneSupply
-                        ? "Gathering Supply"
+                        ? "Event Supply"
                         : currentNeed
                             .category
                             .displayName
@@ -799,7 +799,7 @@ private extension GatheringNeedDetailView {
                     : KinColors.success
             )
 
-            Text("This gathering is completed, so claims can't be changed.")
+            Text("This event is completed, so claims can't be changed.")
                 .font(KinTypography.caption)
                 .foregroundStyle(KinColors.secondaryText)
         }

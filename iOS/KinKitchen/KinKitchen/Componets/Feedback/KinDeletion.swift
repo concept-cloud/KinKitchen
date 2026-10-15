@@ -24,7 +24,7 @@ enum KinDeletion {
             switch self {
             case .recipe: "recipe"
             case .cookbook: "cookbook"
-            case .gathering: "gathering"
+            case .gathering: "event"
             }
         }
     }

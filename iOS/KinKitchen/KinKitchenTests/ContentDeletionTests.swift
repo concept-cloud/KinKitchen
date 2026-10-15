@@ -32,7 +32,7 @@ struct ContentDeletionTests {
                     .message
             )
 
-        #expect(pastGathering.contains("past gathering"))
+        #expect(pastGathering.contains("past event"))
         #expect(versions.contains("versions"))
     }
 
@@ -49,7 +49,7 @@ struct ContentDeletionTests {
                 fallback: "fallback"
             )
 
-        #expect(message.contains("Gathering History"))
+        #expect(message.contains("Event History"))
     }
 
     @Test func nonHostIsToldOnlyTheHostCan() {
@@ -161,7 +161,7 @@ struct ContentDeletionTests {
             KinDeletion.failureMessage(
                 for: DatabaseError(description: "GATHERING_ALREADY_OCCURRED"),
                 deleting: .gathering
-            ).contains("Gathering History")
+            ).contains("Event History")
         )
     }
 

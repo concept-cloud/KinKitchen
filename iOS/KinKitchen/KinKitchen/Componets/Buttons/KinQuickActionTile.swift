@@ -142,7 +142,7 @@ struct KinQuickActionTile: View {
         ) {}
 
         KinQuickActionTile(
-            title: "New Gathering",
+            title: "New Event",
             icon: "person.3.fill",
             tint: KinColors.success
         ) {}

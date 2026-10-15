@@ -677,7 +677,7 @@ private extension AddDishView {
                         )
 
                         Text(
-                            "This dish may already be represented in the gathering. Review the potential match before adding another dish."
+                            "This dish may already be represented in the event. Review the potential match before adding another dish."
                         )
                         .font(
                             KinTypography.body

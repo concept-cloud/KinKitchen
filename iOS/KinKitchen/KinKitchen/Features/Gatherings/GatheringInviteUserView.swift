@@ -76,7 +76,7 @@ struct GatheringInviteUserView: View {
             }
         } message: {
             Text(
-                "The gathering invitation was sent successfully."
+                "The event invitation was sent successfully."
             )
         }
         .alert(
@@ -660,7 +660,7 @@ private extension GatheringInviteUserView {
                     "Already Invited"
 
                 invitationErrorMessage =
-                    "\(displayName(for: selectedUser)) already has an invitation to this gathering."
+                    "\(displayName(for: selectedUser)) already has an invitation to this event."
 
             } else {
                 invitationErrorTitle =

@@ -447,11 +447,11 @@ enum GatheringService {
         }
 
         if description.contains("GATHERING_ALREADY_OCCURRED") {
-            return "This gathering has already happened, so it's kept in Gathering History and can't be deleted."
+            return "This event has already happened, so it's kept in Event History and can't be deleted."
         }
 
         if description.contains("GATHERING_CANNOT_BE_CANCELLED") {
-            return "Only upcoming gatherings that haven't started can be cancelled."
+            return "Only upcoming events that haven't started can be cancelled."
         }
 
         return fallback

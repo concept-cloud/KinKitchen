@@ -80,7 +80,7 @@ extension KinNotification {
         }
 
         if type == .gatheringUpdated {
-            return "The host updated the gathering details."
+            return "The host updated the event details."
         }
 
         return nil

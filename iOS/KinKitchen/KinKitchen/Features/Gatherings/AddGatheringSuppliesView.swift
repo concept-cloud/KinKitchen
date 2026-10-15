@@ -148,7 +148,7 @@ private extension AddGatheringSuppliesView {
             alignment: .leading,
             spacing: KinSpacing.small
         ) {
-            Text("What does the gathering need?")
+            Text("What does the event need?")
                 .font(
                     KinTypography.sectionTitle
                 )

@@ -96,7 +96,7 @@ enum RecipeDeletionOutcome: Equatable {
         case .deleted:
             return nil
         case .archived(.pastGathering):
-            return "This recipe was served at a past gathering, so it's been removed from your recipes but kept for the people who attended."
+            return "This recipe was served at a past event, so it's been removed from your recipes but kept for the people who attended."
         case .archived(.versions):
             return "Other cooks have made their own versions of this recipe, so it's been removed from your recipes but kept so their versions still credit you."
         }
