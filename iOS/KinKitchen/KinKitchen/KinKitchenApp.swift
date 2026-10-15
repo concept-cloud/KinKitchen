@@ -68,9 +68,7 @@ struct KinKitchenApp: App {
                 }
             }
             .preferredColorScheme(
-                appearanceMode == "dark"
-                    ? .dark
-                    : .light
+                KinAppearance.saved(appearanceMode).colorScheme
             )
             .task(id: authService.isAuthenticated) {
 

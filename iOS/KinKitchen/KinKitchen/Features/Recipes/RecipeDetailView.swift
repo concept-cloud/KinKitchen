@@ -114,6 +114,7 @@ struct RecipeDetailView: View {
             }
         }
         .navigationBarHidden(true)
+        .kinKeepsScreenAwake()
         .task {
             await loadRecipe()
 

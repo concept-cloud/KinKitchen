@@ -102,6 +102,7 @@ struct CookbookRecipePager: View {
         }
         .sensoryFeedback(.selection, trigger: currentId)
         .navigationBarHidden(true)
+        .kinKeepsScreenAwake()
         .navigationDestination(item: $fullDetailsId) { id in
             RecipeDetailView(
                 recipeId: id,

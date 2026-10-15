@@ -7,7 +7,7 @@
 
 import Foundation
 import Testing
-import UIKit
+import SwiftUI
 @testable import KinKitchen
 
 /// C1: Home screen redesign.
@@ -323,5 +323,22 @@ struct DietaryBackgroundTests {
                 "Missing asset \(background.imageName)"
             )
         }
+    }
+}
+
+
+// MARK: - Appearance
+
+struct KinAppearanceTests {
+
+    @Test func savedModesMapToColorSchemes() {
+        #expect(KinAppearance.saved("light").colorScheme == .light)
+        #expect(KinAppearance.saved("dark").colorScheme == .dark)
+        #expect(KinAppearance.saved("system").colorScheme == nil)
+    }
+
+    @Test func unknownModeFallsBackToLight() {
+        #expect(KinAppearance.saved("") == .light)
+        #expect(KinAppearance.saved("sepia") == .light)
     }
 }

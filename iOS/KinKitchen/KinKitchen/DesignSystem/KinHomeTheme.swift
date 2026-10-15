@@ -140,3 +140,19 @@ extension KinHomeTheme {
         )
     }
 }
+
+
+// MARK: - Settings Preview
+
+extension KinHomeTheme {
+
+    /// Small swatch for the Settings picker.
+    var previewGradient: LinearGradient {
+        let (first, second) = tints
+        return LinearGradient(
+            colors: [first, second],
+            startPoint: .topLeading,
+            endPoint: .bottomTrailing
+        )
+    }
+}
