@@ -6,7 +6,6 @@
 //
 
 import SwiftUI
-import PhotosUI
 import UIKit
 
 struct ProfileView: View {
@@ -20,7 +19,7 @@ struct ProfileView: View {
 
     // MARK: - Profile Photo
 
-    @State private var selectedPhotoItem: PhotosPickerItem?
+    /// Changed from Edit Profile.
     @State private var profilePhotoData: Data?
 
     // MARK: - Navigation
@@ -115,31 +114,15 @@ struct ProfileView: View {
                 hasLoadedProfile = true
             }
 
-            // MARK: - Photo Selection
-
-            .onChange(
-                of: selectedPhotoItem
-            ) { _, newItem in
-
-                guard let newItem else {
-                    return
-                }
-
-                Task {
-
-                    await uploadSelectedPhoto(
-                        newItem
-                    )
-                }
-            }
-
             // MARK: - Edit Profile
 
             .sheet(
                 isPresented: $isEditingProfile
             ) {
 
-                EditProfileView()
+                EditProfileView(
+                    currentPhotoData: profilePhotoData
+                )
             }
 
             .onChange(
@@ -194,11 +177,8 @@ struct ProfileView: View {
     private static let heroNavy =
         Color(red: 0.07, green: 0.10, blue: 0.17)
 
-    @AppStorage(KinDietaryBackground.storageKey)
-    private var backgroundChoice = KinDietaryBackground.default.rawValue
-
-    /// The user's kitchen photo on the left fading into navy, with who
-    /// they are on the right: photo, name, @username, location, bio.
+    /// The user's profile photo on the left fading into navy, with who
+    /// they are on the right: name, @username, location, bio.
     private func profileHero(
         topInset: CGFloat
     ) -> some View {
@@ -216,9 +196,6 @@ struct ProfileView: View {
                     Spacer()
                     editButton
                 }
-
-                avatar
-                    .padding(.top, KinSpacing.xSmall)
 
                 Text(displayName)
                     .font(KinTypography.title)
@@ -274,20 +251,21 @@ struct ProfileView: View {
         .padding(.bottom, KinSpacing.xLarge + KinSpacing.large)
         .frame(maxWidth: .infinity, minHeight: 380, alignment: .top)
         .background {
-            Color.clear
+            // Navy underneath, so the photo fades into it with no edge.
+            Self.heroNavy
                 .overlay(alignment: .leading) {
-                    Image(KinDietaryBackground.saved(backgroundChoice).imageName)
-                        .resizable()
-                        .scaledToFill()
+                    heroPhoto
                 }
                 .clipped()
                 .overlay {
                     // Photo on the left, navy behind the text.
                     LinearGradient(
                         stops: [
-                            .init(color: Self.heroNavy.opacity(0), location: 0.2),
-                            .init(color: Self.heroNavy.opacity(0.75), location: 0.45),
-                            .init(color: Self.heroNavy.opacity(0.97), location: 0.62),
+                            .init(color: Self.heroNavy.opacity(0), location: 0.18),
+                            .init(color: Self.heroNavy.opacity(0.75), location: 0.42),
+                            // Solid before the photo's edge (62%), so
+                            // the edge never shows.
+                            .init(color: Self.heroNavy, location: 0.58),
                             .init(color: Self.heroNavy, location: 1)
                         ],
                         startPoint: .leading,
@@ -310,6 +288,46 @@ struct ProfileView: View {
         }
     }
 
+    /// The profile photo, filling the left of the header and showing
+    /// the person's face (top of the photo) rather than the middle.
+    /// A warm placeholder until one is chosen.
+    @ViewBuilder
+    private var heroPhoto: some View {
+
+        if let profilePhotoData,
+           let uiImage = UIImage(data: profilePhotoData) {
+
+            GeometryReader { proxy in
+                Image(uiImage: uiImage)
+                    .resizable()
+                    .scaledToFill()
+                    // Photo sits in the left ~60%, where it shows.
+                    .frame(
+                        width: proxy.size.width * 0.62,
+                        height: proxy.size.height,
+                        alignment: .top
+                    )
+                    .clipped()
+            }
+
+        } else {
+
+            GeometryReader { proxy in
+                KinPhotoPlaceholder(
+                    icon: KinIcons.profile,
+                    iconSize: 64
+                )
+                .background(KinColors.paper)
+                // Same spot as a photo, so the icon sits on the
+                // photo side rather than behind the text.
+                .frame(
+                    width: proxy.size.width * 0.62,
+                    height: proxy.size.height
+                )
+            }
+        }
+    }
+
     private var editButton: some View {
 
         Button {
@@ -329,50 +347,6 @@ struct ProfileView: View {
         }
         .buttonStyle(.kinPressable)
         .accessibilityLabel("Edit profile")
-    }
-
-    /// Tap to change the profile photo.
-    private var avatar: some View {
-
-        PhotosPicker(
-            selection: $selectedPhotoItem,
-            matching: .images
-        ) {
-            ZStack(alignment: .bottomTrailing) {
-
-                Group {
-                    if let profilePhotoData,
-                       let uiImage = UIImage(data: profilePhotoData) {
-                        Image(uiImage: uiImage)
-                            .resizable()
-                            .scaledToFill()
-                    } else {
-                        Image(systemName: KinIcons.profile)
-                            .resizable()
-                            .scaledToFit()
-                            .foregroundStyle(.white.opacity(0.6))
-                            .padding(KinSpacing.small)
-                    }
-                }
-                .frame(width: 72, height: 72)
-                .background(.white.opacity(0.12))
-                .clipShape(Circle())
-                .overlay {
-                    Circle().strokeBorder(.white.opacity(0.85), lineWidth: 2)
-                }
-
-                Image(systemName: KinIcons.camera)
-                    .font(.system(size: 11, weight: .semibold))
-                    .foregroundStyle(.white)
-                    .frame(width: 26, height: 26)
-                    .background(KinColors.primary, in: Circle())
-                    .overlay {
-                        Circle().strokeBorder(Self.heroNavy, lineWidth: 2)
-                    }
-            }
-        }
-        .buttonStyle(.plain)
-        .accessibilityLabel("Change profile photo")
     }
 
     private func cleaned(
@@ -638,54 +612,6 @@ struct ProfileView: View {
 
             print(
                 "PROFILE LOAD ERROR:",
-                error.localizedDescription
-            )
-        }
-    }
-
-    // MARK: - Upload Profile Photo
-
-    @MainActor
-    private func uploadSelectedPhoto(
-        _ item: PhotosPickerItem
-    ) async {
-
-        defer {
-
-            selectedPhotoItem = nil
-        }
-
-        do {
-
-            guard
-                let imageData =
-                    try await item
-                        .loadTransferable(
-                            type: Data.self
-                        )
-            else {
-
-                errorMessage =
-                    "Unable to load the selected photo."
-
-                return
-            }
-
-            _ =
-                try await ProfileService
-                    .uploadProfilePhoto(
-                        imageData
-                    )
-
-            await loadProfile()
-
-        } catch {
-
-            errorMessage =
-                "Unable to upload profile photo."
-
-            print(
-                "PROFILE PHOTO UPLOAD ERROR:",
                 error.localizedDescription
             )
         }
