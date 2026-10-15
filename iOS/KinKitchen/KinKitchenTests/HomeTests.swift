@@ -561,3 +561,40 @@ struct RecipeListSignatureTests {
         #expect(RecipeListSignature([original]) != RecipeListSignature([]))
     }
 }
+
+
+// MARK: - Profile Stats
+
+struct ProfileStatsTextTests {
+
+    @Test func ratingWording() {
+        #expect(ProfileStatsText.average(4.56) == "4.6")
+        #expect(ProfileStatsText.ratingCount(1) == "from 1 rating")
+        #expect(ProfileStatsText.ratingCount(23) == "from 23 ratings")
+    }
+
+    @Test func starsRoundToTheNearestHalf() {
+        #expect(ProfileStatsText.stars(for: 4.6) == (4, true))
+        #expect(ProfileStatsText.stars(for: 4.8) == (5, false))
+        #expect(ProfileStatsText.stars(for: 3.2) == (3, false))
+        #expect(ProfileStatsText.stars(for: 9) == (5, false))
+    }
+
+    @Test func statsDecodeFromTheDatabaseFunction() throws {
+        let json = """
+        [{"recipe_count":12,"cookbook_count":3,"shared_recipe_count":5,
+          "rating_average":4.25,"rating_count":8,"rating_is_public":false}]
+        """
+        let rows = try JSONDecoder().decode([ProfileStats].self, from: Data(json.utf8))
+        #expect(rows.first?.recipeCount == 12)
+        #expect(rows.first?.ratingAverage == 4.25)
+        #expect(rows.first?.ratingIsPublic == false)
+
+        let empty = """
+        [{"recipe_count":0,"cookbook_count":0,"shared_recipe_count":0,
+          "rating_average":null,"rating_count":0,"rating_is_public":true}]
+        """
+        let none = try JSONDecoder().decode([ProfileStats].self, from: Data(empty.utf8))
+        #expect(none.first?.ratingAverage == nil)
+    }
+}

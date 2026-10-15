@@ -22,6 +22,14 @@ struct ProfileView: View {
     /// Changed from Edit Profile.
     @State private var profilePhotoData: Data?
 
+    // MARK: - Full Profile
+
+    /// Collapsed shows who you are and every option; pulling down
+    /// opens the full profile (bio, numbers, family rating).
+    @State private var isExpanded = false
+    @State private var stats: ProfileStats?
+    @State private var isUpdatingRatingVisibility = false
+
     // MARK: - Navigation
 
     @State private var isEditingProfile = false
@@ -59,6 +67,8 @@ struct ProfileView: View {
                                 spacing: KinSpacing.medium
                             ) {
 
+                                sheetHandle
+
                                 if let errorMessage {
 
                                     Text(errorMessage)
@@ -76,7 +86,7 @@ struct ProfileView: View {
                                     .padding(.top, KinSpacing.small)
                             }
                             .padding(KinSpacing.large)
-                            .padding(.top, KinSpacing.small)
+                            .padding(.top, -KinSpacing.small)
                             .padding(.bottom, KinSpacing.xxLarge)
                             .frame(
                                 maxWidth: .infinity,
@@ -97,6 +107,17 @@ struct ProfileView: View {
                     }
                 }
                 .scrollEdgeEffectHidden(true, for: .top)
+                // Pulling down past the top opens the full profile.
+                .onScrollGeometryChange(
+                    for: Bool.self
+                ) { geometry in
+                    geometry.contentOffset.y + geometry.contentInsets.top < -70
+                } action: { _, isPulled in
+                    if isPulled, !isExpanded, !isLoading {
+                        setExpanded(true)
+                    }
+                }
+                .sensoryFeedback(.impact(weight: .light), trigger: isExpanded)
                 .ignoresSafeArea(edges: .top)
                 .background(KinColors.paper.ignoresSafeArea())
             }
@@ -177,9 +198,33 @@ struct ProfileView: View {
     private static let heroNavy =
         Color(red: 0.07, green: 0.10, blue: 0.17)
 
-    /// The user's profile photo on the left fading into navy, with who
-    /// they are on the right: name, @username, location, bio.
+    /// Who you are: the photo fading into navy with your name,
+    /// @username and location. Pulled open, the full profile follows
+    /// on the navy: bio, your numbers and your family rating.
     private func profileHero(
+        topInset: CGFloat
+    ) -> some View {
+
+        VStack(spacing: 0) {
+
+            identityHeader(topInset: topInset)
+
+            if isExpanded {
+                fullProfile
+                    .transition(
+                        .move(edge: .top)
+                            .combined(with: .opacity)
+                    )
+            }
+        }
+        // Room for the sheet to tuck under.
+        .padding(.bottom, KinSpacing.xLarge + KinSpacing.medium)
+        .frame(maxWidth: .infinity)
+        .background(Self.heroNavy)
+        .clipped()
+    }
+
+    private func identityHeader(
         topInset: CGFloat
     ) -> some View {
 
@@ -218,28 +263,6 @@ struct ProfileView: View {
                         .foregroundStyle(.white.opacity(0.8))
                         .lineLimit(1)
                 }
-
-                if let bio = cleaned(profile?.bio) {
-
-                    Rectangle()
-                        .fill(.white.opacity(0.2))
-                        .frame(height: 1)
-                        .padding(.vertical, KinSpacing.xSmall)
-
-                    Label {
-                        Text("Bio")
-                            .font(KinTypography.headline)
-                            .foregroundStyle(.white)
-                    } icon: {
-                        Image(systemName: "leaf.fill")
-                            .foregroundStyle(KinColors.success)
-                    }
-
-                    Text(bio)
-                        .font(KinTypography.callout)
-                        .foregroundStyle(.white.opacity(0.85))
-                        .fixedSize(horizontal: false, vertical: true)
-                }
             }
             .containerRelativeFrame(.horizontal) { width, _ in
                 width * 0.58
@@ -247,9 +270,8 @@ struct ProfileView: View {
             .padding(.trailing, KinSpacing.large)
         }
         .padding(.top, topInset + KinSpacing.small)
-        // Room for the sheet to tuck under.
-        .padding(.bottom, KinSpacing.xLarge + KinSpacing.large)
-        .frame(maxWidth: .infinity, minHeight: 380, alignment: .top)
+        .padding(.bottom, KinSpacing.large)
+        .frame(maxWidth: .infinity, minHeight: topInset + 200, alignment: .top)
         .background {
             // Navy underneath, so the photo fades into it with no edge.
             Self.heroNavy
@@ -272,6 +294,16 @@ struct ProfileView: View {
                         endPoint: .trailing
                     )
                 }
+                .overlay(alignment: .bottom) {
+                    // Blends into the full profile below when open.
+                    LinearGradient(
+                        colors: [Self.heroNavy.opacity(0), Self.heroNavy],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                    .frame(height: 40)
+                    .opacity(isExpanded ? 1 : 0)
+                }
                 .overlay(alignment: .top) {
                     // Keeps the clock readable over a bright photo.
                     LinearGradient(
@@ -287,6 +319,279 @@ struct ProfileView: View {
                 .accessibilityHidden(true)
         }
     }
+
+
+    // MARK: - Full Profile
+
+    private var fullProfile: some View {
+
+        VStack(
+            alignment: .leading,
+            spacing: KinSpacing.large
+        ) {
+
+            if let bio = cleaned(profile?.bio) {
+
+                VStack(alignment: .leading, spacing: KinSpacing.small) {
+                    Label {
+                        Text("Bio")
+                            .font(KinTypography.headline)
+                            .foregroundStyle(.white)
+                    } icon: {
+                        Image(systemName: "leaf.fill")
+                            .foregroundStyle(KinColors.success)
+                    }
+
+                    Text(bio)
+                        .font(KinTypography.callout)
+                        .foregroundStyle(.white.opacity(0.85))
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+
+            if let stats {
+
+                HStack(spacing: KinSpacing.small) {
+                    statTile(stats.recipeCount, label: "Recipes", systemImage: KinIcons.recipes)
+                    statTile(stats.cookbookCount, label: "Cookbooks", systemImage: KinIcons.cookbooks)
+                    statTile(stats.sharedRecipeCount, label: "Shared", systemImage: KinIcons.share)
+                }
+
+                ratingCard(stats)
+
+            } else {
+
+                Text("Your numbers couldn't be loaded right now.")
+                    .font(KinTypography.footnote)
+                    .foregroundStyle(.white.opacity(0.6))
+            }
+        }
+        .padding(.horizontal, KinSpacing.large)
+        .padding(.top, KinSpacing.xSmall)
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private func statTile(
+        _ value: Int,
+        label: String,
+        systemImage: String
+    ) -> some View {
+
+        VStack(spacing: KinSpacing.xxSmall) {
+            Image(systemName: systemImage)
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundStyle(KinColors.accent)
+
+            Text("\(value)")
+                .font(KinTypography.title2)
+                .foregroundStyle(.white)
+                .contentTransition(.numericText())
+
+            Text(label)
+                .font(KinTypography.caption)
+                .foregroundStyle(.white.opacity(0.7))
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, KinSpacing.medium)
+        .background(
+            .white.opacity(0.08),
+            in: RoundedRectangle(cornerRadius: KinRadius.large)
+        )
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("\(value) \(label)")
+    }
+
+    /// Average of the ratings other people gave your recipes, and
+    /// whether others may see it.
+    private func ratingCard(
+        _ stats: ProfileStats
+    ) -> some View {
+
+        VStack(alignment: .leading, spacing: KinSpacing.medium) {
+
+            HStack(alignment: .center, spacing: KinSpacing.medium) {
+
+                VStack(alignment: .leading, spacing: KinSpacing.xxSmall) {
+                    Text("Family Rating")
+                        .font(KinTypography.headline)
+                        .foregroundStyle(.white)
+
+                    if let average = stats.ratingAverage,
+                       let count = stats.ratingCount,
+                       count > 0 {
+
+                        HStack(spacing: KinSpacing.small) {
+                            stars(average)
+                            Text(ProfileStatsText.ratingCount(count))
+                                .font(KinTypography.caption)
+                                .foregroundStyle(.white.opacity(0.7))
+                        }
+                        .accessibilityElement(children: .ignore)
+                        .accessibilityLabel(
+                            "\(ProfileStatsText.average(average)) out of 5, \(ProfileStatsText.ratingCount(count))"
+                        )
+
+                    } else {
+
+                        Text("When family rates your recipes, it shows here.")
+                            .font(KinTypography.caption)
+                            .foregroundStyle(.white.opacity(0.7))
+                    }
+                }
+
+                Spacer(minLength: 0)
+
+                if let average = stats.ratingAverage,
+                   (stats.ratingCount ?? 0) > 0 {
+                    Text(ProfileStatsText.average(average))
+                        .font(KinTypography.largeTitle)
+                        .foregroundStyle(.white)
+                        .accessibilityHidden(true)
+                }
+            }
+
+            Rectangle()
+                .fill(.white.opacity(0.12))
+                .frame(height: 1)
+
+            Toggle(
+                isOn: Binding(
+                    get: { stats.ratingIsPublic },
+                    set: { newValue in
+                        Task {
+                            await setRatingPublic(newValue)
+                        }
+                    }
+                )
+            ) {
+                VStack(alignment: .leading, spacing: KinSpacing.xxSmall) {
+                    Text("Show on my profile")
+                        .font(KinTypography.subheadline)
+                        .foregroundStyle(.white)
+                    Text(
+                        stats.ratingIsPublic
+                            ? "Others can see your family rating."
+                            : "Only you can see your family rating."
+                    )
+                    .font(KinTypography.caption)
+                    .foregroundStyle(.white.opacity(0.65))
+                }
+            }
+            .tint(KinColors.success)
+            .disabled(isUpdatingRatingVisibility)
+        }
+        .padding(KinSpacing.medium)
+        .background(
+            .white.opacity(0.08),
+            in: RoundedRectangle(cornerRadius: KinRadius.large)
+        )
+    }
+
+    private func stars(
+        _ average: Double
+    ) -> some View {
+
+        let stars = ProfileStatsText.stars(for: average)
+
+        return HStack(spacing: 2) {
+            ForEach(0..<5, id: \.self) { index in
+                Image(
+                    systemName:
+                        index < stars.full
+                            ? "star.fill"
+                            : (index == stars.full && stars.half
+                                ? "star.leadinghalf.filled"
+                                : "star")
+                )
+            }
+        }
+        .font(.system(size: 14))
+        .foregroundStyle(KinColors.accent)
+    }
+
+
+    // MARK: - Sheet Handle
+
+    /// Pull down (or tap) to open the full profile; swipe up (or tap)
+    /// to close it.
+    private var sheetHandle: some View {
+
+        VStack(spacing: KinSpacing.xSmall) {
+            Capsule()
+                .fill(KinColors.secondaryText.opacity(0.4))
+                .frame(width: 40, height: 5)
+
+            Label(
+                isExpanded ? "Swipe up to close" : "Pull down for your full profile",
+                systemImage: isExpanded ? "chevron.up" : "chevron.down"
+            )
+            .font(KinTypography.caption)
+            .foregroundStyle(KinColors.secondaryText)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.top, KinSpacing.small)
+        .padding(.bottom, KinSpacing.xSmall)
+        .contentShape(Rectangle())
+        .onTapGesture {
+            setExpanded(!isExpanded)
+        }
+        .gesture(
+            DragGesture(minimumDistance: 12)
+                .onEnded { value in
+                    if value.translation.height > 30 {
+                        setExpanded(true)
+                    } else if value.translation.height < -30 {
+                        setExpanded(false)
+                    }
+                }
+        )
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(isExpanded ? "Hide full profile" : "Show full profile")
+        .accessibilityAddTraits(.isButton)
+    }
+
+    private func setExpanded(
+        _ expanded: Bool
+    ) {
+        guard expanded != isExpanded else {
+            return
+        }
+        withAnimation(.spring(response: 0.45, dampingFraction: 0.85)) {
+            isExpanded = expanded
+        }
+    }
+
+    @MainActor
+    private func setRatingPublic(
+        _ isPublic: Bool
+    ) async {
+
+        guard var updated = stats else {
+            return
+        }
+
+        let previous = updated.ratingIsPublic
+        updated.ratingIsPublic = isPublic
+        stats = updated
+        isUpdatingRatingVisibility = true
+
+        defer {
+            isUpdatingRatingVisibility = false
+        }
+
+        do {
+            try await ProfileStatsService.setRatingPublic(isPublic)
+        } catch {
+            // Put the switch back; nothing changed on the account.
+            updated.ratingIsPublic = previous
+            stats = updated
+            errorMessage = "Couldn't change who sees your rating. Please try again."
+            print("RATING VISIBILITY ERROR:", error.localizedDescription)
+        }
+    }
+
 
     /// The profile photo, filling the left of the header and showing
     /// the person's face (top of the photo) rather than the middle.
@@ -313,17 +618,27 @@ struct ProfileView: View {
         } else {
 
             GeometryReader { proxy in
-                KinPhotoPlaceholder(
-                    icon: KinIcons.profile,
-                    iconSize: 64
+                // Warm fill where a photo would be, with the icon kept
+                // on the photo side, clear of the name.
+                LinearGradient(
+                    colors: [
+                        KinColors.accent.opacity(0.35),
+                        KinColors.primary.opacity(0.25)
+                    ],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
                 )
                 .background(KinColors.paper)
-                // Same spot as a photo, so the icon sits on the
-                // photo side rather than behind the text.
                 .frame(
                     width: proxy.size.width * 0.62,
                     height: proxy.size.height
                 )
+                .overlay(alignment: .leading) {
+                    Image(systemName: KinIcons.profile)
+                        .font(.system(size: 52, weight: .semibold))
+                        .foregroundStyle(KinColors.primary.opacity(0.6))
+                        .frame(width: proxy.size.width * 0.36)
+                }
             }
         }
     }
@@ -563,13 +878,20 @@ struct ProfileView: View {
     @MainActor
     private func loadProfile() async {
 
-        isLoading = true
+        // Loader only the first time; after editing, refresh quietly.
+        isLoading = profile == nil
         errorMessage = nil
+
+        // Numbers are extra; the page works without them.
+        async let statsRequest =
+            try? ProfileStatsService.fetchStats()
 
         defer {
 
             isLoading = false
         }
+
+        stats = await statsRequest
 
         do {
 
