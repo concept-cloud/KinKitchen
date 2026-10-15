@@ -71,6 +71,24 @@ extension KinNotification {
         return relatedId
     }
 
+    /// A copy with a different read state, for updating the list
+    /// before Supabase confirms.
+    func withRead(
+        _ isRead: Bool
+    ) -> KinNotification {
+        KinNotification(
+            id: id,
+            userId: userId,
+            type: type,
+            title: title,
+            message: message,
+            relatedType: relatedType,
+            relatedId: relatedId,
+            isRead: isRead,
+            createdAt: createdAt
+        )
+    }
+
     /// The recipe this notification points to, if any.
     var recipeId: UUID? {
         relatedType == "recipe" ? relatedId : nil

@@ -25,8 +25,18 @@ struct NotificationsView: View {
     /// The newest unread one starts open.
     @State private var expandedIds: Set<UUID> = []
 
-    @AppStorage(KinDietaryBackground.storageKey)
-    private var backgroundChoice = KinDietaryBackground.default.rawValue
+    /// What counted as "New" when the list loaded. A notification
+    /// read while you're here stays put (shown as read) instead of
+    /// jumping down to Earlier; it moves on the next visit or refresh.
+    @State private var newSectionIds: Set<UUID> = []
+
+    /// Read/unread changes waiting on Supabase, so a quick second tap
+    /// can't flip one back mid-save.
+    @State private var updatingIds: Set<UUID> = []
+
+    /// Marked unread on purpose with the bell; opening these doesn't
+    /// mark them read again.
+    @State private var keptUnreadIds: Set<UUID> = []
     @State private var hasAutoExpanded = false
 
     // MARK: - Body
@@ -41,6 +51,16 @@ struct NotificationsView: View {
 
                     header(topInset: geometry.safeAreaInsets.top)
 
+                    // The title sits under the photo so the logo
+                    // stays clear.
+                    Text("Notifications")
+                        .font(KinTypography.largeTitle)
+                        .foregroundStyle(KinColors.primaryText)
+                        .accessibilityAddTraits(.isHeader)
+                        .padding(.horizontal, KinSpacing.large)
+                        .padding(.top, -KinSpacing.small)
+                        .padding(.bottom, KinSpacing.medium)
+
                     Group {
                         if isLoading && notifications.isEmpty {
                             loadingState
@@ -54,8 +74,6 @@ struct NotificationsView: View {
                             notificationList
                         }
                     }
-                    // Starts in the header's curve.
-                    .padding(.top, -KinSpacing.medium)
                 }
             }
             .scrollEdgeEffectHidden(true, for: .top)
@@ -91,34 +109,38 @@ struct NotificationsView: View {
             await loadNotifications()
         }
         .refreshable {
-            await refreshNotifications()
+            await loadNotifications()
         }
         .sensoryFeedback(.selection, trigger: expandedIds)
     }
 
     // MARK: - Unread / Read
 
-    private var unreadNotifications:
+    private var newNotifications:
         [KinNotification] {
 
         notifications.filter {
-            !$0.isRead
+            newSectionIds.contains($0.id)
         }
     }
 
-    private var readNotifications:
+    private var earlierNotifications:
         [KinNotification] {
 
         notifications.filter {
-            $0.isRead
+            !newSectionIds.contains($0.id)
         }
+    }
+
+    private var hasUnread: Bool {
+        notifications.contains { !$0.isRead }
     }
 
 
     // MARK: - Header
 
-    /// A warm kitchen photo with a curved bottom edge, the back
-    /// button, title and Mark All Read.
+    /// The Kin Kitchen photo and logo with a curved bottom edge, the
+    /// back button and Mark All Read.
     private func header(
         topInset: CGFloat
     ) -> some View {
@@ -138,17 +160,9 @@ struct NotificationsView: View {
             .buttonStyle(.kinPressable)
             .accessibilityLabel("Back")
 
-            Text("Notifications")
-                .font(KinTypography.title)
-                .foregroundStyle(.white)
-                .lineLimit(1)
-                .minimumScaleFactor(0.7)
-                .kinTextOnPhoto()
-                .accessibilityAddTraits(.isHeader)
-
             Spacer(minLength: 0)
 
-            if !unreadNotifications.isEmpty {
+            if hasUnread {
                 Button {
                     Task {
                         await markAllAsRead()
@@ -169,29 +183,24 @@ struct NotificationsView: View {
         }
         .padding(.horizontal, KinSpacing.large)
         .padding(.top, topInset + KinSpacing.small)
-        .padding(.bottom, KinSpacing.xxLarge + KinSpacing.medium)
-        .frame(maxWidth: .infinity)
+        // Tall enough for the logo to show under the buttons.
+        .frame(
+            maxWidth: .infinity,
+            minHeight: topInset + 230,
+            alignment: .top
+        )
         .background {
             Color.clear
                 .overlay {
-                    // The user's chosen kitchen photo, as on their
-                    // Dietary Profile.
-                    Image(KinDietaryBackground.saved(backgroundChoice).imageName)
+                    // The Kin Kitchen photo with the logo, as on Home.
+                    Image("HomeHero")
                         .resizable()
                         .scaledToFill()
-                }
-                .overlay {
-                    // Keeps the white title readable.
-                    LinearGradient(
-                        colors: [.black.opacity(0.45), .black.opacity(0.15)],
-                        startPoint: .top,
-                        endPoint: .bottom
-                    )
                 }
                 .clipShape(CurvedBottom())
                 .accessibilityHidden(true)
         }
-        .animation(.easeInOut(duration: 0.2), value: unreadNotifications.isEmpty)
+        .animation(.easeInOut(duration: 0.2), value: hasUnread)
     }
 
 
@@ -204,24 +213,24 @@ struct NotificationsView: View {
             spacing: KinSpacing.medium
         ) {
 
-            if !unreadNotifications.isEmpty {
+            if !newNotifications.isEmpty {
 
                 sectionTitle("New")
 
-                ForEach(unreadNotifications) { notification in
+                ForEach(newNotifications) { notification in
                     notificationCard(notification)
                 }
             }
 
-            if !readNotifications.isEmpty {
+            if !earlierNotifications.isEmpty {
 
                 sectionTitle("Earlier")
                     .padding(
                         .top,
-                        unreadNotifications.isEmpty ? 0 : KinSpacing.medium
+                        newNotifications.isEmpty ? 0 : KinSpacing.medium
                     )
 
-                ForEach(readNotifications) { notification in
+                ForEach(earlierNotifications) { notification in
                     notificationCard(notification)
                 }
             }
@@ -261,7 +270,7 @@ struct NotificationsView: View {
                     toggleExpanded(notification)
                 } else if !notification.isRead {
                     Task {
-                        await markAsRead(notification)
+                        await setRead(notification, true)
                     }
                 }
             } label: {
@@ -396,14 +405,25 @@ struct NotificationsView: View {
         .padding(KinSpacing.medium)
     }
 
+    /// Opening a card counts as reading it.
     private func toggleExpanded(
         _ notification: KinNotification
     ) {
+        let opening = !expandedIds.contains(notification.id)
+
         withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
-            if expandedIds.contains(notification.id) {
-                expandedIds.remove(notification.id)
-            } else {
+            if opening {
                 expandedIds.insert(notification.id)
+            } else {
+                expandedIds.remove(notification.id)
+            }
+        }
+
+        if opening,
+           !notification.isRead,
+           !keptUnreadIds.contains(notification.id) {
+            Task {
+                await setRead(notification, true)
             }
         }
     }
@@ -416,8 +436,16 @@ struct NotificationsView: View {
     ) -> some View {
 
         Button {
+            let markingUnread = notification.isRead
+
+            if markingUnread {
+                keptUnreadIds.insert(notification.id)
+            } else {
+                keptUnreadIds.remove(notification.id)
+            }
+
             Task {
-                await toggleReadState(notification)
+                await setRead(notification, !notification.isRead)
             }
         } label: {
             Image(systemName: notification.isRead ? "bell" : "bell.fill")
@@ -576,7 +604,7 @@ struct NotificationsView: View {
 
         if !notification.isRead {
             Task {
-                await markAsRead(notification)
+                await setRead(notification, true)
             }
         }
 
@@ -587,31 +615,55 @@ struct NotificationsView: View {
         }
     }
 
-    // MARK: - Mark Read
+    // MARK: - Read State
 
+    /// Shows the change right away, then saves it. If saving fails,
+    /// the card goes back to how it was.
     @MainActor
-    private func markAsRead(
-        _ notification: KinNotification
+    private func setRead(
+        _ notification: KinNotification,
+        _ isRead: Bool
     ) async {
 
-        do {
-
-            try await NotificationService
-                .markAsRead(
-                    notificationId:
-                        notification.id
-                )
-
-            await refreshNotifications()
-
-        } catch is CancellationError {
-
+        guard
+            !updatingIds.contains(notification.id),
+            let index =
+                notifications.firstIndex(where: { $0.id == notification.id }),
+            notifications[index].isRead != isRead
+        else {
             return
+        }
 
+        updatingIds.insert(notification.id)
+
+        defer {
+            updatingIds.remove(notification.id)
+        }
+
+        withAnimation(.easeInOut(duration: 0.2)) {
+            notifications[index] = notifications[index].withRead(isRead)
+        }
+
+        do {
+            if isRead {
+                try await NotificationService.markAsRead(
+                    notificationId: notification.id
+                )
+            } else {
+                try await NotificationService.markAsUnread(
+                    notificationId: notification.id
+                )
+            }
+        } catch is CancellationError {
+            return
         } catch {
-
+            if let index = notifications.firstIndex(where: { $0.id == notification.id }) {
+                withAnimation {
+                    notifications[index] = notifications[index].withRead(!isRead)
+                }
+            }
             print(
-                "NOTIFICATION MARK READ ERROR:",
+                "NOTIFICATION READ STATE ERROR:",
                 error.localizedDescription
             )
         }
@@ -622,88 +674,20 @@ struct NotificationsView: View {
     @MainActor
     private func markAllAsRead() async {
 
+        let before = notifications
+
+        withAnimation(.easeInOut(duration: 0.2)) {
+            notifications = notifications.map { $0.withRead(true) }
+        }
+
         do {
-
-            try await NotificationService
-                .markAllAsRead()
-
-            await refreshNotifications()
-
+            try await NotificationService.markAllAsRead()
         } catch is CancellationError {
-
             return
-
         } catch {
-
+            notifications = before
             print(
                 "NOTIFICATION MARK ALL READ ERROR:",
-                error.localizedDescription
-            )
-        }
-    }
-
-    // MARK: - Toggle Read State
-
-    @MainActor
-    private func toggleReadState(
-        _ notification: KinNotification
-    ) async {
-
-        do {
-
-            if notification.isRead {
-
-                try await NotificationService
-                    .markAsUnread(
-                        notificationId:
-                            notification.id
-                    )
-
-            } else {
-
-                try await NotificationService
-                    .markAsRead(
-                        notificationId:
-                            notification.id
-                    )
-            }
-
-            await refreshNotifications()
-
-        } catch is CancellationError {
-
-            return
-
-        } catch {
-
-            print(
-                "NOTIFICATION READ STATE ERROR:",
-                error.localizedDescription
-            )
-        }
-    }
-
-    // MARK: - Refresh Notifications
-
-    /// Reloads without showing the loading state, used
-    /// after read-state changes.
-    @MainActor
-    private func refreshNotifications() async {
-
-        do {
-
-            notifications =
-                try await NotificationService
-                    .fetchNotifications()
-
-        } catch is CancellationError {
-
-            return
-
-        } catch {
-
-            print(
-                "NOTIFICATION REFRESH ERROR:",
                 error.localizedDescription
             )
         }
@@ -726,6 +710,9 @@ struct NotificationsView: View {
             notifications =
                 try await NotificationService
                     .fetchNotifications()
+
+            newSectionIds =
+                Set(notifications.filter { !$0.isRead }.map(\.id))
 
             // The newest unread notification starts open.
             if !hasAutoExpanded,

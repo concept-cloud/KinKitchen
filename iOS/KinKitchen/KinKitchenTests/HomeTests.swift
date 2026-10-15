@@ -640,3 +640,24 @@ struct NotificationTextTests {
         #expect(recipe.recipeId != nil && recipe.gatheringId == nil)
     }
 }
+
+
+// MARK: - Notification Read State
+
+struct NotificationReadStateTests {
+
+    @Test func withReadOnlyChangesReadState() {
+        let original = KinNotification(
+            id: UUID(), userId: UUID(), type: .recipeShared, title: "Shared",
+            message: "Hi", relatedType: "recipe", relatedId: UUID(),
+            isRead: false, createdAt: .now
+        )
+        let read = original.withRead(true)
+
+        #expect(read.isRead)
+        #expect(read.id == original.id)
+        #expect(read.title == original.title)
+        #expect(read.relatedId == original.relatedId)
+        #expect(read.withRead(false) == original)
+    }
+}
