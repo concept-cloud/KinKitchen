@@ -598,3 +598,45 @@ struct ProfileStatsTextTests {
         #expect(none.first?.ratingAverage == nil)
     }
 }
+
+
+// MARK: - Notification Text
+
+struct NotificationTextTests {
+
+    private let calendar = Calendar(identifier: .gregorian)
+
+    private func notification(
+        _ type: KinNotificationType,
+        relatedType: String?
+    ) -> KinNotification {
+        KinNotification(
+            id: UUID(), userId: UUID(), type: type, title: "T", message: nil,
+            relatedType: relatedType, relatedId: relatedType == nil ? nil : UUID(),
+            isRead: false, createdAt: .now
+        )
+    }
+
+    @Test func datesSayTodayAndYesterday() {
+        let now = calendar.date(from: DateComponents(year: 2026, month: 10, day: 15, hour: 12))!
+        let earlier = now.addingTimeInterval(-3600)
+        let yesterday = now.addingTimeInterval(-86_400)
+        let lastWeek = now.addingTimeInterval(-7 * 86_400)
+
+        #expect(NotificationText.date(earlier, now: now, calendar: calendar).hasPrefix("Today at"))
+        #expect(NotificationText.date(yesterday, now: now, calendar: calendar).hasPrefix("Yesterday at"))
+        #expect(NotificationText.date(lastWeek, now: now, calendar: calendar).contains(" at "))
+    }
+
+    @Test func actionsMatchWhatTheNotificationPointsAt() {
+        let event = notification(.invitationAccepted, relatedType: "gathering")
+        let recipe = notification(.recipeShared, relatedType: "recipe")
+        let plain = notification(.dishUpdated, relatedType: nil)
+
+        #expect(NotificationText.actionTitle(for: event) == "View Event")
+        #expect(NotificationText.actionTitle(for: recipe) == "View Recipe")
+        #expect(NotificationText.actionTitle(for: plain) == nil)
+        #expect(event.hasDetails && recipe.hasDetails && !plain.hasDetails)
+        #expect(recipe.recipeId != nil && recipe.gatheringId == nil)
+    }
+}

@@ -19,10 +19,10 @@ extension KinNotificationType {
             return "envelope.fill"
 
         case .invitationAccepted:
-            return "checkmark.circle.fill"
+            return KinIcons.gatherings
 
         case .invitationDeclined:
-            return "xmark.circle.fill"
+            return "xmark"
 
         case .gatheringUpdated:
             return "calendar.badge.clock"
@@ -40,12 +40,18 @@ extension KinNotificationType {
         switch self {
 
         case .invitationAccepted:
-            return .green
+            return KinColors.success
 
         case .invitationDeclined:
             return KinColors.error
 
-        default:
+        case .gatheringUpdated:
+            return KinColors.warning
+
+        case .dishUpdated:
+            return Color(red: 0.85, green: 0.55, blue: 0.15)
+
+        case .gatheringInvitation, .recipeShared:
             return KinColors.primary
         }
     }
@@ -63,6 +69,17 @@ extension KinNotification {
         }
 
         return relatedId
+    }
+
+    /// The recipe this notification points to, if any.
+    var recipeId: UUID? {
+        relatedType == "recipe" ? relatedId : nil
+    }
+
+    /// Opens to show a photo, the full message and a button when it
+    /// points at an event or recipe.
+    var hasDetails: Bool {
+        gatheringId != nil || recipeId != nil
     }
 
     /// Message shown under the title. Gathering updates
@@ -323,5 +340,61 @@ struct KinUnreadIndicator: View {
                 ? "1 unread notification"
                 : "\(count) unread notifications"
         )
+    }
+}
+
+
+// MARK: - Notification Text
+
+nonisolated enum NotificationText {
+
+    /// "Today at 6:31 PM", "Yesterday at 9:02 AM", "Oct 4, 2026 at 6:31 PM"
+    static func date(
+        _ date: Date,
+        now: Date = .now,
+        calendar: Calendar = .current
+    ) -> String {
+        let time = date.formatted(date: .omitted, time: .shortened)
+        if calendar.isDate(date, inSameDayAs: now) {
+            return "Today at \(time)"
+        }
+        if let yesterday = calendar.date(byAdding: .day, value: -1, to: now),
+           calendar.isDate(date, inSameDayAs: yesterday) {
+            return "Yesterday at \(time)"
+        }
+        return "\(date.formatted(date: .abbreviated, time: .omitted)) at \(time)"
+    }
+
+    /// The opened card's line about what you can do next.
+    static func detail(
+        for notification: KinNotification
+    ) -> String {
+        switch notification.type {
+        case .gatheringInvitation:
+            return "You're invited. Open the event to see the details and respond."
+        case .invitationAccepted:
+            return "They're on the guest list. Open the event to see who's coming and what's being brought."
+        case .invitationDeclined:
+            return "They won't make it this time. Open the event to see your guest list."
+        case .gatheringUpdated:
+            return "Something changed. Open the event to see the latest details."
+        case .dishUpdated:
+            return "The menu changed. Open the event to see what everyone's bringing."
+        case .recipeShared:
+            return "A recipe is waiting for you. Open it to cook, save or add it to a cookbook."
+        }
+    }
+
+    /// The opened card's button, if there's somewhere to go.
+    static func actionTitle(
+        for notification: KinNotification
+    ) -> String? {
+        if notification.gatheringId != nil {
+            return "View Event"
+        }
+        if notification.recipeId != nil {
+            return "View Recipe"
+        }
+        return nil
     }
 }

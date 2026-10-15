@@ -9,6 +9,8 @@ import SwiftUI
 
 struct NotificationsView: View {
 
+    @Environment(\.dismiss) private var dismiss
+
     // MARK: - State
 
     @State private var notifications:
@@ -17,61 +19,52 @@ struct NotificationsView: View {
     @State private var isLoading = true
     @State private var errorMessage: String?
     @State private var selectedNotification: KinNotification?
+    @State private var selectedRecipeId: UUID?
+
+    /// Cards opened to show the photo, full message and actions.
+    /// The newest unread one starts open.
+    @State private var expandedIds: Set<UUID> = []
+
+    @AppStorage(KinDietaryBackground.storageKey)
+    private var backgroundChoice = KinDietaryBackground.default.rawValue
+    @State private var hasAutoExpanded = false
 
     // MARK: - Body
 
     var body: some View {
 
-        ZStack {
+        GeometryReader { geometry in
 
-            KinColors.background
-                .ignoresSafeArea()
+            ScrollView {
 
-            if isLoading && notifications.isEmpty {
+                VStack(alignment: .leading, spacing: 0) {
 
-                loadingState
+                    header(topInset: geometry.safeAreaInsets.top)
 
-            } else if let errorMessage {
-
-                errorState(
-                    message: errorMessage
-                )
-
-            } else if notifications.isEmpty {
-
-                emptyState
-
-            } else {
-
-                notificationList
-            }
-        }
-        .navigationTitle("Notifications")
-        .navigationBarTitleDisplayMode(.inline)
-        .toolbar {
-
-            if !unreadNotifications.isEmpty {
-
-                ToolbarItem(
-                    placement: .topBarTrailing
-                ) {
-
-                    Button("Mark All Read") {
-
-                        Task {
-                            await markAllAsRead()
+                    Group {
+                        if isLoading && notifications.isEmpty {
+                            loadingState
+                                .frame(minHeight: 360)
+                        } else if let errorMessage {
+                            errorState(message: errorMessage)
+                        } else if notifications.isEmpty {
+                            emptyState
+                                .frame(minHeight: 360)
+                        } else {
+                            notificationList
                         }
                     }
-                    .font(
-                        KinTypography.subheadline
-                    )
-                    .foregroundStyle(
-                        KinColors.primary
-                    )
+                    // Starts in the header's curve.
+                    .padding(.top, -KinSpacing.medium)
                 }
             }
+            .scrollEdgeEffectHidden(true, for: .top)
+            .ignoresSafeArea(edges: .top)
+            .background(KinColors.paper.ignoresSafeArea())
         }
-        // MARK: - Gathering Destination
+        .navigationBarHidden(true)
+
+        // MARK: - Destinations
 
         .navigationDestination(
             item: $selectedNotification
@@ -86,12 +79,21 @@ struct NotificationsView: View {
                 )
             }
         }
+        .navigationDestination(
+            item: $selectedRecipeId
+        ) { recipeId in
+            RecipeDetailView(
+                recipeId: recipeId,
+                onBack: { selectedRecipeId = nil }
+            )
+        }
         .task {
             await loadNotifications()
         }
         .refreshable {
-            await loadNotifications()
+            await refreshNotifications()
         }
+        .sensoryFeedback(.selection, trigger: expandedIds)
     }
 
     // MARK: - Unread / Read
@@ -112,57 +114,120 @@ struct NotificationsView: View {
         }
     }
 
+
+    // MARK: - Header
+
+    /// A warm kitchen photo with a curved bottom edge, the back
+    /// button, title and Mark All Read.
+    private func header(
+        topInset: CGFloat
+    ) -> some View {
+
+        HStack(spacing: KinSpacing.medium) {
+
+            Button {
+                dismiss()
+            } label: {
+                Image(systemName: KinIcons.back)
+                    .font(.system(size: 18, weight: .semibold))
+                    .foregroundStyle(KinColors.primary)
+                    .frame(width: 44, height: 44)
+                    .background(.white, in: Circle())
+                    .kinFloatingShadow()
+            }
+            .buttonStyle(.kinPressable)
+            .accessibilityLabel("Back")
+
+            Text("Notifications")
+                .font(KinTypography.title)
+                .foregroundStyle(.white)
+                .lineLimit(1)
+                .minimumScaleFactor(0.7)
+                .kinTextOnPhoto()
+                .accessibilityAddTraits(.isHeader)
+
+            Spacer(minLength: 0)
+
+            if !unreadNotifications.isEmpty {
+                Button {
+                    Task {
+                        await markAllAsRead()
+                    }
+                } label: {
+                    Label("Mark All Read", systemImage: KinIcons.check)
+                        .font(KinTypography.footnote.weight(.semibold))
+                        .foregroundStyle(KinColors.primary)
+                        .lineLimit(1)
+                        .padding(.horizontal, KinSpacing.medium)
+                        .padding(.vertical, KinSpacing.small)
+                        .background(.white, in: Capsule())
+                        .kinFloatingShadow()
+                }
+                .buttonStyle(.kinPressable)
+                .transition(.opacity.combined(with: .scale))
+            }
+        }
+        .padding(.horizontal, KinSpacing.large)
+        .padding(.top, topInset + KinSpacing.small)
+        .padding(.bottom, KinSpacing.xxLarge + KinSpacing.medium)
+        .frame(maxWidth: .infinity)
+        .background {
+            Color.clear
+                .overlay {
+                    // The user's chosen kitchen photo, as on their
+                    // Dietary Profile.
+                    Image(KinDietaryBackground.saved(backgroundChoice).imageName)
+                        .resizable()
+                        .scaledToFill()
+                }
+                .overlay {
+                    // Keeps the white title readable.
+                    LinearGradient(
+                        colors: [.black.opacity(0.45), .black.opacity(0.15)],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                }
+                .clipShape(CurvedBottom())
+                .accessibilityHidden(true)
+        }
+        .animation(.easeInOut(duration: 0.2), value: unreadNotifications.isEmpty)
+    }
+
+
     // MARK: - Notification List
 
     private var notificationList: some View {
 
-        ScrollView {
+        LazyVStack(
+            alignment: .leading,
+            spacing: KinSpacing.medium
+        ) {
 
-            LazyVStack(
-                alignment: .leading,
-                spacing: KinSpacing.medium
-            ) {
+            if !unreadNotifications.isEmpty {
 
-                if !unreadNotifications.isEmpty {
+                sectionTitle("New")
 
-                    sectionTitle(
-                        "New"
-                    )
-
-                    ForEach(unreadNotifications) {
-                        notification in
-
-                        notificationCard(
-                            notification
-                        )
-                    }
-                }
-
-                if !readNotifications.isEmpty {
-
-                    sectionTitle(
-                        "Earlier"
-                    )
-                    .padding(
-                        .top,
-                        unreadNotifications.isEmpty
-                            ? 0
-                            : KinSpacing.medium
-                    )
-
-                    ForEach(readNotifications) {
-                        notification in
-
-                        notificationCard(
-                            notification
-                        )
-                    }
+                ForEach(unreadNotifications) { notification in
+                    notificationCard(notification)
                 }
             }
-            .padding(
-                KinSpacing.large
-            )
+
+            if !readNotifications.isEmpty {
+
+                sectionTitle("Earlier")
+                    .padding(
+                        .top,
+                        unreadNotifications.isEmpty ? 0 : KinSpacing.medium
+                    )
+
+                ForEach(readNotifications) { notification in
+                    notificationCard(notification)
+                }
+            }
         }
+        .padding(.horizontal, KinSpacing.large)
+        .padding(.bottom, KinSpacing.xxLarge)
     }
 
     // MARK: - Section Title
@@ -172,13 +237,11 @@ struct NotificationsView: View {
     ) -> some View {
 
         Text(title)
-            .font(
-                KinTypography.headline
-            )
-            .foregroundStyle(
-                KinColors.secondaryText
-            )
+            .font(KinTypography.title2)
+            .foregroundStyle(KinColors.primaryText)
+            .accessibilityAddTraits(.isHeader)
     }
+
 
     // MARK: - Notification Card
 
@@ -186,133 +249,163 @@ struct NotificationsView: View {
         _ notification: KinNotification
     ) -> some View {
 
-        Button {
+        let isExpanded = expandedIds.contains(notification.id)
+        let color = notification.type.color
+        let canExpand = notification.hasDetails
 
-            openNotification(
-                notification
-            )
+        return VStack(alignment: .leading, spacing: 0) {
 
-        } label: {
+            // Summary: tap to open (or, without details, to mark read).
+            Button {
+                if canExpand {
+                    toggleExpanded(notification)
+                } else if !notification.isRead {
+                    Task {
+                        await markAsRead(notification)
+                    }
+                }
+            } label: {
 
-            KinCard {
+                HStack(alignment: .top, spacing: KinSpacing.medium) {
 
-                HStack(
-                    alignment: .top,
-                    spacing: KinSpacing.medium
-                ) {
+                    notificationIcon(notification)
 
-                    notificationIcon(
-                        notification
-                    )
+                    VStack(alignment: .leading, spacing: KinSpacing.xSmall) {
 
-                    VStack(
-                        alignment: .leading,
-                        spacing: KinSpacing.xSmall
-                    ) {
+                        Text(notification.title)
+                            .font(KinTypography.headline)
+                            .foregroundStyle(KinColors.primaryText)
+                            .multilineTextAlignment(.leading)
 
-                        HStack(
-                            alignment: .top,
-                            spacing: KinSpacing.small
-                        ) {
-
-                            Text(
-                                notification.title
-                            )
-                            .font(
-                                notification.isRead
-                                    ? KinTypography.body
-                                    : KinTypography.headline
-                            )
-                            .foregroundStyle(
-                                KinColors.primaryText
-                            )
-                            .multilineTextAlignment(
-                                .leading
-                            )
-
-                            Spacer()
-
-                            readStateButton(
-                                notification
-                            )
-                        }
-
-                        if let message =
-                            notification.displayMessage {
-
+                        if let message = notification.displayMessage {
                             Text(message)
-                                .font(
-                                    KinTypography.body
-                                )
-                                .foregroundStyle(
-                                    KinColors.secondaryText
-                                )
-                                .multilineTextAlignment(
-                                    .leading
-                                )
+                                .font(KinTypography.callout)
+                                .foregroundStyle(KinColors.secondaryText)
+                                .multilineTextAlignment(.leading)
+                                .lineLimit(isExpanded ? nil : 3)
                         }
 
-                        Text(
-                            formattedDate(
-                                notification.createdAt
-                            )
-                        )
-                        .font(
-                            KinTypography.caption
-                        )
-                        .foregroundStyle(
-                            KinColors.secondaryText
-                        )
+                        Text(NotificationText.date(notification.createdAt))
+                            .font(KinTypography.caption)
+                            .foregroundStyle(KinColors.secondaryText)
+                    }
+
+                    Spacer(minLength: 0)
+
+                    // Room for the bell and chevron drawn on top.
+                    Color.clear
+                        .frame(width: canExpand ? 72 : 36, height: 1)
+                }
+                .padding(KinSpacing.medium)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(
+                    notification.isRead ? Color.clear : color.opacity(0.08)
+                )
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .overlay(alignment: .topTrailing) {
+                HStack(spacing: KinSpacing.xSmall) {
+                    readStateButton(notification)
+
+                    if canExpand {
+                        Button {
+                            toggleExpanded(notification)
+                        } label: {
+                            Image(systemName: "chevron.down")
+                                .font(.system(size: 15, weight: .semibold))
+                                .foregroundStyle(KinColors.secondaryText)
+                                .rotationEffect(.degrees(isExpanded ? 180 : 0))
+                                .frame(width: 32, height: 32)
+                                .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel(isExpanded ? "Show less" : "Show more")
                     }
                 }
-                .frame(
-                    maxWidth: .infinity,
-                    alignment: .leading
-                )
-                .opacity(
-                    notification.isRead
-                        ? 0.7
-                        : 1
-                )
+                .padding(.top, KinSpacing.small)
+                .padding(.trailing, KinSpacing.small)
             }
-            // Unread tint and accent bar
-            .overlay(
-                alignment: .leading
-            ) {
 
-                if !notification.isRead {
+            if isExpanded {
+                Divider()
+                    .padding(.horizontal, KinSpacing.medium)
 
-                    ZStack(
-                        alignment: .leading
-                    ) {
-
-                        notification.type.color
-                            .opacity(0.06)
-
-                        Rectangle()
-                            .fill(
-                                notification.type.color
-                            )
-                            .frame(
-                                width: 4
-                            )
-                    }
-                    .allowsHitTesting(false)
-                }
+                expandedDetails(notification)
+                    .transition(.opacity.combined(with: .move(edge: .top)))
             }
-            .clipShape(
-                RoundedRectangle(
-                    cornerRadius:
-                        KinRadius.large
-                )
-            )
         }
-        .buttonStyle(.plain)
-        .accessibilityValue(
-            notification.isRead
-                ? "Read"
-                : "Unread"
+        .background(
+            KinColors.surface,
+            in: RoundedRectangle(cornerRadius: KinRadius.large)
         )
+        // Unread: a bar in the notification's color down the side.
+        .overlay(alignment: .leading) {
+            if !notification.isRead {
+                Rectangle()
+                    .fill(color)
+                    .frame(width: 5)
+                    .allowsHitTesting(false)
+            }
+        }
+        .clipShape(RoundedRectangle(cornerRadius: KinRadius.large))
+        .kinCardShadow()
+        .accessibilityElement(children: .contain)
+        .accessibilityValue(notification.isRead ? "Read" : "Unread")
+    }
+
+    /// The event's photo and a button to open what it's about.
+    @ViewBuilder
+    private func expandedDetails(
+        _ notification: KinNotification
+    ) -> some View {
+
+        HStack(alignment: .top, spacing: KinSpacing.medium) {
+
+            if let gatheringId = notification.gatheringId {
+                NotificationEventPhoto(gatheringId: gatheringId)
+                    .frame(width: 120, height: 120)
+                    .clipShape(RoundedRectangle(cornerRadius: KinRadius.medium))
+            }
+
+            VStack(alignment: .leading, spacing: KinSpacing.medium) {
+
+                Text(NotificationText.detail(for: notification))
+                    .font(KinTypography.callout)
+                    .foregroundStyle(KinColors.primaryText)
+                    .fixedSize(horizontal: false, vertical: true)
+
+                if let action = NotificationText.actionTitle(for: notification) {
+                    Button {
+                        open(notification)
+                    } label: {
+                        Text(action)
+                            .font(KinTypography.headline)
+                            .foregroundStyle(.white)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, KinSpacing.small + 2)
+                            .background(
+                                KinColors.primary,
+                                in: RoundedRectangle(cornerRadius: KinRadius.medium)
+                            )
+                    }
+                    .buttonStyle(.kinPressable)
+                }
+            }
+        }
+        .padding(KinSpacing.medium)
+    }
+
+    private func toggleExpanded(
+        _ notification: KinNotification
+    ) {
+        withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
+            if expandedIds.contains(notification.id) {
+                expandedIds.remove(notification.id)
+            } else {
+                expandedIds.insert(notification.id)
+            }
+        }
     }
 
 
@@ -323,79 +416,45 @@ struct NotificationsView: View {
     ) -> some View {
 
         Button {
-
             Task {
-                await toggleReadState(
-                    notification
-                )
+                await toggleReadState(notification)
             }
-
         } label: {
-
-            Image(
-                systemName:
+            Image(systemName: notification.isRead ? "bell" : "bell.fill")
+                .font(.system(size: 19))
+                .foregroundStyle(
                     notification.isRead
-                        ? "bell"
-                        : "bell.fill"
-            )
-            .font(
-                .system(size: 20)
-            )
-            .foregroundStyle(
-                notification.isRead
-                    ? KinColors.secondaryText
-                    : KinColors.primary
-            )
-            .frame(
-                width: 32,
-                height: 32
-            )
-            .contentShape(
-                Rectangle()
-            )
+                        ? KinColors.secondaryText
+                        : KinColors.primary
+                )
+                .symbolEffect(.bounce, value: notification.isRead)
+                .frame(width: 32, height: 32)
+                .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         .accessibilityLabel(
-            notification.isRead
-                ? "Mark as unread"
-                : "Mark as read"
+            notification.isRead ? "Mark as unread" : "Mark as read"
         )
     }
+
     // MARK: - Notification Icon
 
+    /// Solid color while unread; soft and grey once read.
     private func notificationIcon(
         _ notification: KinNotification
     ) -> some View {
 
-        let color =
-            notification.type.color
+        let color = notification.type.color
 
-        return ZStack {
-
-            Circle()
-                .fill(
-                    notification.isRead
-                        ? KinColors.background
-                        : color.opacity(0.15)
-                )
-                .frame(
-                    width: 44,
-                    height: 44
-                )
-
-            Image(
-                systemName:
-                    notification.type.iconName
+        return Image(systemName: notification.type.iconName)
+            .font(.system(size: 20, weight: .semibold))
+            .foregroundStyle(notification.isRead ? color : .white)
+            .frame(width: 52, height: 52)
+            .background(
+                notification.isRead ? color.opacity(0.14) : color,
+                in: Circle()
             )
-            .font(
-                .system(size: 18)
-            )
-            .foregroundStyle(
-                notification.isRead
-                    ? KinColors.secondaryText
-                    : color
-            )
-        }
+            .accessibilityHidden(true)
     }
 
     // MARK: - Loading State
@@ -510,27 +569,22 @@ struct NotificationsView: View {
 
     // MARK: - Open Notification
 
-    private func openNotification(
+    /// Opens the event or recipe, marking the notification read.
+    private func open(
         _ notification: KinNotification
     ) {
 
         if !notification.isRead {
-
             Task {
-                await markAsRead(
-                    notification
-                )
+                await markAsRead(notification)
             }
         }
 
-        guard
-            notification.gatheringId != nil
-        else {
-            return
+        if notification.gatheringId != nil {
+            selectedNotification = notification
+        } else if let recipeId = notification.recipeId {
+            selectedRecipeId = recipeId
         }
-
-        selectedNotification =
-            notification
     }
 
     // MARK: - Mark Read
@@ -660,7 +714,7 @@ struct NotificationsView: View {
     @MainActor
     private func loadNotifications() async {
 
-        isLoading = true
+        isLoading = notifications.isEmpty
         errorMessage = nil
 
         defer {
@@ -672,6 +726,13 @@ struct NotificationsView: View {
             notifications =
                 try await NotificationService
                     .fetchNotifications()
+
+            // The newest unread notification starts open.
+            if !hasAutoExpanded,
+               let newest = notifications.first(where: { !$0.isRead && $0.hasDetails }) {
+                expandedIds.insert(newest.id)
+                hasAutoExpanded = true
+            }
 
         } catch is CancellationError {
 
@@ -688,39 +749,63 @@ struct NotificationsView: View {
             )
         }
     }
+}
 
-    // MARK: - Date Formatting
 
-    private func formattedDate(
-        _ date: Date
-    ) -> String {
+// MARK: - Curved Header
 
-        let calendar =
-            Calendar.current
+/// The header photo's bottom edge: a gentle wave, like the mockup.
+private struct CurvedBottom: Shape {
 
-        if calendar.isDateInToday(
-            date
-        ) {
-
-            return date.formatted(
-                date: .omitted,
-                time: .shortened
-            )
-        }
-
-        if calendar.isDateInYesterday(
-            date
-        ) {
-
-            return "Yesterday, \(date.formatted(date: .omitted, time: .shortened))"
-        }
-
-        return date.formatted(
-            date: .abbreviated,
-            time: .shortened
+    func path(in rect: CGRect) -> Path {
+        var path = Path()
+        let dip: CGFloat = 28
+        path.move(to: .zero)
+        path.addLine(to: CGPoint(x: rect.maxX, y: 0))
+        path.addLine(to: CGPoint(x: rect.maxX, y: rect.maxY))
+        path.addCurve(
+            to: CGPoint(x: 0, y: rect.maxY - dip),
+            control1: CGPoint(x: rect.maxX * 0.65, y: rect.maxY - dip * 2.2),
+            control2: CGPoint(x: rect.maxX * 0.3, y: rect.maxY - dip * 0.2)
         )
+        path.closeSubpath()
+        return path
     }
 }
+
+
+// MARK: - Event Photo
+
+/// The event's cover photo, loaded when a card is opened.
+private struct NotificationEventPhoto: View {
+
+    let gatheringId: UUID
+
+    @State private var coverPath: String?
+    @State private var didLoad = false
+
+    var body: some View {
+        Group {
+            if didLoad {
+                GatheringCardImage(path: coverPath, size: nil)
+            } else {
+                KinPhotoPlaceholder(icon: KinIcons.gatherings)
+            }
+        }
+        .task {
+            guard !didLoad else {
+                return
+            }
+            coverPath =
+                try? await GatheringService
+                    .fetchGathering(id: gatheringId)
+                    .coverImagePath
+            didLoad = true
+        }
+        .accessibilityHidden(true)
+    }
+}
+
 
 // MARK: - Preview
 
