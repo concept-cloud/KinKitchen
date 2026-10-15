@@ -35,37 +35,33 @@ struct ProfileView: View {
 
         NavigationStack {
 
-            ZStack{
-                KinColors.background
-                    .ignoresSafeArea()
-                
-                GeometryReader { geometry in
-                    
-                    ScrollView {
-                        
-                        VStack(
-                            alignment: .leading,
-                            spacing: KinSpacing.xLarge
-                        ) {
-                            
-                            if isLoading {
-                                
-                                loadingSection
-                                
-                            } else {
-                                
-                                // MARK: - Identity
-                                
-                                profileHeader
-                                
-                                // MARK: - About
-                                
-                                profileDetails
-                                
-                                // MARK: - Error
-                                
+            GeometryReader { geometry in
+
+                ScrollView {
+
+                    if isLoading {
+
+                        loadingSection
+                            .frame(minHeight: geometry.size.height)
+
+                    } else {
+
+                        VStack(spacing: 0) {
+
+                            // MARK: - Identity
+
+                            profileHero(
+                                topInset: geometry.safeAreaInsets.top
+                            )
+
+                            // MARK: - Sections
+
+                            VStack(
+                                spacing: KinSpacing.medium
+                            ) {
+
                                 if let errorMessage {
-                                    
+
                                     Text(errorMessage)
                                         .font(KinTypography.caption)
                                         .foregroundStyle(KinColors.error)
@@ -74,30 +70,38 @@ struct ProfileView: View {
                                             alignment: .leading
                                         )
                                 }
-                                
-                                // MARK: - Profile Sections
-                                
+
                                 profileNavigation
-                                
-                                Spacer(
-                                    minLength: KinSpacing.small
-                                )
-                                
-                                // MARK: - Sign Out
-                                
+
                                 signOutButton
+                                    .padding(.top, KinSpacing.small)
                             }
+                            .padding(KinSpacing.large)
+                            .padding(.top, KinSpacing.small)
+                            .padding(.bottom, KinSpacing.xxLarge)
+                            .frame(
+                                maxWidth: .infinity,
+                                minHeight: geometry.size.height * 0.55,
+                                alignment: .top
+                            )
+                            .background(
+                                UnevenRoundedRectangle(
+                                    topLeadingRadius: KinRadius.xLarge,
+                                    topTrailingRadius: KinRadius.xLarge
+                                )
+                                .fill(KinColors.paper)
+                                .shadow(color: .black.opacity(0.12), radius: 10, y: -2)
+                            )
+                            // Tucks up over the bottom of the photo.
+                            .padding(.top, -KinSpacing.xLarge)
                         }
-                        .padding(KinSpacing.xLarge)
-                        .frame(
-                            maxWidth: .infinity,
-                            minHeight: geometry.size.height,
-                            alignment: .top
-                        )
                     }
-                    .background(KinColors.background)
                 }
+                .scrollEdgeEffectHidden(true, for: .top)
+                .ignoresSafeArea(edges: .top)
+                .background(KinColors.paper.ignoresSafeArea())
             }
+            .navigationBarHidden(true)
             // MARK: - Load Profile
 
             .task {
@@ -180,267 +184,205 @@ struct ProfileView: View {
                 AppInfoView()
             }
         }
-        .toolbarBackground(
-            KinColors.background,
-            for: .navigationBar
-        )
-        .toolbarBackground(
-            .visible,
-            for: .navigationBar
-        )
-        .background(
-            KinColors.background
-                .ignoresSafeArea()
-        )
     }
    
 
-    // MARK: - Profile Header
+    // MARK: - Profile Hero
 
-    private var profileHeader: some View {
+    /// Deep navy the photo fades into; the same in light and dark mode
+    /// so the white text always reads.
+    private static let heroNavy =
+        Color(red: 0.07, green: 0.10, blue: 0.17)
 
-        HStack(
-            alignment: .top,
-            spacing: KinSpacing.large
-        ) {
+    @AppStorage(KinDietaryBackground.storageKey)
+    private var backgroundChoice = KinDietaryBackground.default.rawValue
 
-            // MARK: Photo
+    /// The user's kitchen photo on the left fading into navy, with who
+    /// they are on the right: photo, name, @username, location, bio.
+    private func profileHero(
+        topInset: CGFloat
+    ) -> some View {
 
-            PhotosPicker(
-                selection: $selectedPhotoItem,
-                matching: .images
-            ) {
+        HStack(spacing: 0) {
 
-                ZStack(
-                    alignment: .bottomTrailing
-                ) {
-
-                    ZStack {
-
-                        Circle()
-                            .fill(KinColors.surface)
-                            .frame(
-                                width: 120,
-                                height: 120
-                            )
-
-                        if
-                            let profilePhotoData,
-                            let uiImage = UIImage(
-                                data: profilePhotoData
-                            )
-                        {
-
-                            Image(uiImage: uiImage)
-                                .resizable()
-                                .scaledToFill()
-                                .frame(
-                                    width: 120,
-                                    height: 120
-                                )
-                                .clipShape(Circle())
-
-                        } else {
-
-                            Image(
-                                systemName:
-                                    KinIcons.profile
-                            )
-                            .font(
-                                .system(size: 48)
-                            )
-                            .foregroundStyle(
-                                KinColors.secondaryText
-                            )
-                        }
-                    }
-
-                    Image(
-                        systemName: "camera.fill"
-                    )
-                    .font(
-                        .system(size: 12)
-                    )
-                    .foregroundStyle(
-                        KinColors.background
-                    )
-                    .frame(
-                        width: 30,
-                        height: 30
-                    )
-                    .background(
-                        KinColors.primary
-                    )
-                    .clipShape(Circle())
-                }
-            }
-            .buttonStyle(.plain)
-
-            // MARK: Identity
-
-            VStack(
-                alignment: .leading,
-                spacing: KinSpacing.medium
-            ) {
-
-                // Display Name
-
-                Text(displayName)
-                    .font(
-                        KinTypography.largeTitle
-                    )
-                    .foregroundStyle(
-                        KinColors.primaryText
-                    )
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.7)
-                    .frame(
-                        maxWidth: .infinity,
-                        alignment: .leading
-                    )
-
-                // Username + Edit
-
-                HStack(
-                    alignment: .center,
-                    spacing: KinSpacing.medium
-                ) {
-
-                    if let username =
-                        profile?.username?
-                            .trimmingCharacters(
-                                in:
-                                    .whitespacesAndNewlines
-                            ),
-                       !username.isEmpty
-                    {
-
-                        Text("@\(username)")
-                            .font(
-                                KinTypography.body
-                            )
-                            .foregroundStyle(
-                                KinColors.secondaryText
-                            )
-                            .lineLimit(1)
-                    }
-
-                    Spacer(
-                        minLength: KinSpacing.small
-                    )
-
-                    Button {
-
-                        isEditingProfile = true
-
-                    } label: {
-
-                        HStack(
-                            spacing: KinSpacing.small
-                        ) {
-
-                            Image(
-                                systemName: "pencil"
-                            )
-
-                            Text("Edit")
-                        }
-                        .font(
-                            KinTypography.caption
-                        )
-                        .foregroundStyle(
-                            KinColors.primary
-                        )
-                    }
-                    .buttonStyle(.plain)
-                }
-
-                // Location
-
-                if let location =
-                    profile?.location?
-                        .trimmingCharacters(
-                            in:
-                                .whitespacesAndNewlines
-                        ),
-                   !location.isEmpty
-                {
-
-                    HStack(
-                        spacing: KinSpacing.small
-                    ) {
-
-                        Image(
-                            systemName:
-                                "mappin.and.ellipse"
-                        )
-
-                        Text(location)
-                            .lineLimit(1)
-                    }
-                    .font(
-                        KinTypography.caption
-                    )
-                    .foregroundStyle(
-                        KinColors.secondaryText
-                    )
-                }
-            }
-            .frame(
-                maxWidth: .infinity,
-                minHeight: 120,
-                alignment: .topLeading
-            )
-        }
-        .frame(
-            maxWidth: .infinity,
-            alignment: .leading
-        )
-    }
-
-    // MARK: - Profile Details
-
-    @ViewBuilder
-    private var profileDetails: some View {
-
-        if let bio =
-            profile?.bio?
-                .trimmingCharacters(
-                    in: .whitespacesAndNewlines
-                ),
-           !bio.isEmpty
-        {
+            Spacer(minLength: 0)
 
             VStack(
                 alignment: .leading,
                 spacing: KinSpacing.small
             ) {
 
-                Text("About")
-                    .font(
-                        KinTypography.title
-                    )
-                    .foregroundStyle(
-                        KinColors.primaryText
-                    )
+                HStack {
+                    Spacer()
+                    editButton
+                }
 
-                Text(bio)
-                    .font(
-                        KinTypography.body
-                    )
-                    .foregroundStyle(
-                        KinColors.secondaryText
-                    )
-                    .frame(
-                        maxWidth: .infinity,
-                        alignment: .leading
-                    )
+                avatar
+                    .padding(.top, KinSpacing.xSmall)
+
+                Text(displayName)
+                    .font(KinTypography.title)
+                    .foregroundStyle(.white)
+                    .lineLimit(2)
+                    .minimumScaleFactor(0.7)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .accessibilityAddTraits(.isHeader)
+
+                if let username = cleaned(profile?.username) {
+                    Text("@\(username)")
+                        .font(KinTypography.body)
+                        .foregroundStyle(.white.opacity(0.7))
+                        .lineLimit(1)
+                }
+
+                if let location = cleaned(profile?.location) {
+                    Label(location, systemImage: "mappin.and.ellipse")
+                        .font(KinTypography.footnote)
+                        .foregroundStyle(.white.opacity(0.8))
+                        .lineLimit(1)
+                }
+
+                if let bio = cleaned(profile?.bio) {
+
+                    Rectangle()
+                        .fill(.white.opacity(0.2))
+                        .frame(height: 1)
+                        .padding(.vertical, KinSpacing.xSmall)
+
+                    Label {
+                        Text("Bio")
+                            .font(KinTypography.headline)
+                            .foregroundStyle(.white)
+                    } icon: {
+                        Image(systemName: "leaf.fill")
+                            .foregroundStyle(KinColors.success)
+                    }
+
+                    Text(bio)
+                        .font(KinTypography.callout)
+                        .foregroundStyle(.white.opacity(0.85))
+                        .fixedSize(horizontal: false, vertical: true)
+                }
             }
-            .frame(
-                maxWidth: .infinity,
-                alignment: .leading
-            )
+            .containerRelativeFrame(.horizontal) { width, _ in
+                width * 0.58
+            }
+            .padding(.trailing, KinSpacing.large)
         }
+        .padding(.top, topInset + KinSpacing.small)
+        // Room for the sheet to tuck under.
+        .padding(.bottom, KinSpacing.xLarge + KinSpacing.large)
+        .frame(maxWidth: .infinity, minHeight: 380, alignment: .top)
+        .background {
+            Color.clear
+                .overlay(alignment: .leading) {
+                    Image(KinDietaryBackground.saved(backgroundChoice).imageName)
+                        .resizable()
+                        .scaledToFill()
+                }
+                .clipped()
+                .overlay {
+                    // Photo on the left, navy behind the text.
+                    LinearGradient(
+                        stops: [
+                            .init(color: Self.heroNavy.opacity(0), location: 0.2),
+                            .init(color: Self.heroNavy.opacity(0.75), location: 0.45),
+                            .init(color: Self.heroNavy.opacity(0.97), location: 0.62),
+                            .init(color: Self.heroNavy, location: 1)
+                        ],
+                        startPoint: .leading,
+                        endPoint: .trailing
+                    )
+                }
+                .overlay(alignment: .top) {
+                    // Keeps the clock readable over a bright photo.
+                    LinearGradient(
+                        colors: [
+                            KinColors.background.opacity(0.55),
+                            KinColors.background.opacity(0)
+                        ],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                    .frame(height: topInset + 30)
+                }
+                .accessibilityHidden(true)
+        }
+    }
+
+    private var editButton: some View {
+
+        Button {
+            isEditingProfile = true
+        } label: {
+            HStack(spacing: KinSpacing.xSmall) {
+                Image(systemName: KinIcons.edit)
+                    .foregroundStyle(KinColors.primary)
+                Text("Edit")
+                    .foregroundStyle(Color(red: 0.12, green: 0.14, blue: 0.2))
+            }
+            .font(KinTypography.subheadline)
+            .padding(.horizontal, KinSpacing.medium)
+            .padding(.vertical, KinSpacing.small)
+            .background(.white, in: Capsule())
+            .kinFloatingShadow()
+        }
+        .buttonStyle(.kinPressable)
+        .accessibilityLabel("Edit profile")
+    }
+
+    /// Tap to change the profile photo.
+    private var avatar: some View {
+
+        PhotosPicker(
+            selection: $selectedPhotoItem,
+            matching: .images
+        ) {
+            ZStack(alignment: .bottomTrailing) {
+
+                Group {
+                    if let profilePhotoData,
+                       let uiImage = UIImage(data: profilePhotoData) {
+                        Image(uiImage: uiImage)
+                            .resizable()
+                            .scaledToFill()
+                    } else {
+                        Image(systemName: KinIcons.profile)
+                            .resizable()
+                            .scaledToFit()
+                            .foregroundStyle(.white.opacity(0.6))
+                            .padding(KinSpacing.small)
+                    }
+                }
+                .frame(width: 72, height: 72)
+                .background(.white.opacity(0.12))
+                .clipShape(Circle())
+                .overlay {
+                    Circle().strokeBorder(.white.opacity(0.85), lineWidth: 2)
+                }
+
+                Image(systemName: KinIcons.camera)
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(.white)
+                    .frame(width: 26, height: 26)
+                    .background(KinColors.primary, in: Circle())
+                    .overlay {
+                        Circle().strokeBorder(Self.heroNavy, lineWidth: 2)
+                    }
+            }
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Change profile photo")
+    }
+
+    private func cleaned(
+        _ value: String?
+    ) -> String? {
+        guard let value = value?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !value.isEmpty else {
+            return nil
+        }
+        return value
     }
 
 
@@ -449,38 +391,41 @@ struct ProfileView: View {
     private var profileNavigation: some View {
 
         VStack(
-            spacing: KinSpacing.small
+            spacing: KinSpacing.medium
         ) {
-
-            // Dietary Profile
 
             profileNavigationRow(
                 title: "Dietary Profile",
-                systemImage: "fork.knife"
+                subtitle: "Manage your allergens, restrictions, and preferences.",
+                systemImage: KinIcons.recipes,
+                tint: KinColors.primary
             ) {
-
                 isEditingDietaryProfile = true
             }
 
             profileNavigationRow(
-                           title: "Notifications",
-                           systemImage: "bell"
-                       ) {
-                           isShowingNotifications = true
-                       }
-            
-            // Settings
+                title: "Notifications",
+                subtitle: "Invites, event updates, and reminders.",
+                systemImage: "bell",
+                tint: KinColors.warning
+            ) {
+                isShowingNotifications = true
+            }
 
             profileNavigationRow(
                 title: "Settings",
-                systemImage: "gearshape"
+                subtitle: "Appearance, themes, and cooking options.",
+                systemImage: "gearshape",
+                tint: KinColors.success
             ) {
                 isShowingSettings = true
             }
 
             profileNavigationRow(
                 title: "App Info",
-                systemImage: "info.circle"
+                subtitle: "Version and build details.",
+                systemImage: "info.circle",
+                tint: KinColors.secondaryText
             ) {
                 isShowingAppInfo = true
             }
@@ -489,73 +434,60 @@ struct ProfileView: View {
 
     // MARK: - Navigation Row
 
+    /// Tinted icon tile, title, a line about what's inside, chevron.
     private func profileNavigationRow(
         title: String,
+        subtitle: String,
         systemImage: String,
+        tint: Color,
         action: @escaping () -> Void
     ) -> some View {
 
-        Button(
-            action: action
-        ) {
+        Button(action: action) {
 
-            HStack(
-                spacing: KinSpacing.medium
-            ) {
+            HStack(spacing: KinSpacing.medium) {
 
-                Image(
-                    systemName: systemImage
-                )
-                .font(.body)
-                .foregroundStyle(
-                    KinColors.primary
-                )
-                .frame(width: 24)
-
-                Text(title)
-                    .font(
-                        KinTypography.body
+                Image(systemName: systemImage)
+                    .font(.system(size: 24, weight: .semibold))
+                    .foregroundStyle(tint)
+                    .frame(width: 56, height: 56)
+                    .background(
+                        tint.opacity(0.14),
+                        in: RoundedRectangle(cornerRadius: KinRadius.large)
                     )
-                    .foregroundStyle(
-                        KinColors.primaryText
-                    )
+                    .accessibilityHidden(true)
 
-                Spacer()
+                VStack(alignment: .leading, spacing: KinSpacing.xxSmall) {
+                    Text(title)
+                        .font(KinTypography.headline)
+                        .foregroundStyle(KinColors.primaryText)
 
-                Image(
-                    systemName:
-                        "chevron.right"
-                )
-                .font(.caption)
-                .foregroundStyle(
-                    KinColors.secondaryText
-                )
+                    Text(subtitle)
+                        .font(KinTypography.footnote)
+                        .foregroundStyle(KinColors.secondaryText)
+                        .multilineTextAlignment(.leading)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+
+                Spacer(minLength: KinSpacing.small)
+
+                Image(systemName: KinIcons.forward)
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(KinColors.secondaryText)
             }
-            .padding(
-                KinSpacing.medium
-            )
-            .frame(
-                maxWidth: .infinity
-            )
+            .padding(KinSpacing.medium)
+            .frame(maxWidth: .infinity)
             .background(
-                KinColors.surface
-            )
-            .clipShape(
-                RoundedRectangle(
-                    cornerRadius:
-                        KinRadius.large
-                )
+                KinColors.surface,
+                in: RoundedRectangle(cornerRadius: KinRadius.large)
             )
             .kinCardShadow()
-            .contentShape(
-                RoundedRectangle(
-                    cornerRadius: KinRadius.large
-                )
-            )
+            .contentShape(RoundedRectangle(cornerRadius: KinRadius.large))
         }
         .buttonStyle(.kinPressable)
+        .accessibilityElement(children: .combine)
     }
-    
+
     // MARK: - Sign Out
 
     private var signOutButton: some View {
@@ -584,40 +516,24 @@ struct ProfileView: View {
 
         } label: {
 
-            HStack {
-
-                Image(
-                    systemName:
-                        "rectangle.portrait.and.arrow.right"
-                )
-
-                Text("Sign Out")
-
-                Spacer()
-            }
-            .font(
-                KinTypography.body
+            Label(
+                "Sign Out",
+                systemImage: "rectangle.portrait.and.arrow.right"
             )
-            .foregroundStyle(
-                KinColors.error
-            )
-            .padding(
-                KinSpacing.medium
-            )
-            .frame(
-                maxWidth: .infinity
-            )
+            .font(KinTypography.headline)
+            .foregroundStyle(KinColors.error)
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, KinSpacing.medium)
             .background(
-                KinColors.surface
+                KinColors.error.opacity(0.08),
+                in: RoundedRectangle(cornerRadius: KinRadius.large)
             )
-            .clipShape(
-                RoundedRectangle(
-                    cornerRadius:
-                        KinRadius.medium
-                )
-            )
+            .overlay {
+                RoundedRectangle(cornerRadius: KinRadius.large)
+                    .strokeBorder(KinColors.error.opacity(0.6), lineWidth: 1.5)
+            }
         }
-        .buttonStyle(.plain)
+        .buttonStyle(.kinPressable)
     }
 
     // MARK: - Loading
