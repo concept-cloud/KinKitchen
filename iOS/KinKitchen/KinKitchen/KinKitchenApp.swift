@@ -56,7 +56,7 @@ struct KinKitchenApp: App {
 
                 if authService.isLoadingSession {
 
-                    ProgressView()
+                    KinLoadingScreen()
 
                 } else if !authService.isAuthenticated {
 
@@ -69,6 +69,15 @@ struct KinKitchenApp: App {
             }
             .preferredColorScheme(
                 KinAppearance.saved(appearanceMode).colorScheme
+            )
+            // Fade from the loading screen into the app.
+            .animation(
+                .easeInOut(duration: 0.35),
+                value: LaunchPhase(
+                    isLoadingSession: authService.isLoadingSession,
+                    isAuthenticated: authService.isAuthenticated,
+                    isCheckingOnboarding: onboardingStep == .checking
+                )
             )
             .task(id: authService.isAuthenticated) {
 
@@ -95,7 +104,7 @@ struct KinKitchenApp: App {
 
         case .checking:
 
-            ProgressView()
+            KinLoadingScreen()
 
         case .profile:
 
@@ -271,4 +280,13 @@ struct KinKitchenApp: App {
             )
         }
     }
+}
+
+
+/// What decides whether the loading screen shows, for animating the
+/// change.
+private struct LaunchPhase: Equatable {
+    let isLoadingSession: Bool
+    let isAuthenticated: Bool
+    let isCheckingOnboarding: Bool
 }
