@@ -11,8 +11,9 @@ import SwiftUI
 ///
 /// - Swipe left or right (or use the arrows) to turn pages within the
 ///   section; pages stop at its first and last recipe.
-/// - The section tabs stay on the right edge to jump to another
-///   section while reading.
+/// - The section tabs stay on the right edge. Tapping one goes back
+///   to the cookbook open on that section's list, not straight into
+///   one of its recipes.
 /// - Scroll up and down within a recipe as usual.
 struct CookbookRecipePager: View {
 
@@ -26,6 +27,8 @@ struct CookbookRecipePager: View {
     /// Hands back the section being read so the cookbook can open on it.
     let onClose: (CookbookPage) -> Void
 
+    /// The section being read; fixed for the pager's life, since
+    /// picking another section returns to the cookbook.
     @State private var chapterId: CookbookPage
     @State private var currentId: UUID
     @State private var fullDetailsId: UUID?
@@ -88,7 +91,7 @@ struct CookbookRecipePager: View {
                         )
                     },
                     selectedId: chapterId,
-                    onSelect: open
+                    onSelect: { onClose($0) }
                 )
                 .padding(.top, 220)
                 .padding(.bottom, 90)
@@ -146,17 +149,6 @@ struct CookbookRecipePager: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .padding(.trailing, showsRail ? CookbookSectionRail.width : 0)
-    }
-
-    /// Jumps to a section's first recipe.
-    private func open(_ id: CookbookPage) {
-        guard let target = chapters.first(where: { $0.id == id }) else {
-            return
-        }
-        chapterId = id
-        if let first = target.recipeIds.first {
-            currentId = first
-        }
     }
 
 
