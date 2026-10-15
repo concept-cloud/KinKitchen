@@ -186,23 +186,11 @@ struct CookbookReadingPage: View {
                 topLeadingRadius: KinRadius.xLarge,
                 topTrailingRadius: KinRadius.xLarge
             )
-            .fill(Self.paper)
+            .fill(KinColors.paper)
             .kinSheetShadow()
         )
         .offset(y: -28)
     }
-
-    /// Warm, slightly creamy page in light mode; the normal card color
-    /// in dark mode.
-    static let paper =
-        Color(
-            UIColor { traits in
-                traits.userInterfaceStyle == .dark
-                    ? UIColor(KinColors.surface)
-                    : UIColor(red: 1.0, green: 0.985, blue: 0.95, alpha: 1)
-            }
-        )
-
 
     // MARK: - Header Pieces
 

@@ -25,6 +25,8 @@ struct RecipeDetailView: View {
     @State private var ratingSummary: RecipeRatingSummary?
 
     @State private var selectedTab: DetailTab = .ingredients
+    @State private var checkedIngredientIds = Set<UUID>()
+    @State private var didCopyIngredients = false
     @State private var isLoading = true
     @State private var isSavingRating = false
     @State private var errorMessage: String?
@@ -260,18 +262,20 @@ struct RecipeDetailView: View {
 
     // MARK: - Recipe Content
 
+    /// Laid out like a cookbook page: the photo across the top, then
+    /// a paper sheet with the essentials, tabs, and everything else.
     private func recipeContent(
         _ detail: RecipeWithIngredients
     ) -> some View {
-        VStack(spacing: 0) {
-            header
+        ScrollView {
+            VStack(spacing: 0) {
+                hero(detail.recipe)
 
-            ScrollView {
                 VStack(
                     alignment: .leading,
                     spacing: KinSpacing.large
                 ) {
-                    hero(detail.recipe)
+                    titleBlock(detail.recipe)
 
                     recipeInformation(detail.recipe)
 
@@ -284,96 +288,207 @@ struct RecipeDetailView: View {
                     addToCookbookButton
                 }
                 .padding(KinSpacing.large)
+                .padding(.bottom, KinSpacing.xxLarge)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(
+                    UnevenRoundedRectangle(
+                        topLeadingRadius: KinRadius.xLarge,
+                        topTrailingRadius: KinRadius.xLarge
+                    )
+                    // Holds cards (ratings, versions, sharing), so it
+                    // stays distinct from them in dark mode.
+                    .fill(KinColors.cardPage)
+                    .kinSheetShadow()
+                )
+                // The page overlaps the bottom of the photo.
+                .padding(.top, -28)
             }
+        }
+        .ignoresSafeArea(edges: .top)
+        .overlay(alignment: .top) {
+            floatingButtons(detail.recipe)
         }
     }
 
-    // MARK: - Header
+    // MARK: - Floating Buttons
 
-    private var header: some View {
+    /// Back on the left; Save (shared recipes) or Edit (your own) on
+    /// the right, over the photo.
+    private func floatingButtons(
+        _ recipe: Recipe
+    ) -> some View {
         HStack {
-            Button {
+            floatingButton(
+                systemImage: KinIcons.back,
+                label: "Back"
+            ) {
                 if let onBack {
                     onBack()
                 } else {
                     dismiss()
                 }
-            } label: {
-                Image(systemName: "chevron.left")
-                    .font(.title2)
-                    .foregroundStyle(KinColors.primaryText)
-                    .frame(width: 48, height: 48)
+            }
+
+            Spacer()
+
+            if receivedShare != nil,
+               currentUserId != recipe.ownerId {
+                Button {
+                    Task {
+                        await toggleSaved()
+                    }
+                } label: {
+                    Group {
+                        if isUpdatingSaved {
+                            ProgressView()
+                                .tint(KinColors.primary)
+                        } else {
+                            Image(
+                                systemName:
+                                    isSaved
+                                        ? "bookmark.fill"
+                                        : "bookmark"
+                            )
+                            .font(.system(size: 18, weight: .semibold))
+                            .foregroundStyle(KinColors.primary)
+                            .contentTransition(.symbolEffect(.replace))
+                        }
+                    }
+                    .frame(width: 44, height: 44)
                     .background(KinColors.surface)
                     .clipShape(Circle())
+                    .kinFloatingShadow()
+                }
+                .buttonStyle(.plain)
+                .disabled(isUpdatingSaved)
+                .accessibilityLabel(
+                    isSaved
+                        ? "Remove from Saved"
+                        : "Save Recipe"
+                )
             }
-            .buttonStyle(.plain)
 
-            Spacer()
-
-            Text(detail?.recipe.name ?? "Recipe")
-                .font(KinTypography.title)
-                .foregroundStyle(KinColors.primaryText)
-                .lineLimit(1)
-
-            Spacer()
-
-            // Keeps title visually centered.
-            Color.clear
-                .frame(width: 48, height: 48)
+            if currentUserId == recipe.ownerId {
+                floatingButton(
+                    systemImage: KinIcons.edit,
+                    label: "Edit Recipe",
+                    tint: KinColors.primary
+                ) {
+                    showingEditRecipe = true
+                }
+            }
         }
         .padding(.horizontal, KinSpacing.large)
-        .padding(.vertical, KinSpacing.medium)
-        .background(KinColors.background)
-        .overlay(alignment: .bottom) {
-            Divider()
+    }
+
+    private func floatingButton(
+        systemImage: String,
+        label: String,
+        tint: Color = KinColors.primaryText,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            Image(systemName: systemImage)
+                .font(.system(size: 18, weight: .semibold))
+                .foregroundStyle(tint)
+                .frame(width: 44, height: 44)
+                .background(KinColors.surface)
+                .clipShape(Circle())
+                .kinFloatingShadow()
         }
+        .buttonStyle(.plain)
+        .accessibilityLabel(label)
+    }
+
+    // MARK: - Title
+
+    private func titleBlock(
+        _ recipe: Recipe
+    ) -> some View {
+        VStack(
+            alignment: .leading,
+            spacing: KinSpacing.small
+        ) {
+            Text(recipe.name)
+                .font(KinTypography.title)
+                .foregroundStyle(KinColors.primaryText)
+                .fixedSize(horizontal: false, vertical: true)
+                .accessibilityAddTraits(.isHeader)
+
+            facts(recipe)
+        }
+    }
+
+    /// Time, category and servings in one line, like a cookbook page.
+    private func facts(
+        _ recipe: Recipe
+    ) -> some View {
+        HStack(spacing: KinSpacing.large) {
+            if recipe.totalTimeMinutes > 0 {
+                Label(recipe.formattedTotalTime, systemImage: KinIcons.time)
+            }
+
+            if let category = cleaned(recipe.category) {
+                Label(category, systemImage: KinIcons.recipes)
+            }
+
+            if let servings = recipe.servings,
+               servings > 0 {
+                Label("Serves \(servings)", systemImage: KinIcons.servings)
+            }
+        }
+        .font(KinTypography.footnote)
+        .foregroundStyle(KinColors.secondaryText)
+        .lineLimit(1)
+        .minimumScaleFactor(0.8)
     }
 
     // MARK: - Hero
 
-    @ViewBuilder
     private func hero(
         _ recipe: Recipe
     ) -> some View {
-
-        ZStack {
-
-            RoundedRectangle(
-                cornerRadius: KinRadius.large
-            )
-            .fill(KinColors.surface)
-            .frame(height: 220)
-
-            if let recipePhotoData,
-               let image = UIImage(data: recipePhotoData) {
-
-                Image(uiImage: image)
-                    .resizable()
-                    .scaledToFill()
-                    .frame(maxWidth: .infinity)
-                    .frame(height: 220)
-                    .clipped()
-                    .clipShape(
-                        RoundedRectangle(
-                            cornerRadius: KinRadius.large
-                        )
+        // Color.clear takes the screen width; the photo fills it
+        // without widening the page.
+        Color.clear
+            .frame(height: 300)
+            .frame(maxWidth: .infinity)
+            .overlay {
+                if let recipePhotoData,
+                   let image = UIImage(data: recipePhotoData) {
+                    Image(uiImage: image)
+                        .resizable()
+                        .scaledToFill()
+                } else if isLoadingRecipePhoto {
+                    ZStack {
+                        KinColors.surface
+                        ProgressView()
+                            .tint(KinColors.primary)
+                    }
+                } else {
+                    KinPhotoPlaceholder(
+                        icon: KinIcons.recipes,
+                        iconSize: 52
                     )
-
-            } else if isLoadingRecipePhoto {
-
-                ProgressView()
-                    .tint(KinColors.primary)
-
-            } else {
-
-                Image(systemName: "fork.knife")
-                    .font(.system(size: 52))
-                    .foregroundStyle(KinColors.primary)
+                }
             }
-        }
+            .overlay(alignment: .top) {
+                // Keeps the clock and buttons readable on any photo.
+                LinearGradient(
+                    colors: [
+                        KinColors.background.opacity(0.7),
+                        KinColors.background.opacity(0)
+                    ],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+                .frame(height: 110)
+            }
+            .clipped()
+            .accessibilityHidden(true)
     }
-    
-    
+
+
     @MainActor
     private func loadRecipePhoto(
         path: String?
@@ -420,64 +535,11 @@ struct RecipeDetailView: View {
             alignment: .leading,
             spacing: KinSpacing.medium
         ) {
-            HStack(alignment: .top, spacing: KinSpacing.medium) {
-                if let description = cleaned(recipe.description) {
-                    Text(description)
-                        .font(KinTypography.body)
-                        .foregroundStyle(KinColors.secondaryText)
-                }
-
-                Spacer()
-
-                if receivedShare != nil,
-                   currentUserId != recipe.ownerId {
-                    Button {
-                        Task {
-                            await toggleSaved()
-                        }
-                    } label: {
-                        Group {
-                            if isUpdatingSaved {
-                                ProgressView()
-                                    .tint(KinColors.primary)
-                            } else {
-                                Image(
-                                    systemName:
-                                        isSaved
-                                            ? "bookmark.fill"
-                                            : "bookmark"
-                                )
-                                .font(.title3)
-                                .foregroundStyle(KinColors.primary)
-                            }
-                        }
-                        .frame(width: 44, height: 44)
-                        .background(KinColors.surface)
-                        .clipShape(Circle())
-                    }
-                    .buttonStyle(.plain)
-                    .disabled(isUpdatingSaved)
-                    .accessibilityLabel(
-                        isSaved
-                            ? "Remove from Saved"
-                            : "Save Recipe"
-                    )
-                }
-
-                if currentUserId == recipe.ownerId {
-                    Button {
-                        showingEditRecipe = true
-                    } label: {
-                        Image(systemName: "pencil")
-                            .font(.title3)
-                            .foregroundStyle(KinColors.primary)
-                            .frame(width: 44, height: 44)
-                            .background(KinColors.surface)
-                            .clipShape(Circle())
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityLabel("Edit Recipe")
-                }
+            if let description = cleaned(recipe.description) {
+                Text(description)
+                    .font(KinTypography.body)
+                    .foregroundStyle(KinColors.primaryText)
+                    .fixedSize(horizontal: false, vertical: true)
             }
 
             if let saveErrorMessage {
@@ -509,29 +571,6 @@ struct RecipeDetailView: View {
                     origin: versionOriginText,
                     source: versionSourceText
                 )
-            }
-
-            HStack(spacing: KinSpacing.medium) {
-                if let category = cleaned(recipe.category) {
-                    metadataChip(
-                        icon: "tag",
-                        text: category
-                    )
-                }
-
-                if recipe.totalTimeMinutes > 0 {
-                    metadataChip(
-                        icon: "clock",
-                        text: recipe.formattedTotalTime
-                    )
-                }
-
-                if let servings = recipe.servings {
-                    metadataChip(
-                        icon: "person.2",
-                        text: "\(servings)"
-                    )
-                }
             }
 
             // Owner-marked dietary tags. Informational only;
@@ -1239,35 +1278,40 @@ struct RecipeDetailView: View {
 
     // MARK: - Tabs
 
+    /// Capsule tabs, like a cookbook page.
     private var tabs: some View {
-        HStack(spacing: 0) {
+        HStack(spacing: KinSpacing.xSmall) {
             ForEach(
                 DetailTab.allCases,
                 id: \.self
             ) { tab in
                 Button {
-                    selectedTab = tab
-                } label: {
-                    VStack(spacing: KinSpacing.small) {
-                        Text(tab.rawValue)
-                            .font(KinTypography.button)
-                            .foregroundStyle(
-                                selectedTab == tab
-                                    ? KinColors.primary
-                                    : KinColors.secondaryText
-                            )
-
-                        Rectangle()
-                            .fill(
-                                selectedTab == tab
-                                    ? KinColors.primary
-                                    : .clear
-                            )
-                            .frame(height: 2)
+                    withAnimation(.easeInOut(duration: 0.15)) {
+                        selectedTab = tab
                     }
-                    .frame(maxWidth: .infinity)
+                } label: {
+                    Text(tab.rawValue)
+                        .font(KinTypography.subheadline)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.75)
+                        .foregroundStyle(
+                            selectedTab == tab
+                                ? .white
+                                : KinColors.primaryText
+                        )
+                        .padding(.vertical, KinSpacing.small)
+                        .frame(maxWidth: .infinity)
+                        .background(
+                            selectedTab == tab
+                                ? KinColors.primary
+                                : KinColors.primary.opacity(0.06)
+                        )
+                        .clipShape(Capsule())
                 }
                 .buttonStyle(.plain)
+                .accessibilityAddTraits(
+                    selectedTab == tab ? .isSelected : []
+                )
             }
         }
     }
@@ -1292,12 +1336,13 @@ struct RecipeDetailView: View {
 
     // MARK: - Ingredients
 
+    /// Tick off ingredients while cooking, or copy the list.
     private func ingredientsView(
         _ ingredients: [RecipeIngredient]
     ) -> some View {
         VStack(
             alignment: .leading,
-            spacing: KinSpacing.medium
+            spacing: KinSpacing.small
         ) {
             if ingredients.isEmpty {
                 emptySection(
@@ -1308,31 +1353,89 @@ struct RecipeDetailView: View {
                 )
 
             } else {
-                ForEach(ingredients) { ingredient in
-                    KinCard {
-                        HStack(spacing: KinSpacing.medium) {
-                            Text(
-                                ingredientQuantity(
-                                    ingredient
-                                )
-                            )
-                            .font(KinTypography.title3)
-                            .foregroundStyle(KinColors.primary)
-                            .frame(
-                                minWidth: 75,
-                                alignment: .leading
-                            )
+                HStack {
+                    Spacer()
 
-                            Text(ingredient.name)
-                                .font(KinTypography.body)
-                                .foregroundStyle(KinColors.primaryText)
-
-                            Spacer()
-                        }
+                    Button {
+                        UIPasteboard.general.string =
+                            ingredients
+                                .map(ingredientLine)
+                                .joined(separator: "\n")
+                        didCopyIngredients = true
+                    } label: {
+                        Label(
+                            didCopyIngredients ? "Copied" : "Copy",
+                            systemImage:
+                                didCopyIngredients
+                                    ? KinIcons.check
+                                    : "doc.on.doc"
+                        )
+                        .font(KinTypography.footnote)
+                        .foregroundStyle(KinColors.primary)
                     }
+                    .buttonStyle(.plain)
+                    .accessibilityHint("Copies the ingredient list")
+                }
+
+                ForEach(ingredients) { ingredient in
+
+                    let isChecked =
+                        checkedIngredientIds.contains(ingredient.id)
+
+                    Button {
+                        if isChecked {
+                            checkedIngredientIds.remove(ingredient.id)
+                        } else {
+                            checkedIngredientIds.insert(ingredient.id)
+                        }
+                    } label: {
+                        HStack(
+                            alignment: .firstTextBaseline,
+                            spacing: KinSpacing.small
+                        ) {
+                            Image(
+                                systemName:
+                                    isChecked
+                                        ? "checkmark.square.fill"
+                                        : "square"
+                            )
+                            .foregroundStyle(
+                                isChecked
+                                    ? KinColors.success
+                                    : KinColors.primary
+                            )
+
+                            Text(ingredientLine(ingredient))
+                                .font(KinTypography.body)
+                                .foregroundStyle(
+                                    isChecked
+                                        ? KinColors.secondaryText
+                                        : KinColors.primaryText
+                                )
+                                .strikethrough(isChecked)
+                                .multilineTextAlignment(.leading)
+
+                            Spacer(minLength: 0)
+                        }
+                        .padding(.vertical, KinSpacing.xxSmall)
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityAddTraits(isChecked ? .isSelected : [])
                 }
             }
         }
+        .sensoryFeedback(.selection, trigger: checkedIngredientIds)
+    }
+
+    /// "2 cups flour"
+    private func ingredientLine(
+        _ ingredient: RecipeIngredient
+    ) -> String {
+        let measure = ingredientQuantity(ingredient)
+        return measure.isEmpty
+            ? ingredient.name
+            : "\(measure) \(ingredient.name)"
     }
 
     // MARK: - Instructions
@@ -1362,30 +1465,28 @@ struct RecipeDetailView: View {
                     Array(steps.enumerated()),
                     id: \.offset
                 ) { index, step in
-                    KinCard {
-                        HStack(
-                            alignment: .top,
-                            spacing: KinSpacing.medium
-                        ) {
-                            Text("\(index + 1)")
-                                .font(KinTypography.title3)
-                                .foregroundStyle(.white)
-                                .frame(
-                                    width: 34,
-                                    height: 34
-                                )
-                                .background(KinColors.primary)
-                                .clipShape(Circle())
+                    HStack(
+                        alignment: .top,
+                        spacing: KinSpacing.medium
+                    ) {
+                        Text("\(index + 1)")
+                            .font(KinTypography.headline)
+                            .foregroundStyle(.white)
+                            .frame(width: 28, height: 28)
+                            .background(KinColors.primary)
+                            .clipShape(Circle())
 
-                            Text(step)
-                                .font(KinTypography.body)
-                                .foregroundStyle(KinColors.primaryText)
-                                .frame(
-                                    maxWidth: .infinity,
-                                    alignment: .leading
-                                )
-                        }
+                        Text(step)
+                            .font(KinTypography.body)
+                            .foregroundStyle(KinColors.primaryText)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .frame(
+                                maxWidth: .infinity,
+                                alignment: .leading
+                            )
                     }
+                    .accessibilityElement(children: .combine)
+                    .accessibilityLabel("Step \(index + 1). \(step)")
                 }
             }
         }

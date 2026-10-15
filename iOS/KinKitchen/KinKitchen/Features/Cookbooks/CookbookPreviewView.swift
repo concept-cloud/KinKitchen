@@ -851,7 +851,7 @@ private struct CookbookRecipePage: View {
                         topLeadingRadius: KinRadius.xLarge,
                         topTrailingRadius: KinRadius.xLarge
                     )
-                    .fill(CookbookReadingPage.paper)
+                    .fill(KinColors.paper)
                     .kinSheetShadow()
                 )
                 .offset(y: -28)
