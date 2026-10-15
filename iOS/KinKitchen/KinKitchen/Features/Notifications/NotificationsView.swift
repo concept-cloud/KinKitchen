@@ -27,7 +27,7 @@ struct NotificationsView: View {
 
     /// What counted as "New" when the list loaded. A notification
     /// read while you're here stays put (shown as read) instead of
-    /// jumping down to Earlier; it moves on the next visit or refresh.
+    /// jumping down to Read; it moves on the next visit or refresh.
     @State private var newSectionIds: Set<UUID> = []
 
     /// Read/unread changes waiting on Supabase, so a quick second tap
@@ -224,7 +224,7 @@ struct NotificationsView: View {
 
             if !earlierNotifications.isEmpty {
 
-                sectionTitle("Earlier")
+                sectionTitle("Read")
                     .padding(
                         .top,
                         newNotifications.isEmpty ? 0 : KinSpacing.medium
