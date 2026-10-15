@@ -2897,26 +2897,7 @@ private struct GatheringHeroImage: View {
 private extension GatheringDetailView {
 
     var loadingView: some View {
-
-        VStack(
-            spacing: KinSpacing.medium
-        ) {
-
-            ProgressView()
-                .tint(
-                    KinColors.primary
-                )
-
-            Text(
-                "Loading event..."
-            )
-            .font(
-                KinTypography.body
-            )
-            .foregroundStyle(
-                KinColors.secondaryText
-            )
-        }
+        KinLoadingView(message: "Loading event...")
     }
 }
 

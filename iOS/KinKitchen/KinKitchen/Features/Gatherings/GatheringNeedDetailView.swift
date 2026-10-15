@@ -60,8 +60,7 @@ struct GatheringNeedDetailView: View {
                 .ignoresSafeArea()
 
             if isLoading {
-                ProgressView()
-                    .tint(KinColors.primary)
+                KinLoadingView()
             } else {
                 ScrollView(
                     showsIndicators: false

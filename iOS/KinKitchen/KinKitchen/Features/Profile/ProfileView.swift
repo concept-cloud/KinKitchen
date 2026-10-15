@@ -623,18 +623,8 @@ struct ProfileView: View {
     // MARK: - Loading
 
     private var loadingSection: some View {
-
-        VStack {
-
-            Spacer()
-
-            ProgressView()
-
-            Spacer()
-        }
-        .frame(
-            maxWidth: .infinity
-        )
+        KinLoadingView(message: "Loading profile...")
+            .frame(minHeight: 320)
     }
 
     // MARK: - Display Name

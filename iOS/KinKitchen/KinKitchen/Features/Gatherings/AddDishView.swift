@@ -1099,10 +1099,7 @@ private extension RecipeSelectionView {
     @ViewBuilder
     var content: some View {
         if isLoading {
-            ProgressView()
-                .tint(
-                    KinColors.primary
-                )
+            KinLoadingView()
         } else if let errorMessage {
             VStack(
                 spacing: KinSpacing.large

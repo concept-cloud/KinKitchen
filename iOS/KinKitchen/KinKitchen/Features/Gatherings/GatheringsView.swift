@@ -309,28 +309,7 @@ private extension GatheringsView {
 private extension GatheringsView {
 
     var loadingState: some View {
-
-        VStack(
-            spacing:
-                KinSpacing.medium
-        ) {
-
-            ProgressView()
-
-            Text(
-                "Loading events..."
-            )
-            .font(
-                KinTypography.body
-            )
-            .foregroundStyle(
-                KinColors.secondaryText
-            )
-        }
-        .frame(
-            maxWidth: .infinity,
-            maxHeight: .infinity
-        )
+        KinLoadingView(message: "Loading events...")
     }
 }
 

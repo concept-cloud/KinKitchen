@@ -2153,10 +2153,7 @@ private extension AddCookbookRecipesView {
     @ViewBuilder
     var content: some View {
         if isLoading {
-            ProgressView()
-                .tint(
-                    KinColors.primary
-                )
+            KinLoadingView(message: "Opening cookbook...")
         } else if let errorMessage {
             VStack(
                 spacing: KinSpacing.medium

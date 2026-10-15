@@ -52,8 +52,8 @@ struct CookbookReadingPage: View {
                 } else if loadFailed {
                     message("This recipe couldn't be loaded. Check your connection and try again.")
                 } else {
-                    ProgressView()
-                        .padding(.top, KinSpacing.xxLarge)
+                    KinLoadingView(message: "Loading recipe...")
+                        .frame(minHeight: 320)
                 }
             }
         }

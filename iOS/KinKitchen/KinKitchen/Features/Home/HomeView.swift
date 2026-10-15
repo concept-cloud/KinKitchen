@@ -953,29 +953,10 @@ private extension HomeView {
         if isLoadingGatherings
             && upcomingGatherings.isEmpty {
 
-            KinCard {
-
-                HStack(
-                    spacing: KinSpacing.medium
-                ) {
-
-                    ProgressView()
-
-                    Text(
-                        "Loading events..."
-                    )
-                    .font(
-                        KinTypography.body
-                    )
-                    .foregroundStyle(
-                        KinColors.secondaryText
-                    )
-                }
-                .frame(
-                    maxWidth: .infinity,
-                    alignment: .leading
-                )
-            }
+            KinLoadingView(
+                message: "Loading events...",
+                size: .compact
+            )
 
         } else if upcomingGatherings.isEmpty {
 
@@ -1083,11 +1064,10 @@ private extension HomeView {
 
         if !hasLoadedDiscovery {
 
-            ProgressView()
-                .frame(
-                    maxWidth: .infinity,
-                    minHeight: 120
-                )
+            KinLoadingView(
+                message: "Loading recipes...",
+                size: .compact
+            )
 
         } else if recentRecipes.isEmpty {
 

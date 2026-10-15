@@ -102,8 +102,7 @@ struct RecipeDetailView: View {
                 .ignoresSafeArea()
 
             if isLoading {
-                ProgressView("Loading recipe...")
-                    .foregroundStyle(KinColors.primaryText)
+                KinLoadingView(message: "Loading recipe...")
 
             } else if let errorMessage {
                 errorState(errorMessage)

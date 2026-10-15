@@ -401,30 +401,7 @@ struct NotificationsView: View {
     // MARK: - Loading State
 
     private var loadingState: some View {
-
-        VStack(
-            spacing: KinSpacing.medium
-        ) {
-
-            ProgressView()
-                .tint(
-                    KinColors.primary
-                )
-
-            Text(
-                "Loading notifications..."
-            )
-            .font(
-                KinTypography.body
-            )
-            .foregroundStyle(
-                KinColors.secondaryText
-            )
-        }
-        .frame(
-            maxWidth: .infinity,
-            maxHeight: .infinity
-        )
+        KinLoadingView(message: "Loading notifications...")
     }
 
     // MARK: - Empty State

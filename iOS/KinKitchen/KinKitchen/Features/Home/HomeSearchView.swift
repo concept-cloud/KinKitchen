@@ -94,8 +94,7 @@ struct HomeSearchView: View {
 
         } else if isLoading {
 
-            ProgressView()
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            KinLoadingView(message: "Searching...")
 
         } else if matchedRecipes.isEmpty
                     && matchedCookbooks.isEmpty
