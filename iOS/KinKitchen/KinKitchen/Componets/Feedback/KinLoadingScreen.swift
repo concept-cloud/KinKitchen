@@ -38,10 +38,8 @@ struct KinLoadingScreen: View {
 
             // Only shows if loading takes a moment, so quick launches
             // stay clean.
-            ProgressView()
-                .tint(KinColors.primary)
+            KinUtensilOrbit(isSpinning: !reduceMotion)
                 .opacity(showsProgress ? 1 : 0)
-                .offset(y: 140)
                 .accessibilityLabel("Loading")
         }
         .task {
@@ -65,4 +63,68 @@ struct KinLoadingScreen: View {
 
 #Preview {
     KinLoadingScreen()
+}
+
+
+// MARK: - Utensil Orbit
+
+/// The loading spinner: forks and knives circling the logo, brightest
+/// at the front with a fading tail, like a spinner wheel.
+struct KinUtensilOrbit: View {
+
+    var isSpinning = true
+    var count = 10
+    /// Clears the corners of the 260 × 173 logo.
+    var radius: CGFloat = 168
+    var iconSize: CGFloat = 24
+
+    @State private var angle: Angle = .zero
+
+    var body: some View {
+
+        ZStack {
+            ForEach(0..<count, id: \.self) { index in
+
+                let position =
+                    Angle.degrees(Double(index) / Double(count) * 360)
+
+                Image(systemName: KinIcons.recipes)
+                    .font(.system(size: iconSize, weight: .semibold))
+                    .foregroundStyle(KinColors.primary)
+                    // Point along the circle, like they're marching
+                    // around it.
+                    .rotationEffect(position + .degrees(90))
+                    .opacity(KinUtensilOrbit.opacity(index: index, count: count))
+                    .offset(
+                        x: radius * cos(position.radians),
+                        y: radius * sin(position.radians)
+                    )
+            }
+        }
+        .frame(width: radius * 2 + iconSize * 2, height: radius * 2 + iconSize * 2)
+        .rotationEffect(angle)
+        .onAppear {
+            guard isSpinning else {
+                return
+            }
+            withAnimation(
+                .linear(duration: 2.4)
+                    .repeatForever(autoreverses: false)
+            ) {
+                angle = .degrees(360)
+            }
+        }
+        .accessibilityElement()
+    }
+
+    /// The leading utensil is solid; the ones behind it fade out.
+    nonisolated static func opacity(
+        index: Int,
+        count: Int
+    ) -> Double {
+        guard count > 1 else {
+            return 1
+        }
+        return 0.15 + 0.85 * Double(index) / Double(count - 1)
+    }
 }
