@@ -54,6 +54,28 @@ nonisolated enum KinDietaryBackground: String, CaseIterable, Identifiable {
         }
     }
 
+    /// Value stored in `profiles.dietary_background`, e.g.
+    /// "sunny_kitchen".
+    var databaseValue: String {
+        rawValue.reduce(into: "") { result, character in
+            if character.isUppercase {
+                result += "_" + character.lowercased()
+            } else {
+                result.append(character)
+            }
+        }
+    }
+
+    /// nil for anything this version of the app doesn't know.
+    init?(databaseValue: String) {
+        guard let match = Self.allCases.first(where: {
+            $0.databaseValue == databaseValue
+        }) else {
+            return nil
+        }
+        self = match
+    }
+
     /// Asset catalog name, e.g. "DietaryBgSunnyKitchen".
     var imageName: String {
         "DietaryBg" + rawValue.prefix(1).uppercased() + rawValue.dropFirst()

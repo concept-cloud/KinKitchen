@@ -61,6 +61,7 @@ final class AuthService: ObservableObject {
 
         // Photos belong to the account that loaded them.
         StorageImageCache.shared.removeAll()
+        DietaryBackgroundSync.clearLocal()
     }
 
     deinit {

@@ -29,11 +29,21 @@ enum RecipientDietaryService {
                 for: recipientId
             )
 
+        // Their own additions; missing ones shouldn't block the
+        // built-in checks.
+        async let customResult =
+            try? CustomDietaryService.fetchItems(
+                for: recipientId
+            )
+
+        let custom =
+            await customResult ?? CustomDietaryItems()
+
         return try await RecipientDietaryInformation(
             userId: recipientId,
-            allergens: allergenResult,
-            restrictions: restrictionResult,
-            preferences: preferenceResult
+            allergens: allergenResult + custom.allergens,
+            restrictions: restrictionResult + custom.restrictions,
+            preferences: preferenceResult + custom.preferences
         )
     }
 }

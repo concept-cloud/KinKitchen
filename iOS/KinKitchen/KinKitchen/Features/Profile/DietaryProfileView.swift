@@ -235,6 +235,9 @@ struct DietaryProfileView: View {
             async let loadedLastUpdated =
                 ProfileService.fetchDietaryLastUpdated()
 
+            async let loadedCustom =
+                try? CustomDietaryService.fetchItems()
+
             let allAllergens =
                 try await loadedAllergens
 
@@ -256,20 +259,26 @@ struct DietaryProfileView: View {
             lastUpdated =
                 try await loadedLastUpdated
 
+            let custom =
+                await loadedCustom ?? CustomDietaryItems()
+
             allergens =
                 allAllergens.filter {
                     allergenIds.contains($0.id)
                 }
+                + custom.allergens
 
             restrictions =
                 allRestrictions.filter {
                     restrictionIds.contains($0.id)
                 }
+                + custom.restrictions
 
             preferences =
                 allPreferences.filter {
                     preferenceIds.contains($0.id)
                 }
+                + custom.preferences
 
         } catch {
 

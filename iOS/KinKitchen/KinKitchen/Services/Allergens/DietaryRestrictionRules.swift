@@ -24,6 +24,14 @@ enum DietaryRestrictionRules {
         allergenAssociations: [AllergenSourceAssociation]
     ) -> [String] {
 
+        // The user's own restrictions are matched by name.
+        if restriction.isCustom {
+            return CustomDietaryMatcher.matchingIngredients(
+                for: restriction.name,
+                in: ingredientNames
+            )
+        }
+
         guard
             let rule =
                 rule(

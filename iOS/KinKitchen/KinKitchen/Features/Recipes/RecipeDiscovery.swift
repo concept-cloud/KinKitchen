@@ -309,6 +309,16 @@ struct RecipeDiscoveryContext {
             return .incomplete
         }
 
+        // The user's own allergens are matched by name, so they're
+        // known as soon as the ingredients are.
+        if allergen.isCustom,
+           !CustomDietaryMatcher.matchingIngredients(
+               for: allergen.name,
+               in: insight.ingredientNames
+           ).isEmpty {
+            return .contains
+        }
+
         if insight.isCheckingAllergens {
             return .checking
         }

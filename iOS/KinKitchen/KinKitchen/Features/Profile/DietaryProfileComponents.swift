@@ -245,6 +245,23 @@ nonisolated enum DietarySection {
         }
     }
 
+    /// Which kind of `custom_dietary_items` row "Add your own" makes.
+    var customKind: CustomDietaryItem.Kind {
+        switch self {
+        case .allergens: return .allergen
+        case .restrictions: return .restriction
+        case .preferences: return .preference
+        }
+    }
+
+    var addPlaceholder: String {
+        switch self {
+        case .allergens: return "Add your own, e.g. Strawberry"
+        case .restrictions: return "Add your own, e.g. No Pork"
+        case .preferences: return "Add your own, e.g. Cilantro"
+        }
+    }
+
     var emptyMessage: String {
         switch self {
         case .allergens: return "No allergens selected."

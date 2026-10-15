@@ -28,6 +28,12 @@ enum RecipeDietaryCheckService {
         let availableAllergens =
             try await availableAllergenRequest
 
+        // The user's own allergens are always on. A failure here
+        // shouldn't hide the built-in warnings.
+        let customAllergens =
+            (try? await CustomDietaryService.fetchItems())?
+                .allergens ?? []
+
         let selectedAllergens =
             availableAllergens
                 .filter {
@@ -35,6 +41,7 @@ enum RecipeDietaryCheckService {
                         $0.id
                     )
                 }
+            + customAllergens
 
         return try await evaluateRecipe(
             recipeId: recipeId,
@@ -73,7 +80,7 @@ enum RecipeDietaryCheckService {
         let preferenceConflicts =
             evaluatePreferences(
                 dietaryInformation.preferences,
-                against: allergenResult
+                ingredientNames: evaluation.ingredientNames
             )
 
         return RecipientRecipeDietaryCheckResult(
@@ -235,6 +242,26 @@ private extension RecipeDietaryCheckService {
             )
         }
 
+        // The user's own allergens aren't in the catalog, so they're
+        // matched by name.
+        for allergen in allergens where allergen.isCustom {
+
+            let matches =
+                CustomDietaryMatcher.matchingIngredients(
+                    for: allergen.name,
+                    in: ingredients.map(\.name)
+                )
+
+            if !matches.isEmpty {
+                conflicts.append(
+                    RecipeAllergenConflict(
+                        allergen: allergen,
+                        ingredientNames: matches
+                    )
+                )
+            }
+        }
+
         conflicts.sort {
             $0.allergen.name.localizedCaseInsensitiveCompare(
                 $1.allergen.name
@@ -277,17 +304,20 @@ private extension RecipeDietaryCheckService {
 
 private extension RecipeDietaryCheckService {
 
+    /// Preferences are matched by name against every ingredient,
+    /// e.g. "No Mushrooms" finds "sliced mushrooms". Ones that can't
+    /// be judged from ingredients (like "Low Carb") never match.
     static func evaluatePreferences(
         _ preferences: [DietaryPreference],
-        against result: RecipeDietaryCheckResult
+        ingredientNames: [String]
     ) -> [RecipeDietaryPreferenceConflict] {
         preferences.compactMap {
             preference in
 
             let matchingIngredients =
-                matchingIngredients(
-                    forDietaryName: preference.name,
-                    in: result
+                CustomDietaryMatcher.matchingIngredients(
+                    for: preference.name,
+                    in: ingredientNames
                 )
 
             guard !matchingIngredients.isEmpty else {
@@ -299,59 +329,6 @@ private extension RecipeDietaryCheckService {
                 ingredientNames: matchingIngredients
             )
         }
-    }
-}
-
-// MARK: - Dietary Matching
-
-private extension RecipeDietaryCheckService {
-
-    static func matchingIngredients(
-        forDietaryName dietaryName: String,
-        in result: RecipeDietaryCheckResult
-    ) -> [String] {
-        let dietaryKey =
-            IngredientAllergenService
-                .normalizeIngredientName(
-                    dietaryName
-                )
-
-        guard !dietaryKey.isEmpty else {
-            return []
-        }
-
-        var seen:
-            Set<String> = []
-
-        return result
-            .conflictingIngredientNames
-            .filter {
-                ingredientName in
-
-                let ingredientKey =
-                    IngredientAllergenService
-                        .normalizeIngredientName(
-                            ingredientName
-                        )
-
-                let matches =
-                    ingredientKey.contains(
-                        dietaryKey
-                    ) ||
-                    dietaryKey.contains(
-                        ingredientKey
-                    )
-
-                guard matches else {
-                    return false
-                }
-
-                return seen
-                    .insert(
-                        ingredientKey
-                    )
-                    .inserted
-            }
     }
 }
 

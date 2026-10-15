@@ -1414,17 +1414,29 @@ Spacer()
             DietaryService
                 .fetchSelectedDietaryRestrictions()
 
+        // Allergens and restrictions the user added themselves; they're
+        // always on, and show in the filters with the built-in ones.
+        async let customRequest =
+            CustomDietaryService
+                .fetchItems()
+
+        let custom =
+            (try? await customRequest) ?? CustomDietaryItems()
+
         discoveryContext.restrictions =
-            (try? await restrictionRequest) ?? []
+            ((try? await restrictionRequest) ?? [])
+            + custom.restrictions
 
         discoveryContext.profileAllergenIds =
             Set((try? await profileAllergenRequest) ?? [])
+                .union(custom.allergens.map(\.id))
 
         discoveryContext.profileRestrictionIds =
             Set((try? await profileRestrictionRequest) ?? [])
+                .union(custom.restrictions.map(\.id))
 
         discoveryContext.allergens =
-            ((try? await allergenRequest) ?? [])
+            (((try? await allergenRequest) ?? []) + custom.allergens)
                 .sorted {
                     $0.name.localizedCaseInsensitiveCompare(
                         $1.name

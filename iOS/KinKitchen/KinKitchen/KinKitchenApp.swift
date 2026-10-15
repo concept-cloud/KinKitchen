@@ -79,6 +79,9 @@ struct KinKitchenApp: App {
                 }
 
                 await checkOnboardingStatus()
+
+                // Bring this account's background to this phone.
+                await DietaryBackgroundSync.pull()
             }
         }
     }

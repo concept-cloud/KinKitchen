@@ -72,6 +72,9 @@ struct DietaryBackgroundPicker: View {
 
         return Button {
             selection = background.rawValue
+            Task {
+                await DietaryBackgroundSync.choose(background)
+            }
         } label: {
 
             VStack(

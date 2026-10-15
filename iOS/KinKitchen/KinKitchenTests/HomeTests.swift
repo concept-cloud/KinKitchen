@@ -315,6 +315,24 @@ struct DietaryBackgroundTests {
         #expect(KinDietaryBackground.saved("") == .sunnyKitchen)
     }
 
+    @Test func databaseValuesMatchTheSupabaseEnum() {
+        #expect(
+            KinDietaryBackground.allCases.map(\.databaseValue) == [
+                "sunny_kitchen",
+                "evening_ambience",
+                "modern_marble",
+                "rustic_table",
+                "farmhouse",
+                "herb_garden",
+                "autumn_harvest"
+            ]
+        )
+        for background in KinDietaryBackground.allCases {
+            #expect(KinDietaryBackground(databaseValue: background.databaseValue) == background)
+        }
+        #expect(KinDietaryBackground(databaseValue: "winter_comfort") == nil)
+    }
+
     @Test func everyBackgroundHasItsImageInTheBundle() {
         for background in KinDietaryBackground.allCases {
             #expect(background.imageName.hasPrefix("DietaryBg"))
@@ -340,5 +358,81 @@ struct KinAppearanceTests {
     @Test func unknownModeFallsBackToLight() {
         #expect(KinAppearance.saved("") == .light)
         #expect(KinAppearance.saved("sepia") == .light)
+    }
+}
+
+
+// MARK: - Custom Dietary Items
+
+struct CustomDietaryItemTests {
+
+    @Test func keywordDropsNoAndFreeAndPlurals() {
+        #expect(CustomDietaryMatcher.keyword(from: "No Mushrooms") == "mushroom")
+        #expect(CustomDietaryMatcher.keyword(from: "Corn-Free") == "corn")
+        #expect(CustomDietaryMatcher.keyword(from: "Strawberries") == "strawberry")
+        #expect(CustomDietaryMatcher.keyword(from: "Tomatoes") == "tomato")
+        #expect(CustomDietaryMatcher.keyword(from: "Cilantro") == "cilantro")
+        // Odd plurals still match the ingredient itself.
+        #expect(
+            CustomDietaryMatcher.matchingIngredients(for: "Molasses", in: ["Dark molasses"])
+                == ["Dark molasses"]
+        )
+    }
+
+    @Test func matchesWholeWordsAndPlurals() {
+        let ingredients = [
+            "2 cups fresh strawberries",
+            "Peanut butter",
+            "Sliced mushrooms",
+            "Cilantro, chopped"
+        ]
+        #expect(
+            CustomDietaryMatcher.matchingIngredients(for: "Strawberry", in: ingredients)
+                == ["2 cups fresh strawberries"]
+        )
+        #expect(
+            CustomDietaryMatcher.matchingIngredients(for: "No Mushrooms", in: ingredients)
+                == ["Sliced mushrooms"]
+        )
+        #expect(
+            CustomDietaryMatcher.matchingIngredients(for: "Cilantro", in: ingredients)
+                == ["Cilantro, chopped"]
+        )
+        // "Pea" isn't "peanut".
+        #expect(CustomDietaryMatcher.matchingIngredients(for: "Pea", in: ingredients).isEmpty)
+        // Can't be judged from ingredients.
+        #expect(CustomDietaryMatcher.matchingIngredients(for: "Low Carb", in: ingredients).isEmpty)
+    }
+
+    @Test func customRestrictionIsMatchedByName() {
+        let restriction = DietaryRestriction(
+            id: UUID(), name: "No Pork", createdAt: .now, isCustom: true
+        )
+        #expect(
+            DietaryRestrictionRules.conflictingIngredients(
+                for: restriction,
+                ingredientNames: ["Pork shoulder", "Salt"],
+                allergenAssociations: []
+            ) == ["Pork shoulder"]
+        )
+    }
+
+    @Test func typedNamesAreTidiedAndDeduplicated() {
+        #expect(CustomDietaryText.cleaned("  tree   nuts ") == "Tree nuts")
+        #expect(CustomDietaryText.cleaned(String(repeating: "a", count: 60)).count == 40)
+        #expect(CustomDietaryText.existingMatch(for: "tree NUT", in: ["Egg", "Tree Nut"]) == "Tree Nut")
+        #expect(CustomDietaryText.existingMatch(for: "Kiwi", in: ["Egg"]) == nil)
+    }
+
+    @Test func savingSplitsBuiltInAndCustomChanges() {
+        let builtInA = UUID(), builtInB = UUID(), custom = UUID()
+        let changes = DietaryEditChanges(
+            original: [builtInA, custom],
+            selected: [builtInB],
+            customIds: [custom]
+        )
+        #expect(changes.toAdd == [builtInB])
+        #expect(changes.toRemove == [builtInA])
+        #expect(changes.customToDelete == [custom])
     }
 }
