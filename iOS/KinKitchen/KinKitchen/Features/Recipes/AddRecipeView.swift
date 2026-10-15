@@ -10,6 +10,8 @@ import PhotosUI
 
 struct AddRecipeView: View {
     @Environment(\.dismiss) private var dismiss
+    /// The ingredient whose name gets the cursor after picking a unit.
+    @FocusState private var focusedIngredientNameId: UUID?
     private let onRecipeCreated: ((Recipe) -> Void)?
     private let onCancel: (() -> Void)?
 
@@ -537,22 +539,22 @@ struct AddRecipeView: View {
 
         return VStack(spacing: KinSpacing.small) {
             HStack(spacing: KinSpacing.small) {
-                TextField(
-                    "Qty",
-                    text: $ingredients[index].quantity
-                )
-                .keyboardType(.numbersAndPunctuation)
-                .frame(width: 65)
-
-                TextField(
-                    "Unit",
-                    text: $ingredients[index].unit
-                )
-                .frame(width: 75)
+                // Kitchen keyboards: fractions for the amount, common
+                // units for the unit, then on to the name.
+                KinMeasureFields(
+                    quantity: $ingredients[index].quantity,
+                    unit: $ingredients[index].unit
+                ) {
+                    focusedIngredientNameId = ingredient.id
+                }
 
                 TextField(
                     "Ingredient",
                     text: $ingredients[index].name
+                )
+                .focused(
+                    $focusedIngredientNameId,
+                    equals: ingredient.id
                 )
 
                 Image(systemName: "line.3.horizontal")

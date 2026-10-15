@@ -436,3 +436,50 @@ struct CustomDietaryItemTests {
         #expect(changes.customToDelete == [custom])
     }
 }
+
+
+// MARK: - Measure Keyboard
+
+struct MeasureKeyboardTextTests {
+
+    private func type(_ keys: [MeasureKey]) -> String {
+        keys.reduce("") { MeasureKeyboardText.applying($1, to: $0) }
+    }
+
+    @Test func fractionsFollowWholeNumbersWithASpace() {
+        #expect(type([.digit(1), .fraction("1/2")]) == "1 1/2")
+        #expect(type([.fraction("3/4")]) == "3/4")
+        #expect(IngredientQuantityFormatter.parse(type([.digit(2), .fraction("1/3")])) != nil)
+    }
+
+    @Test func nothingFollowsAFraction() {
+        #expect(type([.fraction("1/2"), .digit(3)]) == "1/2")
+        #expect(type([.fraction("1/2"), .fraction("1/4")]) == "1/2")
+        #expect(type([.fraction("1/2"), .decimal]) == "1/2")
+    }
+
+    @Test func decimalsStayValid() {
+        #expect(type([.decimal]) == "0.")
+        #expect(type([.digit(1), .decimal, .digit(5), .decimal]) == "1.5")
+        #expect(type([.digit(1), .decimal, .fraction("1/2")]) == "1.")
+    }
+
+    @Test func deleteRemovesAWholeFraction() {
+        #expect(type([.digit(1), .fraction("1/2"), .delete]) == "1")
+        #expect(type([.digit(1), .digit(2), .delete]) == "1")
+        #expect(type([.delete]) == "")
+    }
+
+    @Test func unitsHaveSpokenNames() {
+        #expect(MeasureKeyboardText.UnitGroup.volume.units.contains("Tbsp"))
+        #expect(MeasureKeyboardText.UnitGroup.weight.units.contains("lb"))
+        #expect(MeasureKeyboardText.UnitGroup.other.units.contains("pinch"))
+        #expect(MeasureKeyboardText.group(for: "lb") == .weight)
+        #expect(MeasureKeyboardText.group(for: "dash") == .other)
+        #expect(MeasureKeyboardText.group(for: "") == .volume)
+        // Every tab fits in three rows of four.
+        #expect(MeasureKeyboardText.UnitGroup.allCases.allSatisfy { $0.units.count + ($0 == .other ? 1 : 0) <= 12 })
+        #expect(MeasureKeyboardText.spokenName(for: "Tbsp") == "tablespoon")
+        #expect(MeasureKeyboardText.spokenName(for: "cup") == "cup")
+    }
+}

@@ -11,6 +11,9 @@ import UniformTypeIdentifiers
 
 struct EditRecipeView: View {
 
+    /// The ingredient whose name gets the cursor after picking a unit.
+    @FocusState private var focusedIngredientNameId: UUID?
+
     // MARK: - Environment
 
     @Environment(\.dismiss) private var dismiss
@@ -728,24 +731,22 @@ struct EditRecipeView: View {
             HStack(
                 spacing: KinSpacing.small
             ) {
-                TextField(
-                    "Qty",
-                    text: $ingredients[index].quantity
-                )
-                .keyboardType(.numbersAndPunctuation)
-                .submitLabel(.next)
-                .frame(width: 65)
-
-                TextField(
-                    "Unit",
-                    text: $ingredients[index].unit
-                )
-                .submitLabel(.next)
-                .frame(width: 75)
+                // Kitchen keyboards: fractions for the amount, common
+                // units for the unit, then on to the name.
+                KinMeasureFields(
+                    quantity: $ingredients[index].quantity,
+                    unit: $ingredients[index].unit
+                ) {
+                    focusedIngredientNameId = ingredient.id
+                }
 
                 TextField(
                     "Ingredient",
                     text: $ingredients[index].name
+                )
+                .focused(
+                    $focusedIngredientNameId,
+                    equals: ingredient.id
                 )
                 .textInputAutocapitalization(.words)
                 .submitLabel(.next)
