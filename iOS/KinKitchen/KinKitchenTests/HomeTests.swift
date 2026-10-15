@@ -446,26 +446,40 @@ struct MeasureKeyboardTextTests {
         keys.reduce("") { MeasureKeyboardText.applying($1, to: $0) }
     }
 
-    @Test func fractionsFollowWholeNumbersWithASpace() {
-        #expect(type([.digit(1), .fraction("1/2")]) == "1 1/2")
-        #expect(type([.fraction("3/4")]) == "3/4")
-        #expect(IngredientQuantityFormatter.parse(type([.digit(2), .fraction("1/3")])) != nil)
+    @Test func fractionsJoinWholeNumbers() {
+        #expect(type([.digit(1), .fraction("½")]) == "1½")
+        #expect(type([.fraction("¾")]) == "¾")
+        let twoAndAThird: Double = 2 + 1.0 / 3
+        let typed = type([.digit(2), .fraction("⅓")])
+        #expect(IngredientQuantityFormatter.parse(typed) == twoAndAThird)
+        #expect(IngredientQuantityFormatter.parse("1½") == 1.5)
+        #expect(IngredientQuantityFormatter.parse("¾") == 0.75)
+        // Older amounts typed with a slash still read.
+        #expect(IngredientQuantityFormatter.parse("1 1/2") == 1.5)
     }
 
     @Test func nothingFollowsAFraction() {
-        #expect(type([.fraction("1/2"), .digit(3)]) == "1/2")
-        #expect(type([.fraction("1/2"), .fraction("1/4")]) == "1/2")
-        #expect(type([.fraction("1/2"), .decimal]) == "1/2")
+        #expect(type([.fraction("½"), .digit(3)]) == "½")
+        #expect(type([.fraction("½"), .fraction("¼")]) == "½")
+        #expect(type([.fraction("½"), .decimal]) == "½")
+    }
+
+    @Test func amountsDisplayWithFractionCharacters() {
+        #expect(IngredientQuantityFormatter.format(1.5) == "1½")
+        #expect(IngredientQuantityFormatter.format(0.25) == "¼")
+        #expect(IngredientQuantityFormatter.format(2) == "2")
+        // Round trip: what the edit screen shows saves the same.
+        #expect(IngredientQuantityFormatter.parse(IngredientQuantityFormatter.format(2.75)) == 2.75)
     }
 
     @Test func decimalsStayValid() {
         #expect(type([.decimal]) == "0.")
         #expect(type([.digit(1), .decimal, .digit(5), .decimal]) == "1.5")
-        #expect(type([.digit(1), .decimal, .fraction("1/2")]) == "1.")
+        #expect(type([.digit(1), .decimal, .fraction("½")]) == "1.")
     }
 
     @Test func deleteRemovesAWholeFraction() {
-        #expect(type([.digit(1), .fraction("1/2"), .delete]) == "1")
+        #expect(type([.digit(1), .fraction("½"), .delete]) == "1")
         #expect(type([.digit(1), .digit(2), .delete]) == "1")
         #expect(type([.delete]) == "")
     }
@@ -481,5 +495,32 @@ struct MeasureKeyboardTextTests {
         #expect(MeasureKeyboardText.UnitGroup.allCases.allSatisfy { $0.units.count + ($0 == .other ? 1 : 0) <= 12 })
         #expect(MeasureKeyboardText.spokenName(for: "Tbsp") == "tablespoon")
         #expect(MeasureKeyboardText.spokenName(for: "cup") == "cup")
+    }
+}
+
+
+// MARK: - Plural Units
+
+struct PluralUnitTests {
+
+    @Test func wordUnitsArePluralAboveOne() {
+        #expect(IngredientQuantityFormatter.formattedMeasurement(quantity: 2, unit: "cup") == "2 cups")
+        #expect(IngredientQuantityFormatter.formattedMeasurement(quantity: 1.5, unit: "cup") == "1½ cups")
+        #expect(IngredientQuantityFormatter.formattedMeasurement(quantity: 3, unit: "pinch") == "3 pinches")
+        #expect(IngredientQuantityFormatter.formattedMeasurement(quantity: 4, unit: "clove") == "4 cloves")
+    }
+
+    @Test func oneOrLessStaysSingular() {
+        #expect(IngredientQuantityFormatter.formattedMeasurement(quantity: 1, unit: "cup") == "1 cup")
+        #expect(IngredientQuantityFormatter.formattedMeasurement(quantity: 0.5, unit: "cups") == "½ cup")
+        #expect(IngredientQuantityFormatter.formattedMeasurement(quantity: 1, unit: "cloves") == "1 clove")
+    }
+
+    @Test func abbreviationsAndUnknownUnitsDontChange() {
+        #expect(IngredientQuantityFormatter.formattedMeasurement(quantity: 2, unit: "Tbsp") == "2 tbsp")
+        #expect(IngredientQuantityFormatter.formattedMeasurement(quantity: 2, unit: "lb") == "2 lb")
+        #expect(IngredientQuantityFormatter.formattedMeasurement(quantity: 2, unit: "g") == "2 g")
+        #expect(IngredientQuantityFormatter.displayUnit("large", quantity: 3) == "large")
+        #expect(IngredientQuantityFormatter.displayUnit("cup", quantity: nil) == "cup")
     }
 }

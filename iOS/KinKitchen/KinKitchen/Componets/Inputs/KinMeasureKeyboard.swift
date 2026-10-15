@@ -336,7 +336,7 @@ private struct KeyboardSheet<Content: View>: View {
 /// A key on the quantity pad.
 nonisolated enum MeasureKey: Equatable {
     case digit(Int)
-    /// Typed as "1/2" so it saves like any other amount.
+    /// A fraction character like "½"; it reads back as 1/2.
     case fraction(String)
     case decimal
     case delete
@@ -356,7 +356,12 @@ nonisolated enum MeasureKeyboardText {
                 .last
                 .map(String.init) ?? ""
 
-        let endsInFraction = lastToken.contains("/")
+        let endsInFraction =
+            lastToken.contains("/")
+                || text.last.map {
+                    IngredientQuantityFormatter.fractionGlyphs
+                        .values.contains(String($0))
+                } == true
 
         switch key {
 
@@ -371,10 +376,8 @@ nonisolated enum MeasureKeyboardText {
             if endsInFraction || lastToken.contains(".") {
                 return text
             }
-            // "1" + ½ → "1 1/2"
-            return text.last?.isNumber == true
-                ? text + " " + fraction
-                : text + fraction
+            // "1" + ½ → "1½"
+            return text + fraction
 
         case .decimal:
             if endsInFraction || lastToken.contains(".") {
@@ -383,7 +386,7 @@ nonisolated enum MeasureKeyboardText {
             return text.isEmpty ? "0." : text + "."
 
         case .delete:
-            // A fraction comes off whole: "1 1/2" → "1".
+            // A fraction comes off whole: "1½" → "1", "1 1/2" → "1".
             if let range =
                 text.range(
                     of: #"\s?\d+/\d+$"#,
@@ -468,12 +471,12 @@ private struct QuantityKeypad: View {
     let onNext: () -> Void
 
     private let fractions: [(label: String, value: String, spoken: String)] = [
-        ("½", "1/2", "one half"),
-        ("¼", "1/4", "one quarter"),
-        ("¾", "3/4", "three quarters"),
-        ("⅓", "1/3", "one third"),
-        ("⅔", "2/3", "two thirds"),
-        ("⅛", "1/8", "one eighth")
+        ("½", "½", "one half"),
+        ("¼", "¼", "one quarter"),
+        ("¾", "¾", "three quarters"),
+        ("⅓", "⅓", "one third"),
+        ("⅔", "⅔", "two thirds"),
+        ("⅛", "⅛", "one eighth")
     ]
 
     var body: some View {

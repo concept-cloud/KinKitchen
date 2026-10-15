@@ -12,7 +12,7 @@ enum IngredientQuantityFormatter {
     // MARK: - Parse
 
     static func parse(_ value: String) -> Double? {
-        let cleaned = value
+        let cleaned = expandingFractionGlyphs(value)
             .trimmingCharacters(in: .whitespacesAndNewlines)
             .replacingOccurrences(of: "⁄", with: "/")
 
@@ -79,10 +79,13 @@ enum IngredientQuantityFormatter {
                 fraction
             )
 
+        // "1½", "¾": the way recipes print them.
         if let fractionText {
+            let glyph = fractionGlyphs[fractionText] ?? fractionText
+            let joiner = fractionGlyphs[fractionText] == nil ? " " : ""
             return whole > 0
-                ? "\(whole) \(fractionText)"
-                : fractionText
+                ? "\(whole)\(joiner)\(glyph)"
+                : glyph
         }
 
         if quantity.rounded() == quantity {
@@ -457,7 +460,7 @@ enum IngredientQuantityFormatter {
 
         let unitText =
             unit.map {
-                normalizedUnit($0)
+                displayUnit($0, quantity: quantity)
             } ?? ""
 
         let result =
@@ -472,5 +475,99 @@ enum IngredientQuantityFormatter {
         return result.isEmpty
             ? "—"
             : result
+    }
+
+
+    // MARK: - Plural Units
+
+    /// Word units that change with the amount. Abbreviations (tsp,
+    /// tbsp, oz, lb, g, mL…) read the same either way.
+    private static let pluralUnits: [String: String] = [
+        "cup": "cups",
+        "pint": "pints",
+        "quart": "quarts",
+        "gallon": "gallons",
+        "pinch": "pinches",
+        "dash": "dashes",
+        "clove": "cloves",
+        "can": "cans",
+        "slice": "slices",
+        "piece": "pieces",
+        "stick": "sticks",
+        "bunch": "bunches",
+        "sprig": "sprigs",
+        "handful": "handfuls",
+        "head": "heads",
+        "jar": "jars",
+        "bottle": "bottles",
+        "package": "packages",
+        "bag": "bags",
+        "box": "boxes",
+        "drop": "drops",
+        "sheet": "sheets",
+        "leaf": "leaves",
+        "stalk": "stalks",
+        "strip": "strips",
+        "fillet": "fillets",
+        "loaf": "loaves"
+    ]
+
+    /// The unit as it should read next to the amount: plural above 1
+    /// ("2 cups", "1 1/2 cups", "3 pinches"), singular at 1 or less
+    /// ("1 cup", "1/2 cup"). Units it doesn't know are left as typed.
+    static func displayUnit(
+        _ unit: String,
+        quantity: Double?
+    ) -> String {
+
+        let normalized = normalizedUnit(unit)
+        let key = normalized.lowercased()
+
+        let singular =
+            pluralUnits[key] != nil
+                ? key
+                : pluralUnits.first { $0.value == key }?.key
+
+        guard let singular else {
+            return normalized
+        }
+
+        guard let quantity else {
+            return normalized
+        }
+
+        return quantity > 1
+            ? pluralUnits[singular] ?? normalized
+            : singular
+    }
+
+
+    // MARK: - Fraction Characters
+
+    /// "1/2" → "½". Every fraction `format` rounds to has one.
+    static let fractionGlyphs: [String: String] = [
+        "1/8": "⅛", "1/6": "⅙", "1/4": "¼", "1/3": "⅓",
+        "3/8": "⅜", "1/2": "½", "5/8": "⅝", "2/3": "⅔",
+        "3/4": "¾", "5/6": "⅚", "7/8": "⅞"
+    ]
+
+    /// "1½" → "1 1/2", "¾" → "3/4", so typed or displayed amounts
+    /// read back the same.
+    static func expandingFractionGlyphs(
+        _ value: String
+    ) -> String {
+        var result = ""
+        for character in value {
+            if let fraction =
+                fractionGlyphs.first(where: { $0.value == String(character) })?.key {
+                if let last = result.last, last.isNumber {
+                    result += " "
+                }
+                result += fraction
+            } else {
+                result.append(character)
+            }
+        }
+        return result
     }
 }

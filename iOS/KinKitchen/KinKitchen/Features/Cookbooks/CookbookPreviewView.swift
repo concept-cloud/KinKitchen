@@ -1000,7 +1000,12 @@ private struct CookbookRecipePage: View {
     ) -> String {
         [
             ingredient.quantity.map(IngredientQuantityFormatter.format),
-            cleaned(ingredient.unit),
+            cleaned(ingredient.unit).map {
+                IngredientQuantityFormatter.displayUnit(
+                    $0,
+                    quantity: ingredient.quantity
+                )
+            },
             ingredient.name
         ]
         .compactMap { $0 }
