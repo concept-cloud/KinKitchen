@@ -31,6 +31,9 @@ struct RecipesView: View {
     @State private var savingRecipeIds: Set<UUID> = []
     @State private var saveErrorMessage: String?
     @State private var isLoading = true
+    /// After the first load, coming back to the list (e.g. from a
+    /// recipe) refreshes quietly instead of showing the loader again.
+    @State private var hasLoaded = false
     @State private var errorMessage: String?
     @State private var showingAddRecipe = false
     @State private var selectedRecipeId: UUID?
@@ -126,8 +129,21 @@ struct RecipesView: View {
             }
             // MARK: - Load
             .task {
-                await loadRecipes()
-                await loadDietaryInsights()
+                guard hasLoaded else {
+                    await loadRecipes()
+                    await loadDietaryInsights()
+                    hasLoaded = errorMessage == nil
+                    return
+                }
+
+                // Back from a recipe: pick up edits, deletes and new
+                // shares without the loader. Dietary checks only rerun
+                // when the recipes actually changed.
+                let before = RecipeListSignature(combinedRecipes)
+                await loadRecipes(showsLoading: false)
+                if RecipeListSignature(combinedRecipes) != before {
+                    await loadDietaryInsights()
+                }
             }
         }
     }
@@ -1157,12 +1173,18 @@ Spacer()
     // MARK: - Load Recipes
 
     @MainActor
-    private func loadRecipes() async {
-        isLoading = true
-        errorMessage = nil
+    private func loadRecipes(
+        showsLoading: Bool = true
+    ) async {
+        if showsLoading {
+            isLoading = true
+            errorMessage = nil
+        }
 
         defer {
-            isLoading = false
+            if showsLoading {
+                isLoading = false
+            }
         }
 
         do {
@@ -1278,8 +1300,11 @@ Spacer()
                     )
             }
         } catch {
-            errorMessage =
-                "Please check your connection and try again."
+            // A failed quiet refresh keeps the list already showing.
+            if showsLoading {
+                errorMessage =
+                    "Please check your connection and try again."
+            }
 
             print(
                 "RECIPE LIST LOAD ERROR:",
@@ -1462,6 +1487,23 @@ Spacer()
         }
     }
 }
+/// What the list shows, to tell whether a refresh changed anything.
+nonisolated struct RecipeListSignature: Equatable {
+
+    private let entries: [Entry]
+
+    private struct Entry: Equatable {
+        let id: UUID
+        let updatedAt: String
+    }
+
+    init(_ recipes: [Recipe]) {
+        entries = recipes.map {
+            Entry(id: $0.id, updatedAt: $0.updatedAt)
+        }
+    }
+}
+
 #Preview {
     RecipesView()
 }

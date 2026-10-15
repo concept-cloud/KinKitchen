@@ -26,6 +26,10 @@ struct GatheringsView: View {
     @State private var selectedTab: GatheringTab = .upcoming
     
     @State private var isLoading = true
+
+    /// After the first load, coming back from an event refreshes
+    /// quietly instead of showing the loader again.
+    @State private var hasLoaded = false
     
     @State private var errorMessage: String?
     
@@ -60,8 +64,10 @@ struct GatheringsView: View {
             }
             .navigationBarHidden(true)
             .task {
-                
-                await loadGatherings()
+
+                await loadGatherings(
+                    showsLoading: !hasLoaded
+                )
             }
             .navigationDestination(
                 isPresented:
@@ -298,7 +304,8 @@ private extension GatheringsView {
             )
         }
         .refreshable {
-            await loadGatherings()
+            // Pull to refresh has its own spinner.
+            await loadGatherings(showsLoading: false)
         }
     }
 }
@@ -503,17 +510,17 @@ private extension GatheringsView {
 private extension GatheringsView {
 
     @MainActor
-    func loadGatherings() async {
+    func loadGatherings(
+        showsLoading: Bool = true
+    ) async {
 
-        isLoading =
-            true
-
-        errorMessage =
-            nil
+        if showsLoading {
+            isLoading = true
+            errorMessage = nil
+        }
 
         defer {
-            isLoading =
-                false
+            isLoading = false
         }
 
 
@@ -542,13 +549,17 @@ private extension GatheringsView {
                         .fetchPastGatheringItems()
             }
 
+            hasLoaded = true
+
         } catch {
 
-            gatherings =
-                []
+            // A failed quiet refresh keeps the list already showing.
+            if showsLoading {
+                gatherings = []
 
-            errorMessage =
-                "Please check your connection and try again."
+                errorMessage =
+                    "Please check your connection and try again."
+            }
 
             print(
                 "GATHERINGS LOAD ERROR:",

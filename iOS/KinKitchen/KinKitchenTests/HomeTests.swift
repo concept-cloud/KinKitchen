@@ -524,3 +524,40 @@ struct PluralUnitTests {
         #expect(IngredientQuantityFormatter.displayUnit("cup", quantity: nil) == "cup")
     }
 }
+
+
+// MARK: - Recipe List Refresh
+
+struct RecipeListSignatureTests {
+
+    private func recipe(
+        id: UUID = UUID(),
+        updatedAt: String = "2026-10-04T00:00:00Z"
+    ) -> Recipe {
+        Recipe(
+            id: id,
+            ownerId: UUID(),
+            name: "Sunday Gravy",
+            originalContributor: nil,
+            sourceRecipeId: nil,
+            originalRecipeId: nil,
+            createdAt: "2026-10-04T00:00:00Z",
+            updatedAt: updatedAt
+        )
+    }
+
+    @Test func unchangedListMatches() {
+        let soup = recipe()
+        #expect(RecipeListSignature([soup]) == RecipeListSignature([soup]))
+    }
+
+    @Test func editsAddsAndRemovalsAreNoticed() {
+        let id = UUID()
+        let original = recipe(id: id)
+        let edited = recipe(id: id, updatedAt: "2026-10-05T00:00:00Z")
+
+        #expect(RecipeListSignature([original]) != RecipeListSignature([edited]))
+        #expect(RecipeListSignature([original]) != RecipeListSignature([original, recipe()]))
+        #expect(RecipeListSignature([original]) != RecipeListSignature([]))
+    }
+}
