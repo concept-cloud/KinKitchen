@@ -27,6 +27,12 @@ struct AddDishView: View {
     @State private var potentialDuplicate: GatheringNeed?
     @State private var isShowingDuplicateWarning = false
 
+    /// The event's own dietary needs (nil until loaded) and how the
+    /// chosen recipe compares.
+    @State private var eventDietaryNeeds: [EventDietaryNeed]?
+    @State private var dietaryResult: RecipientRecipeDietaryCheckResult?
+    @State private var isCheckingDiet = false
+
     var body: some View {
         ZStack {
             KinColors.background
@@ -63,6 +69,65 @@ struct AddDishView: View {
             isPresented: $isShowingDuplicateWarning
         ) {
             duplicateWarningSheet
+        }
+        .task(id: selectedRecipe?.id) {
+            await checkSelectedRecipe()
+        }
+    }
+}
+
+// MARK: - Dietary Check
+
+private extension AddDishView {
+
+    @ViewBuilder
+    var dietaryCheck: some View {
+        if isCheckingDiet {
+            HStack(spacing: KinSpacing.small) {
+                ProgressView()
+                Text("Checking against this event's dietary needs...")
+                    .font(KinTypography.footnote)
+                    .foregroundStyle(KinColors.secondaryText)
+            }
+        } else if let dietaryResult {
+            EventDietaryWarning(result: dietaryResult)
+        }
+    }
+
+    @MainActor
+    func checkSelectedRecipe() async {
+
+        dietaryResult = nil
+
+        if eventDietaryNeeds == nil {
+            eventDietaryNeeds =
+                try? await EventDietaryService.fetchNeeds(
+                    gatheringId: gatheringId
+                )
+        }
+
+        guard
+            let recipeId = selectedRecipe?.id,
+            let needs = eventDietaryNeeds,
+            !needs.isEmpty
+        else {
+            return
+        }
+
+        isCheckingDiet = true
+        defer { isCheckingDiet = false }
+
+        do {
+            dietaryResult =
+                try await EventDietaryService.checkRecipe(
+                    recipeId: recipeId,
+                    against: needs,
+                    gatheringId: gatheringId
+                )
+        } catch {
+            if !(error is CancellationError) {
+                print("ADD DISH DIETARY CHECK ERROR:", error.localizedDescription)
+            }
         }
     }
 }
@@ -231,6 +296,8 @@ private extension AddDishView {
                 )
             }
             .buttonStyle(.plain)
+
+            dietaryCheck
         }
     }
 }

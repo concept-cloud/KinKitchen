@@ -59,6 +59,19 @@ enum RecipeDietaryCheckService {
                     for: recipientId
                 )
 
+        return try await checkRecipe(
+            recipeId: recipeId,
+            against: dietaryInformation
+        )
+    }
+
+    /// Checks a recipe against dietary needs already loaded, e.g. a
+    /// person's profile or an event's own list. `recipientId` on the
+    /// result is `dietaryInformation.userId`.
+    static func checkRecipe(
+        recipeId: UUID,
+        against dietaryInformation: RecipientDietaryInformation
+    ) async throws -> RecipientRecipeDietaryCheckResult {
         let evaluation =
             try await evaluateRecipe(
                 recipeId: recipeId,
@@ -85,7 +98,7 @@ enum RecipeDietaryCheckService {
 
         return RecipientRecipeDietaryCheckResult(
             recipeId: recipeId,
-            recipientId: recipientId,
+            recipientId: dietaryInformation.userId,
             state: allergenResult.state,
             dietaryInformation: dietaryInformation,
             allergenConflicts: allergenResult.conflicts,

@@ -18,6 +18,11 @@ struct AddGatheringView: View {
     @State private var name = ""
     @State private var theme = ""
     @State private var eventType: KinEventType?
+    @State private var dietaryNeeds: [EventDietaryNeed] = []
+
+    /// Set once the event is made, so a retry after the dietary needs
+    /// fail to save doesn't create it twice.
+    @State private var createdGatheringId: UUID?
     @State private var date = Date()
     @State private var time = Date()
     @State private var location = ""
@@ -313,6 +318,12 @@ private extension AddGatheringView {
 
             KinEventTypePicker(
                 selection: $eventType
+            )
+
+
+            EventDietaryNeedsField(
+                needs: $dietaryNeeds,
+                eventType: eventType
             )
 
 
@@ -787,8 +798,10 @@ private extension AddGatheringView {
         KinPrimaryButton(
             title:
                 isSaving
-                ? "Creating..."
-                : "Create Event"
+                ? "Saving..."
+                : createdGatheringId == nil
+                    ? "Create Event"
+                    : "Save Dietary Needs"
         ) {
 
             Task {
@@ -816,6 +829,16 @@ private extension AddGatheringView {
     func createGathering() async {
 
         errorMessage = nil
+
+        // Already made; only the dietary needs are left.
+        if let createdGatheringId {
+
+            await saveDietaryNeeds(
+                gatheringId: createdGatheringId
+            )
+
+            return
+        }
 
         let cleanName =
             name.trimmingCharacters(
@@ -857,6 +880,8 @@ private extension AddGatheringView {
             isSaving = false
         }
 
+        let gathering: Gathering
+
         do {
 
             var coverImagePath: String?
@@ -869,7 +894,7 @@ private extension AddGatheringView {
                     )
             }
 
-            _ =
+            gathering =
                 try await GatheringService
                     .createGathering(
                         name: cleanName,
@@ -895,7 +920,8 @@ private extension AddGatheringView {
                             guestLimit
                     )
 
-            dismiss()
+            createdGatheringId =
+                gathering.id
 
         } catch {
 
@@ -904,6 +930,53 @@ private extension AddGatheringView {
 
             print(
                 "CREATE GATHERING ERROR:",
+                error.localizedDescription
+            )
+
+            return
+        }
+
+        await saveDietaryNeeds(
+            gatheringId: gathering.id
+        )
+    }
+
+
+    /// Saves the needs for the new event, then closes. On failure the
+    /// screen stays so the needs can be retried.
+    @MainActor
+    func saveDietaryNeeds(
+        gatheringId: UUID
+    ) async {
+
+        guard !dietaryNeeds.isEmpty else {
+            dismiss()
+            return
+        }
+
+        isSaving = true
+
+        defer {
+            isSaving = false
+        }
+
+        do {
+
+            try await EventDietaryService
+                .saveNeeds(
+                    dietaryNeeds,
+                    gatheringId: gatheringId
+                )
+
+            dismiss()
+
+        } catch {
+
+            errorMessage =
+                "Your event was created, but its dietary needs didn't save. Tap Save Dietary Needs to try again."
+
+            print(
+                "EVENT DIETARY NEEDS SAVE ERROR:",
                 error.localizedDescription
             )
         }

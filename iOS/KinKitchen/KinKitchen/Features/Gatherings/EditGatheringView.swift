@@ -22,6 +22,12 @@ struct EditGatheringView: View {
     @State private var name: String
     @State private var theme: String
     @State private var eventType: KinEventType?
+    @State private var dietaryNeeds: [EventDietaryNeed] = []
+
+    /// nil until loaded. Needs are only saved once loaded, so a failed
+    /// load can't wipe them.
+    @State private var originalDietaryNeeds: [EventDietaryNeed]?
+    @State private var dietaryNeedsLoadFailed = false
     @State private var date: Date
     @State private var time: Date
     @State private var location: String
@@ -164,6 +170,9 @@ struct EditGatheringView: View {
             }
         }
         .navigationBarHidden(true)
+        .task {
+            await loadDietaryNeeds()
+        }
 
         .onChange(
             of: selectedPhotoItem
@@ -545,6 +554,29 @@ private extension EditGatheringView {
                 selection:
                     $eventType
             )
+
+
+            // MARK: Dietary Needs
+
+            if originalDietaryNeeds != nil {
+
+                EventDietaryNeedsField(
+                    needs: $dietaryNeeds,
+                    eventType: eventType
+                )
+
+            } else if dietaryNeedsLoadFailed {
+
+                Text(
+                    "Dietary needs couldn't be loaded. Go back and open Edit again to change them."
+                )
+                .font(
+                    KinTypography.footnote
+                )
+                .foregroundStyle(
+                    KinColors.secondaryText
+                )
+            }
 
 
             // MARK: Theme
@@ -1436,6 +1468,35 @@ private extension EditGatheringView {
                     .coverImagePath
 
 
+            if let originalDietaryNeeds,
+               Set(originalDietaryNeeds) != Set(dietaryNeeds) {
+
+                do {
+
+                    try await EventDietaryService
+                        .saveNeeds(
+                            dietaryNeeds,
+                            gatheringId: gathering.id
+                        )
+
+                    self.originalDietaryNeeds =
+                        dietaryNeeds
+
+                } catch {
+
+                    errorMessage =
+                        "Your changes saved, but the dietary needs didn't. Please try again."
+
+                    print(
+                        "EVENT DIETARY NEEDS SAVE ERROR:",
+                        error.localizedDescription
+                    )
+
+                    return
+                }
+            }
+
+
             dismiss()
 
         } catch {
@@ -1448,6 +1509,45 @@ private extension EditGatheringView {
                 "EDIT GATHERING ERROR:",
                 error.localizedDescription
             )
+        }
+    }
+}
+
+
+// MARK: - Dietary Needs
+
+private extension EditGatheringView {
+
+    @MainActor
+    func loadDietaryNeeds() async {
+
+        guard originalDietaryNeeds == nil else {
+            return
+        }
+
+        do {
+
+            let needs =
+                try await EventDietaryService
+                    .fetchNeeds(
+                        gatheringId: gathering.id
+                    )
+
+            dietaryNeeds = needs
+            originalDietaryNeeds = needs
+            dietaryNeedsLoadFailed = false
+
+        } catch {
+
+            if !(error is CancellationError) {
+
+                dietaryNeedsLoadFailed = true
+
+                print(
+                    "EVENT DIETARY NEEDS LOAD ERROR:",
+                    error.localizedDescription
+                )
+            }
         }
     }
 }

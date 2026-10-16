@@ -36,6 +36,7 @@ struct GatheringNeedDetailView: View {
     @State private var needQuantityText = ""
     @State private var isSavingNeed = false
     @State private var needEditErrorMessage: String?
+    @State private var dietaryResult: RecipientRecipeDietaryCheckResult?
 
     init(
         need: GatheringNeed,
@@ -74,6 +75,12 @@ struct GatheringNeedDetailView: View {
 
                         if let recipe {
                             recipeSection(recipe)
+
+                            if let dietaryResult {
+                                EventDietaryWarning(
+                                    result: dietaryResult
+                                )
+                            }
                         }
 
                         dishesNeededSection
@@ -123,6 +130,43 @@ struct GatheringNeedDetailView: View {
         }
         .task {
             await loadDetails()
+        }
+        .task(id: recipe?.id) {
+            await checkRecipeAgainstEvent()
+        }
+    }
+}
+
+// MARK: - Dietary Check
+
+private extension GatheringNeedDetailView {
+
+    /// Compares the dish's recipe with the event's own dietary needs.
+    /// Shows nothing when the event has none or the check fails.
+    @MainActor
+    func checkRecipeAgainstEvent() async {
+
+        guard let recipeId = recipe?.id else {
+            dietaryResult = nil
+            return
+        }
+
+        do {
+            let needs =
+                try await EventDietaryService.fetchNeeds(
+                    gatheringId: currentNeed.gatheringId
+                )
+
+            dietaryResult =
+                try await EventDietaryService.checkRecipe(
+                    recipeId: recipeId,
+                    against: needs,
+                    gatheringId: currentNeed.gatheringId
+                )
+        } catch {
+            if !(error is CancellationError) {
+                print("DISH DIETARY CHECK ERROR:", error.localizedDescription)
+            }
         }
     }
 }

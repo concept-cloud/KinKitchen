@@ -133,6 +133,7 @@ enum GatheringChangeField:
     case location
     case theme
     case eventType
+    case dietaryNeeds
     case guestLimit
     case description
     case coverPhoto
@@ -164,6 +165,7 @@ extension KinNotification {
             ("theme changed", .theme),
             ("theme removed", .theme),
             ("event type changed", .eventType),
+            ("dietary needs updated", .dietaryNeeds),
             ("guest limit", .guestLimit),
             ("description updated", .description),
             ("cover photo updated", .coverPhoto)

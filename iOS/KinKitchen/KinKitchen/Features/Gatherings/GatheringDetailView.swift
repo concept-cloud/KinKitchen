@@ -35,6 +35,7 @@ struct GatheringDetailView: View {
     @State private var gatheringNeeds: [GatheringNeed] = []
     @State private var gatheringClaims: [GatheringNeedClaim] = []
     @State private var gatheringRequirements: [GatheringNeedRequirement] = []
+    @State private var dietaryNeeds: [EventDietaryNeed] = []
     
     @State private var contributorProfiles: [Profile] = []
     @State private var currentUserId: UUID?
@@ -1937,6 +1938,17 @@ private extension GatheringDetailView {
                 gathering
             )
 
+            if !dietaryNeeds.isEmpty {
+
+                EventDietaryNeedsCard(
+                    needs: dietaryNeeds,
+                    isHighlighted:
+                        highlightedFields.contains(
+                            .dietaryNeeds
+                        )
+                )
+            }
+
             dishesSection
 
             suppliesSection
@@ -3044,6 +3056,17 @@ private extension GatheringDetailView {
 
             gathering =
                 loadedGathering
+
+            // Shown when they load; a failure keeps what was showing.
+            if let loadedDietaryNeeds =
+                try? await EventDietaryService
+                    .fetchNeeds(
+                        gatheringId: gatheringId
+                    ) {
+
+                dietaryNeeds =
+                    loadedDietaryNeeds
+            }
 
             gatheringNeeds =
                 loadedNeeds
