@@ -578,10 +578,9 @@ private extension AddGatheringView {
             systemImage: KinIcons.location,
             tint: KinColors.success
         ) {
-            inputField(
-                "Address or place, e.g. Grandma's house",
-                text: $location,
-                field: .location
+            KinAddressField(
+                placeholder: "Search an address or place",
+                text: $location
             )
         }
     }

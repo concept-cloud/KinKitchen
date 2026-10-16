@@ -635,11 +635,13 @@ private extension EditGatheringView {
                 "Location"
             )
 
-            KinTextField(
-                title:
-                    "Location",
+            KinAddressField(
+                placeholder:
+                    "Search an address or place",
                 text:
-                    $location
+                    $location,
+                background:
+                    KinColors.surface
             )
 
 

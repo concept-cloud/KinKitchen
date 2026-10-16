@@ -631,29 +631,17 @@ private extension GatheringDetailView {
                 gathering.location,
                !location.isEmpty {
 
-                Label {
-
-                    Text(
-                        location
-                    )
-
-                } icon: {
-
-                    Image(
-                        systemName:
-                            "mappin.and.ellipse"
-                    )
-                }
-                .font(
-                    KinTypography.body
+                // Map with directions in Apple or Google Maps.
+                EventLocationCard(
+                    address: location,
+                    isHighlighted:
+                        highlightedFields.contains(
+                            .location
+                        )
                 )
-                .foregroundStyle(
-                    KinColors.secondaryText
-                )
-                .kinChangeHighlight(
-                    highlightedFields.contains(
-                        .location
-                    )
+                .padding(
+                    .top,
+                    KinSpacing.xSmall
                 )
             }
         }
