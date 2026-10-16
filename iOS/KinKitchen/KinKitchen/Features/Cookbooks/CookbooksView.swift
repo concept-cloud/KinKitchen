@@ -50,7 +50,11 @@ struct CookbooksView: View {
                 }
 
                 VStack(spacing: 0) {
-                    header
+                    // On the shelf the header scrolls with the books
+                    // (see cookbookList).
+                    if !showsShelf {
+                        header
+                    }
                     content
                 }
             }
@@ -200,10 +204,6 @@ private extension CookbooksView {
 
     @ViewBuilder
     var content: some View {
-        if showsShelf {
-            searchBar
-        }
-
         if isLoading {
             loadingState
         } else if let errorMessage {
@@ -222,8 +222,15 @@ private extension CookbooksView {
 
     /// A bookshelf: two books to a shelf, scrolling up and down, with
     /// a "New Cookbook" book after the last one.
+    ///
+    /// The title and search scroll with the shelves. A scroll area
+    /// cuts off anything drawn past its top edge, and a book lifting
+    /// or opening reaches above its shelf; with the header inside,
+    /// there's always room above the top shelf.
     var cookbookList: some View {
         ScrollView {
+            header
+            searchBar
             LazyVStack(
                 spacing: KinSpacing.xxLarge
             ) {
@@ -246,11 +253,9 @@ private extension CookbooksView {
                     shelfRow(shelf)
                 }
             }
-            // Room above the top shelf so a book lifting off it
-            // isn't cut off by the edge of the scroll area.
             .padding(
                 .top,
-                KinSpacing.xLarge
+                KinSpacing.large
             )
             .padding(
                 .bottom,
@@ -305,7 +310,10 @@ private extension CookbooksView {
 
         case .cookbook(let id):
             if let cookbook = cookbooks.first(where: { $0.id == id }) {
-                KinShelfBookButton {
+                KinShelfBookButton(
+                    transitionID: cookbook.id,
+                    namespace: shelfNamespace
+                ) {
                     navigationPath.append(cookbook.id)
                 } label: {
                     KinCookbookCoverCard(
@@ -317,7 +325,6 @@ private extension CookbooksView {
                         isShelfBook: true
                     )
                 }
-                .matchedTransitionSource(id: cookbook.id, in: shelfNamespace)
                 .accessibilityHint("Opens the cookbook")
             }
 
