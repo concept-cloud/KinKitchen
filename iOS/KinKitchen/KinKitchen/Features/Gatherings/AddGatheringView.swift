@@ -40,6 +40,10 @@ struct AddGatheringView: View {
     @State private var errorMessage: String?
 
     @State private var isCalendarShown = false
+
+    /// Meal Train length in days, counting the first and last.
+    @State private var rangeDays = 14
+    @State private var isEndCalendarShown = false
     @State private var scrolledPastHero = false
 
     @FocusState private var focusedField: Field?
@@ -52,6 +56,17 @@ struct AddGatheringView: View {
     }
 
     private static let heroHeight: CGFloat = 300
+
+    private var isDateRange: Bool {
+        eventType == .mealTrain
+    }
+
+    /// Last day, at the drop-off time; nil for one-day events.
+    private var endsAt: Date? {
+        isDateRange
+            ? EventDateRange.lastDay(from: combinedDateAndTime(), days: rangeDays)
+            : nil
+    }
 
     private var cleanName: String {
         name.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -145,6 +160,7 @@ struct AddGatheringView: View {
         .navigationBarHidden(true)
         .sensoryFeedback(.selection, trigger: eventType)
         .sensoryFeedback(.selection, trigger: combinedDateAndTime())
+        .sensoryFeedback(.selection, trigger: rangeDays)
         .onChange(
             of: selectedPhotoItem
         ) { _, newItem in
@@ -265,7 +281,10 @@ private extension AddGatheringView {
 
     var heroSummary: String {
         let start = combinedDateAndTime()
-        let when = start.formatted(.dateTime.weekday(.wide).month(.abbreviated).day())
+        let when = endsAt.map {
+            EventDateRange.rangeText(from: start, to: $0)
+                + " · " + EventDateRange.lengthText(rangeDays)
+        } ?? start.formatted(.dateTime.weekday(.wide).month(.abbreviated).day())
             + " at " + start.formatted(date: .omitted, time: .shortened)
         let place = location.trimmingCharacters(in: .whitespacesAndNewlines)
         return place.isEmpty ? when : "\(when) · \(place)"
@@ -349,11 +368,14 @@ private extension AddGatheringView {
             title: "When",
             systemImage: KinIcons.calendar,
             tint: KinColors.warning,
-            subtitle: combinedDateAndTime()
-                .formatted(.dateTime.weekday(.wide).month(.wide).day().hour().minute())
+            subtitle: whenSummary
         ) {
 
             VStack(alignment: .leading, spacing: KinSpacing.medium) {
+
+                if isDateRange {
+                    rowLabel("First Day")
+                }
 
                 chipRow {
                     ForEach(EventDateChoices.quickDates(), id: \.self) { choice in
@@ -393,8 +415,17 @@ private extension AddGatheringView {
                     .transition(.opacity.combined(with: .move(edge: .top)))
                 }
 
+                if isDateRange {
+                    lastDaySection
+                        .transition(.opacity.combined(with: .move(edge: .top)))
+                }
+
                 Divider()
                     .overlay(KinColors.secondaryText.opacity(0.15))
+
+                if isDateRange {
+                    rowLabel("Drop-off Time Each Day")
+                }
 
                 HStack(spacing: KinSpacing.small) {
 
@@ -424,6 +455,82 @@ private extension AddGatheringView {
                 }
             }
         }
+    }
+
+    var whenSummary: String {
+        let start = combinedDateAndTime()
+        guard let endsAt else {
+            return start.formatted(.dateTime.weekday(.wide).month(.wide).day().hour().minute())
+        }
+        return EventDateRange.rangeText(from: start, to: endsAt)
+            + " · " + start.formatted(date: .omitted, time: .shortened) + " drop-off"
+    }
+
+    func rowLabel(_ title: String) -> some View {
+        Text(title)
+            .font(KinTypography.caption.weight(.semibold))
+            .textCase(.uppercase)
+            .foregroundStyle(KinColors.secondaryText)
+    }
+
+    /// How long a Meal Train runs: quick lengths, or a last day from
+    /// the calendar.
+    var lastDaySection: some View {
+
+        VStack(alignment: .leading, spacing: KinSpacing.medium) {
+
+            Divider()
+                .overlay(KinColors.secondaryText.opacity(0.15))
+
+            rowLabel("How Long")
+
+            chipRow {
+                ForEach(EventDateRange.quickLengths, id: \.self) { days in
+                    EventChoiceChip(
+                        title: EventDateRange.lengthText(days),
+                        isSelected: !isEndCalendarShown && rangeDays == days
+                    ) {
+                        withAnimation(.snappy) {
+                            rangeDays = days
+                            isEndCalendarShown = false
+                        }
+                    }
+                }
+
+                EventChoiceChip(
+                    title: "Pick Last Day",
+                    systemImage: KinIcons.calendar,
+                    isSelected: isEndCalendarShown
+                        || !EventDateRange.quickLengths.contains(rangeDays)
+                ) {
+                    withAnimation(.snappy) {
+                        isEndCalendarShown.toggle()
+                    }
+                }
+            }
+
+            if isEndCalendarShown {
+                DatePicker(
+                    "Last Day",
+                    selection: lastDayBinding,
+                    in: date...,
+                    displayedComponents: .date
+                )
+                .datePickerStyle(.graphical)
+                .labelsHidden()
+                .tint(KinColors.primary)
+                .transition(.opacity.combined(with: .move(edge: .top)))
+            }
+        }
+    }
+
+    /// The calendar edits the length, so the range keeps its length
+    /// when the first day moves.
+    var lastDayBinding: Binding<Date> {
+        Binding(
+            get: { EventDateRange.lastDay(from: date, days: rangeDays) },
+            set: { rangeDays = EventDateRange.dayCount(from: date, to: $0) }
+        )
     }
 
     var isQuickDate: Bool {
@@ -796,6 +903,8 @@ private extension AddGatheringView {
                             ),
                         startsAt:
                             startsAt,
+                        endsAt:
+                            endsAt,
                         guestLimit:
                             guestLimit
                     )

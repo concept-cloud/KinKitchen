@@ -151,7 +151,12 @@ struct HomeSearchView: View {
 
                             row(
                                 title: item.gathering.name,
-                                detail: HomeView.eventDateText(
+                                detail: item.gathering.endsAt.map {
+                                    EventDateRange.summary(
+                                        from: item.gathering.startsAt,
+                                        to: $0
+                                    )
+                                } ?? HomeView.eventDateText(
                                     item.gathering.startsAt
                                 ),
                                 icon: KinIcons.gatherings

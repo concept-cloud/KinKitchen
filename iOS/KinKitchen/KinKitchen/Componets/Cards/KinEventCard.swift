@@ -187,7 +187,10 @@ struct KinEventCard: View {
     }
 
     private var dateText: String {
-        isPast
+        if let end = event.endsAt {
+            return EventDateRange.summary(from: event.startsAt, to: end)
+        }
+        return isPast
             ? event.startsAt.formatted(date: .abbreviated, time: .shortened)
             : HomeView.eventDateText(event.startsAt)
     }

@@ -21,6 +21,7 @@ enum GatheringService {
         description: String?,
         location: String?,
         startsAt: Date,
+        endsAt: Date?,
         guestLimit: Int?
     ) async throws -> Gathering {
 
@@ -55,6 +56,8 @@ enum GatheringService {
                     ),
                 startsAt:
                     startsAt,
+                endsAt:
+                    endsAt,
                 guestLimit:
                     guestLimit
             )
@@ -122,7 +125,7 @@ enum GatheringService {
                             .rawValue
                 )
                 .gte(
-                    "starts_at",
+                    "active_through",
                     value: now.addingTimeInterval(-Gathering.activeWindowAfterStart)
                 )
                 .order(
@@ -179,7 +182,7 @@ enum GatheringService {
                             .rawValue
                 )
                 .gte(
-                    "starts_at",
+                    "active_through",
                     value: now.addingTimeInterval(-Gathering.activeWindowAfterStart)
                 )
                 .order(
@@ -329,6 +332,7 @@ enum GatheringService {
         description: String?,
         location: String?,
         startsAt: Date,
+        endsAt: Date?,
         guestLimit: Int?
     ) async throws -> Gathering {
 
@@ -343,6 +347,9 @@ enum GatheringService {
             let description: String?
             let location: String?
             let startsAt: Date
+            /// nil for one-day events. Left out of the call, which the
+            /// database reads as "no end" whenever a type is sent.
+            let endsAt: Date?
             let guestLimit: Int?
 
             enum CodingKeys:
@@ -372,6 +379,9 @@ enum GatheringService {
 
                 case startsAt =
                     "p_starts_at"
+
+                case endsAt =
+                    "p_ends_at"
 
                 case guestLimit =
                     "p_guest_limit"
@@ -403,6 +413,7 @@ enum GatheringService {
                         location
                     ),
                 startsAt: startsAt,
+                endsAt: endsAt,
                 guestLimit: guestLimit
             )
 
@@ -624,7 +635,7 @@ enum GatheringService {
                             .rawValue
                 )
                 .gte(
-                    "starts_at",
+                    "active_through",
                     value: now.addingTimeInterval(-Gathering.activeWindowAfterStart)
                 )
                 .order(
@@ -727,7 +738,7 @@ enum GatheringService {
                             .rawValue
                 )
                 .gte(
-                    "starts_at",
+                    "active_through",
                     value:
                         now.addingTimeInterval(-Gathering.activeWindowAfterStart)
                 )
@@ -855,7 +866,7 @@ enum GatheringService {
                     ]
                 )
                 .gte(
-                    "starts_at",
+                    "active_through",
                     value:
                         now.addingTimeInterval(-Gathering.activeWindowAfterStart)
                 )

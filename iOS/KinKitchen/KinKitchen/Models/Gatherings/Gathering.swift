@@ -26,6 +26,9 @@ struct Gathering:
     var description: String?
     var location: String?
     var startsAt: Date
+    /// Last day of an event that runs over several days, like a Meal
+    /// Train. nil for one-day events.
+    var endsAt: Date? = nil
     var guestLimit: Int?
     var status: GatheringStatus
 
@@ -58,6 +61,9 @@ struct Gathering:
 
         case startsAt =
             "starts_at"
+
+        case endsAt =
+            "ends_at"
 
         case guestLimit =
             "guest_limit"
@@ -97,10 +103,24 @@ extension Gathering {
         12 * 60 * 60
 
 
-    /// When the gathering automatically moves to History.
+    /// The last day it runs: the end for a date range, otherwise
+    /// the start. Matches `gatherings.active_through`.
+    var activeThrough: Date {
+        endsAt ?? startsAt
+    }
+
+
+    /// Runs over more than one day, like a Meal Train.
+    var isDateRange: Bool {
+        endsAt != nil
+    }
+
+
+    /// When the gathering automatically moves to History: after
+    /// the last day for a date range.
     var autoCompletesAt: Date {
 
-        startsAt.addingTimeInterval(
+        activeThrough.addingTimeInterval(
             Self.activeWindowAfterStart
         )
     }
@@ -195,6 +215,7 @@ struct GatheringCreate:
     let description: String?
     let location: String?
     let startsAt: Date
+    let endsAt: Date?
     let guestLimit: Int?
 
 
@@ -222,6 +243,9 @@ struct GatheringCreate:
         case startsAt =
             "starts_at"
 
+        case endsAt =
+            "ends_at"
+
         case guestLimit =
             "guest_limit"
     }
@@ -240,6 +264,7 @@ struct GatheringUpdate:
     let description: String?
     let location: String?
     let startsAt: Date
+    let endsAt: Date?
     let guestLimit: Int?
 
 
@@ -263,6 +288,9 @@ struct GatheringUpdate:
 
         case startsAt =
             "starts_at"
+
+        case endsAt =
+            "ends_at"
 
         case guestLimit =
             "guest_limit"

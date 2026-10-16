@@ -556,11 +556,37 @@ private extension GatheringDetailView {
 
             Label {
 
-                Text(
-                    formattedDateTime(
-                        gathering.startsAt
+                if let end =
+                    gathering.endsAt {
+
+                    // A Meal Train or other date range.
+                    VStack(
+                        alignment: .leading,
+                        spacing: KinSpacing.xxSmall
+                    ) {
+                        Text(
+                            EventDateRange.rangeText(
+                                from: gathering.startsAt,
+                                to: end
+                            )
+                        )
+
+                        Text(
+                            "\(EventDateRange.lengthText(EventDateRange.dayCount(from: gathering.startsAt, to: end))) · \(gathering.startsAt.formatted(date: .omitted, time: .shortened)) drop-off each day"
+                        )
+                        .font(
+                            KinTypography.footnote
+                        )
+                    }
+
+                } else {
+
+                    Text(
+                        formattedDateTime(
+                            gathering.startsAt
+                        )
                     )
-                )
+                }
 
             } icon: {
 

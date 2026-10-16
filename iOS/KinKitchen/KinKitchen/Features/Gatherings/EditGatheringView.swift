@@ -30,6 +30,9 @@ struct EditGatheringView: View {
     @State private var dietaryNeedsLoadFailed = false
     @State private var date: Date
     @State private var time: Date
+
+    /// Last day of a Meal Train. Only used for that type.
+    @State private var endDate: Date
     @State private var location: String
     @State private var description: String
     @State private var guestLimit: Int?
@@ -83,6 +86,15 @@ struct EditGatheringView: View {
         _eventType = State(
             initialValue:
                 gathering.eventType
+        )
+
+        _endDate = State(
+            initialValue:
+                gathering.endsAt
+                ?? EventDateRange.lastDay(
+                    from: gathering.startsAt,
+                    days: 14
+                )
         )
 
         _date = State(
@@ -598,6 +610,14 @@ private extension EditGatheringView {
             dateSection
 
 
+            // MARK: Last Day
+
+            if eventType == .mealTrain {
+
+                lastDaySection
+            }
+
+
             // MARK: Time
 
             timeSection
@@ -656,6 +676,82 @@ private extension EditGatheringView {
 // MARK: - Date
 
 private extension EditGatheringView {
+
+    /// How long a Meal Train runs.
+    var lastDaySection: some View {
+
+        VStack(
+            alignment: .leading,
+            spacing: KinSpacing.small
+        ) {
+
+            fieldLabel(
+                "Last Day"
+            )
+
+            HStack {
+
+                Text(
+                    EventDateRange.lengthText(
+                        EventDateRange.dayCount(
+                            from: date,
+                            to: max(endDate, date)
+                        )
+                    )
+                    + " · drop-off each day"
+                )
+                .font(
+                    KinTypography.body
+                )
+                .foregroundStyle(
+                    KinColors.secondaryText
+                )
+
+                Spacer()
+
+                DatePicker(
+                    "Last Day",
+                    selection: $endDate,
+                    in: date...,
+                    displayedComponents: .date
+                )
+                .labelsHidden()
+                .datePickerStyle(.compact)
+                .tint(KinColors.primary)
+            }
+            .padding(
+                KinSpacing.medium
+            )
+            .background(
+                KinColors.surface
+            )
+            .clipShape(
+                RoundedRectangle(
+                    cornerRadius:
+                        KinRadius.medium
+                )
+            )
+        }
+    }
+
+
+    /// The Meal Train's last day at the drop-off time; nil for
+    /// one-day events.
+    var endsAt: Date? {
+
+        guard eventType == .mealTrain else {
+            return nil
+        }
+
+        return EventDateRange.lastDay(
+            from: combinedDateAndTime(),
+            days: EventDateRange.dayCount(
+                from: date,
+                to: max(endDate, date)
+            )
+        )
+    }
+
 
     var dateSection: some View {
 
@@ -1397,10 +1493,25 @@ private extension EditGatheringView {
             combinedDateAndTime()
 
 
-        guard startsAt > Date() else {
+        // A Meal Train that's already running can still be edited
+        // as long as its first day stays the same.
+        let isRunningRange =
+            eventType == .mealTrain
+            && abs(startsAt.timeIntervalSince(gathering.startsAt)) < 60
+
+        guard startsAt > Date() || isRunningRange else {
 
             errorMessage =
                 "Please select a future date and time."
+
+            return
+        }
+
+        if let endsAt,
+           endsAt < Date() {
+
+            errorMessage =
+                "Please pick a last day that hasn't passed."
 
             return
         }
@@ -1458,6 +1569,8 @@ private extension EditGatheringView {
                             ),
                         startsAt:
                             startsAt,
+                        endsAt:
+                            endsAt,
                         guestLimit:
                             guestLimit
                     )
