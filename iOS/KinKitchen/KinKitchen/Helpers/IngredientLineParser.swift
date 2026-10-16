@@ -170,3 +170,54 @@ nonisolated enum IngredientLineParser {
         return names
     }()
 }
+
+
+// MARK: - While Typing
+
+/// What Add Recipe shows under a typed ingredient, and the quick keys
+/// above the keyboard.
+nonisolated enum IngredientLinePreview {
+
+    /// Fractions first, then the most used units.
+    static let quickKeys = [
+        "½", "⅓", "¼", "¾", "⅔", "⅛",
+        "cup", "Tbsp", "tsp", "oz", "lb", "g", "pinch", "clove", "can"
+    ]
+
+    /// "2 cups · flour" once the line has an amount or unit; nil
+    /// when there's nothing to show beyond what was typed.
+    static func text(for line: String) -> String? {
+
+        let parsed = IngredientLineParser.ingredient(
+            from: line.trimmingCharacters(in: .whitespacesAndNewlines)
+        )
+
+        guard
+            !parsed.name.isEmpty,
+            !parsed.quantity.isEmpty || !parsed.unit.isEmpty
+        else {
+            return nil
+        }
+
+        let measurement = IngredientQuantityFormatter.formattedMeasurement(
+            quantity: IngredientQuantityFormatter.parse(parsed.quantity),
+            unit: parsed.unit.isEmpty ? nil : parsed.unit
+        )
+
+        return "\(measurement) · \(parsed.name)"
+    }
+
+    /// A fraction sits right after a number ("1½"); anything else
+    /// gets a space before and after ("2 cup ").
+    static func appending(_ key: String, to line: String) -> String {
+
+        let isFraction = IngredientQuantityFormatter.fractionGlyphs.values.contains(key)
+
+        if isFraction {
+            return line + key
+        }
+
+        let trimmed = line.hasSuffix(" ") || line.isEmpty ? line : line + " "
+        return trimmed + key + " "
+    }
+}

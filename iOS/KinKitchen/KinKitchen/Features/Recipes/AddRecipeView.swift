@@ -127,6 +127,13 @@ struct AddRecipeView: View {
             }
         }
         .navigationBarHidden(true)
+        .toolbar {
+            ToolbarItemGroup(placement: .keyboard) {
+                if let id = focusedIngredientNameId {
+                    ingredientKeyBar(for: id)
+                }
+            }
+        }
         .sensoryFeedback(.selection, trigger: selectedCategory)
         .sensoryFeedback(.selection, trigger: servings)
         .sensoryFeedback(.selection, trigger: ingredients.count)
@@ -378,7 +385,7 @@ struct AddRecipeView: View {
             title: "Ingredients",
             systemImage: KinIcons.ingredients,
             tint: KinColors.success,
-            subtitle: "Amount, unit, then the ingredient. Drag ≡ to reorder."
+            subtitle: "Type each one like \"2 cups flour\". Return adds the next. Drag ≡ to reorder."
         ) {
 
             VStack(spacing: KinSpacing.small) {
@@ -426,30 +433,34 @@ struct AddRecipeView: View {
     private func ingredientRow(index: Int) -> some View {
         let ingredient = ingredients[index]
 
-        return HStack(spacing: KinSpacing.small) {
+        return HStack(alignment: .top, spacing: KinSpacing.small) {
 
-            // Kitchen keyboards: fractions for the amount, common
-            // units for the unit, then on to the name.
-            KinMeasureFields(
-                quantity: $ingredients[index].quantity,
-                unit: $ingredients[index].unit,
-                quantityWidth: 58,
-                unitWidth: 66
-            ) {
-                focusedIngredientNameId = ingredient.id
-            }
+            // Typed as one line, e.g. "2 cups flour". The amount,
+            // unit and ingredient are worked out for you.
+            VStack(alignment: .leading, spacing: KinSpacing.xxSmall) {
 
-            TextField(
-                "Ingredient",
-                text: $ingredients[index].name
-            )
-            .focused($focusedIngredientNameId, equals: ingredient.id)
-            .submitLabel(.next)
-            .onSubmit {
-                // Return goes to the next ingredient, adding one at
-                // the end.
-                addIngredient(after: ingredient.id)
+                TextField(
+                    index == 0 ? "e.g. 2 cups flour" : "Next ingredient",
+                    text: $ingredients[index].line,
+                    axis: .vertical
+                )
+                .lineLimit(1...3)
+                .focused($focusedIngredientNameId, equals: ingredient.id)
+                .onChange(of: ingredients[index].line) { _, newValue in
+                    splitIngredient(id: ingredient.id, text: newValue)
+                }
+
+                if let understood = IngredientLinePreview.text(for: ingredient.line) {
+                    Label(understood, systemImage: "checkmark")
+                        .font(KinTypography.caption)
+                        .foregroundStyle(KinColors.success)
+                        .labelStyle(.titleAndIcon)
+                        .transition(.opacity)
+                        .accessibilityLabel("Reads as \(understood)")
+                }
             }
+            .padding(.vertical, 8)
+            .animation(.easeOut(duration: 0.15), value: ingredient.line)
 
             if ingredients.count > 1 {
                 Button {
@@ -461,7 +472,8 @@ struct AddRecipeView: View {
                         .foregroundStyle(KinColors.secondaryText.opacity(0.5))
                 }
                 .buttonStyle(.plain)
-                .accessibilityLabel("Remove \(ingredient.name.isEmpty ? "ingredient" : ingredient.name)")
+                .padding(.top, 10)
+                .accessibilityLabel("Remove \(ingredient.line.isEmpty ? "ingredient" : ingredient.line)")
             }
 
             Image(systemName: "line.3.horizontal")
@@ -547,6 +559,35 @@ struct AddRecipeView: View {
             ingredients.append(draft)
         }
         focusedIngredientNameId = draft.id
+    }
+
+
+    /// Return moves to the next ingredient; pasting several lines
+    /// makes one ingredient per line.
+    private func splitIngredient(id: UUID, text: String) {
+
+        guard
+            text.contains(where: \.isNewline),
+            let index = ingredients.firstIndex(where: { $0.id == id })
+        else {
+            return
+        }
+
+        let lines = text.components(separatedBy: .newlines)
+        let rest = IngredientLineParser.lines(from: lines.dropFirst().joined(separator: "\n"))
+
+        ingredients[index].line = IngredientLineParser.strippingListMarker(lines[0])
+
+        guard !rest.isEmpty else {
+            addIngredient(after: id)
+            return
+        }
+
+        let newRows = rest.map { IngredientDraft(line: $0) }
+        withAnimation(.snappy) {
+            ingredients.insert(contentsOf: newRows, at: index + 1)
+        }
+        focusedIngredientNameId = newRows.last?.id
     }
 
 
@@ -752,6 +793,32 @@ struct AddRecipeView: View {
     }
 
 
+    /// Above the keyboard while typing an ingredient: fractions and
+    /// common units, added to the end of the line.
+    private func ingredientKeyBar(for id: UUID) -> some View {
+
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: KinSpacing.xSmall) {
+                ForEach(IngredientLinePreview.quickKeys, id: \.self) { key in
+                    Button(key) {
+                        guard let index = ingredients.firstIndex(where: { $0.id == id }) else {
+                            return
+                        }
+                        ingredients[index].line =
+                            IngredientLinePreview.appending(key, to: ingredients[index].line)
+                    }
+                    .font(KinTypography.callout.weight(.semibold))
+                    .foregroundStyle(KinColors.primaryText)
+                    .padding(.horizontal, KinSpacing.small)
+                    .padding(.vertical, KinSpacing.xSmall)
+                    .background(KinColors.surface, in: Capsule())
+                    .buttonStyle(.plain)
+                    .accessibilityLabel(MeasureKeyboardText.spokenName(for: key))
+                }
+            }
+        }
+    }
+
     /// "Add" and "Paste a List" side by side under a list.
     private func addRowButtons(
         addTitle: String,
@@ -793,8 +860,8 @@ struct AddRecipeView: View {
     private func addPasted(_ text: String, mode: PasteListSheet.Mode) {
         switch mode {
         case .ingredients:
-            let parsed = IngredientLineParser.ingredients(from: text).map {
-                IngredientDraft(quantity: $0.quantity, unit: $0.unit, name: $0.name)
+            let parsed = IngredientLineParser.lines(from: text).map {
+                IngredientDraft(line: $0)
             }
             guard !parsed.isEmpty else { return }
             withAnimation(.snappy) {
@@ -1092,13 +1159,7 @@ struct AddRecipeView: View {
 
     private func ingredientCardPreview(_ ingredient: IngredientDraft) -> some View {
         HStack(spacing: KinSpacing.small) {
-            Text(ingredient.quantity.isEmpty ? "Qty" : ingredient.quantity)
-                .frame(width: 65)
-
-            Text(ingredient.unit.isEmpty ? "Unit" : ingredient.unit)
-                .frame(width: 75)
-
-            Text(ingredient.name.isEmpty ? "Ingredient" : ingredient.name)
+            Text(ingredient.line.isEmpty ? "Ingredient" : ingredient.line)
                 .lineLimit(1)
 
             Spacer()
@@ -1441,10 +1502,15 @@ struct AddRecipeView: View {
         }
     }
 
+    /// Each typed line split into amount, unit and name for saving.
     private var cleanedIngredients: [IngredientDraft] {
         ingredients.compactMap { ingredient in
+            let parsed = IngredientLineParser.ingredient(
+                from: ingredient.line.trimmingCharacters(in: .whitespacesAndNewlines)
+            )
+
             let cleanName =
-                ingredient.name.trimmingCharacters(in: .whitespacesAndNewlines)
+                parsed.name.trimmingCharacters(in: .whitespacesAndNewlines)
 
             guard !cleanName.isEmpty else {
                 return nil
@@ -1452,8 +1518,9 @@ struct AddRecipeView: View {
 
             return IngredientDraft(
                 id: ingredient.id,
-                quantity: ingredient.quantity.trimmingCharacters(in: .whitespacesAndNewlines),
-                unit: ingredient.unit.trimmingCharacters(in: .whitespacesAndNewlines),
+                line: ingredient.line,
+                quantity: parsed.quantity,
+                unit: parsed.unit,
                 name: cleanName
             )
         }
@@ -1639,25 +1706,29 @@ private struct PasteListSheet: View {
 
 private struct IngredientDraft: Identifiable {
     let id: UUID
+    /// What was typed, e.g. "2 cups flour".
+    var line: String
+    /// Worked out from `line` when saving.
     var quantity: String
     var unit: String
     var name: String
 
     init(
         id: UUID = UUID(),
+        line: String = "",
         quantity: String = "",
         unit: String = "",
         name: String = ""
     ) {
         self.id = id
+        self.line = line
         self.quantity = quantity
         self.unit = unit
         self.name = name
     }
 
     var isEmpty: Bool {
-        quantity.isEmpty && unit.isEmpty
-            && name.trimmingCharacters(in: .whitespaces).isEmpty
+        line.trimmingCharacters(in: .whitespaces).isEmpty
     }
 }
 

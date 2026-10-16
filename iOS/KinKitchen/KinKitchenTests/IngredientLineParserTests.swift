@@ -65,3 +65,26 @@ struct IngredientLineParserTests {
         #expect(RecipeTimeChoices.text(90) == "1 hr 30 min")
     }
 }
+
+
+/// Regression: typing ingredients as one line.
+struct IngredientLinePreviewTests {
+
+    @Test func showsWhatTheLineReadsAs() {
+        #expect(IngredientLinePreview.text(for: "2 cups flour") == "2 cups · flour")
+        #expect(IngredientLinePreview.text(for: "1½ tsp salt") == "1½ tsp · salt")
+        #expect(IngredientLinePreview.text(for: "3 eggs") == "3 · eggs")
+    }
+
+    @Test func showsNothingUntilThereIsAnAmountAndAName() {
+        #expect(IngredientLinePreview.text(for: "") == nil)
+        #expect(IngredientLinePreview.text(for: "salt to taste") == nil)
+        #expect(IngredientLinePreview.text(for: "2 cups") == nil)
+    }
+
+    @Test func quickKeysJoinTheLineNaturally() {
+        #expect(IngredientLinePreview.appending("½", to: "1") == "1½")
+        #expect(IngredientLinePreview.appending("cup", to: "1½") == "1½ cup ")
+        #expect(IngredientLinePreview.appending("Tbsp", to: "2 ") == "2 Tbsp ")
+    }
+}
