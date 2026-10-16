@@ -68,6 +68,12 @@ struct CookbookDetailView: View {
                 showLoadingState: cookbook == nil
             )
         }
+        // Counts once per open, for Recent Cookbooks on Home.
+        .task(id: cookbookId) {
+            await CookbookService.recordView(
+                cookbookId: cookbookId
+            )
+        }
         .refreshable {
             await loadCookbook()
         }

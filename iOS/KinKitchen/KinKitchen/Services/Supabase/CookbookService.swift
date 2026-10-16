@@ -93,6 +93,56 @@ enum CookbookService {
         return cookbooks
     }
 
+    // MARK: - Recent Cookbooks
+
+    /// Notes that the user opened a cookbook, for Recent Cookbooks
+    /// (supabase/REGRESSION-recent-cookbooks). Never blocks opening.
+    static func recordView(
+        cookbookId: UUID
+    ) async {
+        do {
+            try await SupabaseManager.client
+                .rpc(
+                    "record_cookbook_view",
+                    params: ["p_cookbook_id": cookbookId]
+                )
+                .execute()
+        } catch {
+            if !(error is CancellationError) {
+                print("COOKBOOK VIEW RECORD ERROR:", error.localizedDescription)
+            }
+        }
+    }
+
+    /// Cookbooks the user opened, most recent first. Ones they can no
+    /// longer see are left out.
+    static func fetchRecentlyViewed(
+        limit: Int = 10
+    ) async throws -> [Cookbook] {
+
+        struct Row: Decodable {
+            let cookbook: Cookbook?
+        }
+
+        let user =
+            try await SupabaseManager.client
+                .auth
+                .session
+                .user
+
+        let rows: [Row] =
+            try await SupabaseManager.client
+                .from("cookbook_views")
+                .select("cookbook:cookbooks(*)")
+                .eq("user_id", value: user.id)
+                .order("last_viewed_at", ascending: false)
+                .limit(limit)
+                .execute()
+                .value
+
+        return rows.compactMap(\.cookbook)
+    }
+
     // MARK: - Recipe Counts
 
     /// How many recipes each cookbook holds, in one request.

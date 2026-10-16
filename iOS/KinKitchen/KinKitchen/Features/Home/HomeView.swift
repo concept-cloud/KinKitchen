@@ -95,14 +95,14 @@ struct HomeView: View {
                         recentRecipesSection
                     }
 
-                    // MARK: - Your Cookbooks
+                    // MARK: - Recent Cookbooks
 
                     VStack(
                         alignment: .leading,
                         spacing: KinSpacing.medium
                     ) {
 
-                        themedHeader("Your Cookbooks") {
+                        themedHeader("Recent Cookbooks") {
                             selectTab(.cookbooks)
                         }
 
@@ -1428,11 +1428,20 @@ private extension HomeView {
 
         do {
 
+            // Recently opened first (including other people's, once
+            // cookbooks can be browsed and sold), then the user's own.
+            // Before the recent-cookbooks SQL runs, just their own.
+            async let recentRequest =
+                try? CookbookService.fetchRecentlyViewed()
+
+            let owned =
+                try await CookbookService
+                    .fetchCurrentUserCookbooks()
+
             cookbooks =
-                Array(
-                    try await CookbookService
-                        .fetchCurrentUserCookbooks()
-                        .prefix(6)
+                RecentCookbooks.merge(
+                    recent: await recentRequest ?? [],
+                    owned: owned
                 )
 
         } catch {
@@ -1606,4 +1615,27 @@ extension HomeView {
 #Preview {
 
     HomeView()
+}
+
+
+// MARK: - Recent Cookbooks
+
+/// What Home's Recent Cookbooks row shows.
+enum RecentCookbooks {
+
+    static let limit = 6
+
+    /// Recently opened first, then the user's own cookbooks they
+    /// haven't opened lately, without repeats.
+    static func merge(
+        recent: [Cookbook],
+        owned: [Cookbook],
+        limit: Int = limit
+    ) -> [Cookbook] {
+        var seen: Set<UUID> = []
+        return (recent + owned)
+            .filter { seen.insert($0.id).inserted }
+            .prefix(limit)
+            .map { $0 }
+    }
 }
