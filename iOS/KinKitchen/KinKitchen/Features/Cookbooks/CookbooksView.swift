@@ -283,6 +283,9 @@ private extension CookbooksView {
                 }
             }
             .padding(.horizontal, KinSpacing.xLarge)
+            // In front of the plank, so the books stand on its top
+            // surface instead of being cut off by it.
+            .zIndex(1)
 
             // Books stand on the plank's top edge, which runs the
             // full width like a real bookcase. The shade below hangs
