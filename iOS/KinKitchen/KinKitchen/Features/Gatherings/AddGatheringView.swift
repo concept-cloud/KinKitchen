@@ -33,6 +33,9 @@ struct AddGatheringView: View {
     @State private var description = ""
     @State private var guestLimit: Int?
 
+    /// Meal Train only: how many people each meal feeds.
+    @State private var familySize = 4
+
     @State private var selectedPhotoItem: PhotosPickerItem?
     @State private var selectedImageData: Data?
 
@@ -115,7 +118,11 @@ struct AddGatheringView: View {
 
                         detailsCard
 
-                        guestsCard
+                        if isDateRange {
+                            familyCard
+                        } else {
+                            guestsCard
+                        }
                     }
                     .padding(KinSpacing.large)
                     .padding(.top, KinSpacing.small)
@@ -720,6 +727,43 @@ private extension AddGatheringView {
         }
     }
 
+    /// Meal Train: the people being cooked for, so helpers know how
+    /// much to make.
+    var familyCard: some View {
+
+        EventFormCard(
+            title: "Family Size",
+            systemImage: "house.fill",
+            tint: KinColors.success
+        ) {
+
+            HStack(spacing: KinSpacing.medium) {
+
+                VStack(alignment: .leading, spacing: KinSpacing.xxSmall) {
+                    Text("Feeds \(familySize) \(familySize == 1 ? "person" : "people")")
+                        .font(KinTypography.body)
+                        .foregroundStyle(KinColors.primaryText)
+                        .contentTransition(.numericText())
+
+                    Text("How many people each meal should feed.")
+                        .font(KinTypography.caption)
+                        .foregroundStyle(KinColors.secondaryText)
+                }
+
+                Spacer(minLength: KinSpacing.small)
+
+                stepperButton("minus", label: "Fewer people", isEnabled: familySize > 1) {
+                    familySize -= 1
+                }
+
+                stepperButton("plus", label: "More people", isEnabled: familySize < 50) {
+                    familySize += 1
+                }
+            }
+            .sensoryFeedback(.selection, trigger: familySize)
+        }
+    }
+
     func stepperButton(
         _ systemImage: String,
         label: String,
@@ -905,8 +949,12 @@ private extension AddGatheringView {
                             startsAt,
                         endsAt:
                             endsAt,
+                        // A Meal Train feeds a family instead of
+                        // capping guests.
                         guestLimit:
-                            guestLimit
+                            isDateRange ? nil : guestLimit,
+                        familySize:
+                            isDateRange ? familySize : nil
                     )
 
             createdGatheringId =

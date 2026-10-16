@@ -22,7 +22,8 @@ enum GatheringService {
         location: String?,
         startsAt: Date,
         endsAt: Date?,
-        guestLimit: Int?
+        guestLimit: Int?,
+        familySize: Int?
     ) async throws -> Gathering {
 
         let user =
@@ -59,7 +60,9 @@ enum GatheringService {
                 endsAt:
                     endsAt,
                 guestLimit:
-                    guestLimit
+                    guestLimit,
+                familySize:
+                    familySize
             )
 
         let gathering: Gathering =
@@ -333,7 +336,8 @@ enum GatheringService {
         location: String?,
         startsAt: Date,
         endsAt: Date?,
-        guestLimit: Int?
+        guestLimit: Int?,
+        familySize: Int?
     ) async throws -> Gathering {
 
         struct Parameters: Encodable {
@@ -351,6 +355,7 @@ enum GatheringService {
             /// database reads as "no end" whenever a type is sent.
             let endsAt: Date?
             let guestLimit: Int?
+            let familySize: Int?
 
             enum CodingKeys:
                 String,
@@ -385,6 +390,9 @@ enum GatheringService {
 
                 case guestLimit =
                     "p_guest_limit"
+
+                case familySize =
+                    "p_family_size"
             }
         }
 
@@ -414,7 +422,8 @@ enum GatheringService {
                     ),
                 startsAt: startsAt,
                 endsAt: endsAt,
-                guestLimit: guestLimit
+                guestLimit: guestLimit,
+                familySize: familySize
             )
 
         let gathering: Gathering =

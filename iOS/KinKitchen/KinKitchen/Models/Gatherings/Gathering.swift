@@ -30,6 +30,8 @@ struct Gathering:
     /// Train. nil for one-day events.
     var endsAt: Date? = nil
     var guestLimit: Int?
+    /// How many people each Meal Train meal feeds. nil otherwise.
+    var familySize: Int? = nil
     var status: GatheringStatus
 
     let createdAt: Date
@@ -67,6 +69,9 @@ struct Gathering:
 
         case guestLimit =
             "guest_limit"
+
+        case familySize =
+            "family_size"
 
         case status
 
@@ -217,6 +222,7 @@ struct GatheringCreate:
     let startsAt: Date
     let endsAt: Date?
     let guestLimit: Int?
+    let familySize: Int?
 
 
     enum CodingKeys:
@@ -248,6 +254,9 @@ struct GatheringCreate:
 
         case guestLimit =
             "guest_limit"
+
+        case familySize =
+            "family_size"
     }
 }
 
@@ -266,6 +275,7 @@ struct GatheringUpdate:
     let startsAt: Date
     let endsAt: Date?
     let guestLimit: Int?
+    let familySize: Int?
 
 
     enum CodingKeys:
@@ -294,6 +304,9 @@ struct GatheringUpdate:
 
         case guestLimit =
             "guest_limit"
+
+        case familySize =
+            "family_size"
     }
 }
 

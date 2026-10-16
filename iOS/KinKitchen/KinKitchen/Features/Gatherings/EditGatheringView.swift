@@ -36,6 +36,7 @@ struct EditGatheringView: View {
     @State private var location: String
     @State private var description: String
     @State private var guestLimit: Int?
+    @State private var familySize: Int
     @State private var coverImagePath: String?
 
     // MARK: - Photo
@@ -120,6 +121,11 @@ struct EditGatheringView: View {
         _guestLimit = State(
             initialValue:
                 gathering.guestLimit
+        )
+
+        _familySize = State(
+            initialValue:
+                gathering.familySize ?? 4
         )
 
         _coverImagePath = State(
@@ -649,9 +655,16 @@ private extension EditGatheringView {
             )
 
 
-            // MARK: Guest Limit
+            // MARK: Guest Limit or Family Size
 
-            guestLimitSection
+            if eventType == .mealTrain {
+
+                familySizeSection
+
+            } else {
+
+                guestLimitSection
+            }
         }
     }
 
@@ -1044,6 +1057,73 @@ private extension EditGatheringView {
                     )
                 )
             }
+        }
+    }
+}
+
+
+// MARK: - Family Size
+
+private extension EditGatheringView {
+
+    /// Meal Train: how many people each meal feeds.
+    var familySizeSection: some View {
+
+        HStack {
+
+            VStack(
+                alignment: .leading,
+                spacing: 2
+            ) {
+
+                Text("Family Size")
+                    .font(
+                        KinTypography.headline
+                    )
+                    .foregroundStyle(
+                        KinColors.primaryText
+                    )
+
+                Text("How many people each meal feeds")
+                    .font(
+                        KinTypography.caption
+                    )
+                    .foregroundStyle(
+                        KinColors.secondaryText
+                    )
+            }
+
+            Spacer()
+
+            Stepper(
+                "\(familySize)",
+                value: $familySize,
+                in: 1...50
+            )
+            .fixedSize()
+            .font(
+                KinTypography.body
+            )
+            .foregroundStyle(
+                KinColors.primaryText
+            )
+            .padding(
+                .horizontal,
+                KinSpacing.small
+            )
+            .padding(
+                .vertical,
+                KinSpacing.xSmall
+            )
+            .background(
+                KinColors.surface
+            )
+            .clipShape(
+                RoundedRectangle(
+                    cornerRadius:
+                        KinRadius.medium
+                )
+            )
         }
     }
 }
@@ -1572,7 +1652,13 @@ private extension EditGatheringView {
                         endsAt:
                             endsAt,
                         guestLimit:
-                            guestLimit
+                            eventType == .mealTrain
+                                ? nil
+                                : guestLimit,
+                        familySize:
+                            eventType == .mealTrain
+                                ? familySize
+                                : nil
                     )
 
 

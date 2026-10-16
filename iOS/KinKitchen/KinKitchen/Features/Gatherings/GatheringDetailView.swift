@@ -607,6 +607,26 @@ private extension GatheringDetailView {
                 )
             )
 
+            if let familySize =
+                gathering.familySize {
+
+                Label(
+                    "Feeds \(familySize) \(familySize == 1 ? "person" : "people")",
+                    systemImage: "house.fill"
+                )
+                .font(
+                    KinTypography.body
+                )
+                .foregroundStyle(
+                    KinColors.secondaryText
+                )
+                .kinChangeHighlight(
+                    highlightedFields.contains(
+                        .familySize
+                    )
+                )
+            }
+
             if let location =
                 gathering.location,
                !location.isEmpty {
