@@ -65,6 +65,21 @@ nonisolated enum KinEventType: String, CaseIterable, Identifiable, Hashable, Cod
         }
     }
 
+    /// Tap-to-fill ideas for the optional Theme.
+    var themeSuggestions: [String] {
+        switch self {
+        case .backyardBBQ: return ["Fourth of July", "Summer Cookout", "Game Day", "Pool Party"]
+        case .potluck: return ["Friendsgiving", "Church Supper", "Office Potluck", "Block Party"]
+        case .buffet: return ["Taco Bar", "Pasta Bar", "Breakfast Buffet", "Holiday Spread"]
+        case .dinnerParty: return ["Italian Night", "Date Night", "Wine Pairing", "Family Supper"]
+        case .mealTrain: return ["New Baby", "Get Well Soon", "Surgery Recovery", "In Loving Memory"]
+        case .holiday: return ["Thanksgiving", "Christmas", "Easter", "New Year's"]
+        case .brunch: return ["Mother's Day", "Bridal Shower", "Sunday Brunch", "Mimosa Bar"]
+        case .celebration: return ["Birthday", "Graduation", "Baby Shower", "Anniversary"]
+        case .other: return ["Family Night", "Game Night", "Reunion", "Cookie Swap"]
+        }
+    }
+
     /// A type added later that this version doesn't know shows as
     /// Other instead of failing to load the event.
     init(from decoder: Decoder) throws {

@@ -80,6 +80,8 @@ struct EventDietaryNeedsField: View {
 
     @Binding var needs: [EventDietaryNeed]
     var eventType: KinEventType?
+    /// Off inside a card that already says "Dietary Needs".
+    var showsTitle = true
 
     @State private var isEditing = false
 
@@ -92,9 +94,16 @@ struct EventDietaryNeedsField: View {
 
             HStack(alignment: .firstTextBaseline) {
 
-                Text("Dietary Needs")
-                    .font(KinTypography.headline)
-                    .foregroundStyle(KinColors.primaryText)
+                if showsTitle {
+                    Text("Dietary Needs")
+                        .font(KinTypography.headline)
+                        .foregroundStyle(KinColors.primaryText)
+                } else {
+                    Text(EventDietaryText.hint(for: eventType))
+                        .font(KinTypography.caption)
+                        .foregroundStyle(KinColors.secondaryText)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
 
                 Spacer()
 
@@ -105,10 +114,12 @@ struct EventDietaryNeedsField: View {
                 .foregroundStyle(KinColors.primary)
             }
 
-            Text(EventDietaryText.hint(for: eventType))
-                .font(KinTypography.caption)
-                .foregroundStyle(KinColors.secondaryText)
-                .fixedSize(horizontal: false, vertical: true)
+            if showsTitle {
+                Text(EventDietaryText.hint(for: eventType))
+                    .font(KinTypography.caption)
+                    .foregroundStyle(KinColors.secondaryText)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
 
             Button {
                 isEditing = true
