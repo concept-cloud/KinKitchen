@@ -350,10 +350,11 @@ struct EditRecipeView: View {
 
             Task {
                 do {
-                    if let data =
+                    if let picked =
                         try await newItem.loadTransferable(
                             type: Data.self
-                        ) {
+                        ),
+                       let data = await KinPhotoResizer.prepared(picked, for: .print) {
 
                         await MainActor.run {
                             selectedPhotoData = data

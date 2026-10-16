@@ -1047,10 +1047,17 @@ struct ProfileSetupView: View {
 
         do {
 
-            profilePhotoData =
-                try await item.loadTransferable(
-                    type: Data.self
-                )
+            guard let picked =
+                    try await item.loadTransferable(
+                        type: Data.self
+                    ),
+                  let data =
+                    await KinPhotoResizer.prepared(picked)
+            else {
+                throw CocoaError(.fileReadCorruptFile)
+            }
+
+            profilePhotoData = data
 
         } catch {
 

@@ -408,7 +408,8 @@ struct EditProfileView: View {
         }
 
         do {
-            guard let data = try await item.loadTransferable(type: Data.self) else {
+            guard let picked = try await item.loadTransferable(type: Data.self),
+                  let data = await KinPhotoResizer.prepared(picked) else {
                 errorMessage = "Unable to load the selected photo."
                 return
             }

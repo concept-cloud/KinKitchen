@@ -1032,10 +1032,12 @@ private extension AddGatheringView {
         do {
 
             guard
-                let imageData =
+                let picked =
                     try await item.loadTransferable(
                         type: Data.self
-                    )
+                    ),
+                let imageData =
+                    await KinPhotoResizer.prepared(picked)
             else {
 
                 errorMessage =

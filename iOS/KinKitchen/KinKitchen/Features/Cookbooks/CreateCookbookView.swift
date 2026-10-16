@@ -431,12 +431,10 @@ private extension CreateCookbookView {
                     .loadTransferable(
                         type: Data.self
                     ),
-                  let image =
-                    UIImage(data: data),
                   let jpegData =
-                    image.jpegData(
-                        compressionQuality: 0.85
-                    )
+                    await KinPhotoResizer.prepared(data, for: .print),
+                  let image =
+                    UIImage(data: jpegData)
             else {
                 return
             }

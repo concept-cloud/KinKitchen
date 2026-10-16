@@ -149,7 +149,8 @@ struct AddRecipeView: View {
             }
             Task {
                 do {
-                    if let data = try await newItem.loadTransferable(type: Data.self) {
+                    if let picked = try await newItem.loadTransferable(type: Data.self),
+                       let data = await KinPhotoResizer.prepared(picked, for: .print) {
                         withAnimation(.easeInOut(duration: 0.25)) {
                             selectedPhotoData = data
                         }
