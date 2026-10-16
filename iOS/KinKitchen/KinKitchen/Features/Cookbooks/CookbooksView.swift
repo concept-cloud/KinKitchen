@@ -19,6 +19,9 @@ struct CookbooksView: View {
     @State private var recipeCounts: [UUID: Int] = [:]
     @State private var searchText = ""
 
+    /// Lets a cookbook zoom up out of its book on the shelf.
+    @Namespace private var shelfNamespace
+
     /// The bookcase look, once there are cookbooks to put on it.
     private var showsShelf: Bool {
         !isLoading && errorMessage == nil && !cookbooks.isEmpty
@@ -58,6 +61,9 @@ struct CookbooksView: View {
             ) { cookbookId in
                 CookbookDetailView(
                     cookbookId: cookbookId
+                )
+                .navigationTransition(
+                    .zoom(sourceID: cookbookId, in: shelfNamespace)
                 )
                 .onDisappear {
                     Task {
@@ -240,9 +246,11 @@ private extension CookbooksView {
                     shelfRow(shelf)
                 }
             }
+            // Room above the top shelf so a book lifting off it
+            // isn't cut off by the edge of the scroll area.
             .padding(
                 .top,
-                KinSpacing.small
+                KinSpacing.xLarge
             )
             .padding(
                 .bottom,
@@ -306,6 +314,7 @@ private extension CookbooksView {
                         isShelfBook: true
                     )
                 }
+                .matchedTransitionSource(id: cookbook.id, in: shelfNamespace)
                 .accessibilityHint("Opens the cookbook")
             }
 

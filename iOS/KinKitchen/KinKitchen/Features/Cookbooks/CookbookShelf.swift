@@ -185,39 +185,150 @@ struct KinAddCookbookBook: View {
 
 // MARK: - Book Button
 
-/// Tapping a book lifts it off the shelf a little before it opens.
+/// Tapping a book opens it like a real one: it lifts off the shelf,
+/// the cover swings open on its spine to a cream first page, then the
+/// cookbook zooms up out of it (see CookbooksView). Coming back, it
+/// zooms back down and the cover closes.
 struct KinShelfBookButton<Label: View>: View {
 
     let action: () -> Void
     @ViewBuilder var label: Label
 
-    @State private var isLifted = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    private enum Phase {
+        case resting
+        case lifted
+        case open
+    }
+
+    @State private var phase: Phase = .resting
+
+    private var isLifted: Bool { phase != .resting }
+    private var isOpen: Bool { phase == .open }
 
     var body: some View {
 
         Button {
-            guard !isLifted else { return }
-            withAnimation(.spring(duration: 0.22, bounce: 0.3)) {
-                isLifted = true
-            }
-            Task {
-                try? await Task.sleep(for: .milliseconds(180))
-                action()
-                try? await Task.sleep(for: .milliseconds(400))
-                isLifted = false
-            }
+            open()
         } label: {
-            label
-                .scaleEffect(isLifted ? 1.06 : 1, anchor: .bottom)
-                .offset(y: isLifted ? -8 : 0)
-                .rotation3DEffect(
-                    .degrees(isLifted ? -8 : 0),
-                    axis: (x: 0, y: 1, z: 0),
-                    anchor: .leading,
-                    perspective: 0.6
-                )
+            ZStack {
+                // Revealed as the cover swings away.
+                KinBookFirstPage()
+                    .padding(.trailing, 5)
+                    .opacity(isOpen ? 1 : 0)
+
+                label
+                    .rotation3DEffect(
+                        .degrees(isOpen ? -70 : 0),
+                        axis: (x: 0, y: 1, z: 0),
+                        anchor: .leading,
+                        // Gentle, so the swinging edge stays inside
+                        // the book's space.
+                        perspective: 0.25
+                    )
+            }
+            .scaleEffect(isLifted ? 1.04 : 1, anchor: .bottom)
+            .offset(y: isLifted ? -6 : 0)
+            .shadow(
+                color: .black.opacity(isLifted ? 0.4 : 0),
+                radius: isLifted ? 16 : 0,
+                y: isLifted ? 12 : 0
+            )
+            .zIndex(isLifted ? 1 : 0)
         }
         .buttonStyle(.kinPressable)
-        .sensoryFeedback(.impact(weight: .light), trigger: isLifted)
+        .disabled(phase != .resting)
+        .sensoryFeedback(.impact(weight: .light), trigger: isLifted) { _, new in new }
+        .sensoryFeedback(.impact(flexibility: .soft), trigger: isOpen) { _, new in new }
+    }
+
+    private func open() {
+
+        guard phase == .resting else {
+            return
+        }
+
+        guard !reduceMotion else {
+            action()
+            return
+        }
+
+        Task { @MainActor in
+            // Pull it off the shelf.
+            withAnimation(.spring(duration: 0.22, bounce: 0.25)) {
+                phase = .lifted
+            }
+            try? await Task.sleep(for: .milliseconds(150))
+
+            // Swing the cover open.
+            withAnimation(.easeInOut(duration: 0.34)) {
+                phase = .open
+            }
+            try? await Task.sleep(for: .milliseconds(300))
+
+            // The cookbook zooms up out of the open book.
+            action()
+
+            // Close it again once it's off screen, ready for the
+            // zoom back.
+            try? await Task.sleep(for: .milliseconds(700))
+            var quiet = Transaction()
+            quiet.disablesAnimations = true
+            withTransaction(quiet) {
+                phase = .resting
+            }
+        }
+    }
+}
+
+
+/// The inside of a cookbook: a cream page with a few faint lines,
+/// seen when the cover opens.
+struct KinBookFirstPage: View {
+
+    var body: some View {
+
+        UnevenRoundedRectangle(
+            topLeadingRadius: 2,
+            bottomLeadingRadius: 2,
+            bottomTrailingRadius: KinRadius.large,
+            topTrailingRadius: KinRadius.large
+        )
+        .fill(Color(red: 0.99, green: 0.96, blue: 0.89))
+        .overlay {
+            VStack(alignment: .leading, spacing: 9) {
+                Image(systemName: "fork.knife")
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundStyle(KinCookbookCoverCard.gold)
+                    .frame(maxWidth: .infinity)
+                    .padding(.bottom, 6)
+                ForEach(0..<6, id: \.self) { line in
+                    Capsule()
+                        .fill(Color(red: 0.45, green: 0.38, blue: 0.32).opacity(0.18))
+                        .frame(height: 3)
+                        .padding(.trailing, line % 3 == 2 ? 40 : 0)
+                }
+            }
+            .padding(.horizontal, KinSpacing.large)
+        }
+        // Shade along the spine, where the page curves in.
+        .overlay(alignment: .leading) {
+            LinearGradient(
+                colors: [.black.opacity(0.18), .clear],
+                startPoint: .leading,
+                endPoint: .trailing
+            )
+            .frame(width: 18)
+        }
+        .clipShape(
+            UnevenRoundedRectangle(
+                topLeadingRadius: 2,
+                bottomLeadingRadius: 2,
+                bottomTrailingRadius: KinRadius.large,
+                topTrailingRadius: KinRadius.large
+            )
+        )
+        .accessibilityHidden(true)
     }
 }
