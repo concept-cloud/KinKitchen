@@ -8,10 +8,17 @@
 import SwiftUI
 import PhotosUI
 
+/// Add Recipe, laid out like Add Event: the photo across the top with
+/// the name typed right on it, then simple cards in the order people
+/// write a recipe down: kind of dish, ingredients, steps, details,
+/// dietary, and the optional story. Save stays pinned at the bottom.
 struct AddRecipeView: View {
     @Environment(\.dismiss) private var dismiss
     /// The ingredient whose name gets the cursor after picking a unit.
     @FocusState private var focusedIngredientNameId: UUID?
+    /// The step being typed, so Return can move to the next one.
+    @FocusState private var focusedStepId: UUID?
+    @FocusState private var isNameFocused: Bool
     private let onRecipeCreated: ((Recipe) -> Void)?
     private let onCancel: (() -> Void)?
 
@@ -31,8 +38,6 @@ struct AddRecipeView: View {
 
     @State private var ingredients: [IngredientDraft] = [IngredientDraft()]
     @State private var instructions: [InstructionDraft] = [InstructionDraft()]
-    
-    @State private var dragScrollTarget: UUID?
 
     @State private var draggedIngredientID: UUID?
     @State private var ingredientDropTargetID: UUID?
@@ -43,10 +48,15 @@ struct AddRecipeView: View {
     @State private var instructionDropTargetID: UUID?
     @State private var instructionDropPosition: RecipeDropPosition?
     @State private var instructionEndDropTargeted = false
+
+    @State private var pasteMode: PasteListSheet.Mode?
+    @State private var isStoryShown = false
     
     @State private var isSaving = false
     @State private var errorMessage: String?
     @State private var showingError = false
+
+    private static let heroHeight: CGFloat = 300
 
     init(
         onRecipeCreated: ((Recipe) -> Void)? = nil,
@@ -56,621 +66,1029 @@ struct AddRecipeView: View {
         self.onCancel = onCancel
     }
 
+    /// What's still needed before Save, or nil when ready.
+    private var missingText: String? {
+        var missing: [String] = []
+        if recipeName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            missing.append("a name")
+        }
+        if cleanedIngredients.isEmpty {
+            missing.append("an ingredient")
+        }
+        if cleanedInstructions.isEmpty {
+            missing.append("a step")
+        }
+        guard !missing.isEmpty else {
+            return nil
+        }
+        return "Add " + ListFormatter.localizedString(byJoining: missing)
+    }
+
     var body: some View {
-        ScrollViewReader { proxy in
+
+        GeometryReader { geometry in
+
             ScrollView {
+
                 VStack(spacing: 0) {
-                    header
-                    
-                    VStack(alignment: .leading, spacing: KinSpacing.xLarge) {
-                        recipePhotoPlaceholder
-                        
-                        fieldSection(title: "Recipe Name") {
-                            TextField("Grandma's Baked Ziti", text: $recipeName)
-                                .font(KinTypography.body)
-                                .foregroundStyle(KinColors.primaryText)
-                                .padding(KinSpacing.medium)
-                                .background(KinColors.surface)
-                                .clipShape(RoundedRectangle(cornerRadius: KinRadius.medium))
-                        }
-                        
-                        fieldSection(title: "Description") {
-                            TextEditor(text: $recipeDescription)
-                                .font(KinTypography.body)
-                                .foregroundStyle(KinColors.primaryText)
-                                .frame(minHeight: 120)
-                                .padding(KinSpacing.small)
-                                .scrollContentBackground(.hidden)
-                                .background(KinColors.surface)
-                                .clipShape(RoundedRectangle(cornerRadius: KinRadius.medium))
-                        }
-                        
-                        legacySection
-                        servingsSection
-                        timesSection
-                        categorySection
-                        dietarySection
-                        ingredientsSection
-                        instructionsSection
-                        
-                        if let errorMessage {
-                            Text(errorMessage)
-                                .font(KinTypography.caption)
-                                .foregroundStyle(KinColors.error)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                        }
-                        
-                        Button {
-                            Task {
-                                await saveRecipe()
-                            }
-                        } label: {
-                            Group {
-                                if isSaving {
-                                    ProgressView()
-                                        .tint(.white)
-                                } else {
-                                    Text("Save Recipe")
-                                        .font(KinTypography.button)
-                                }
-                            }
-                            .foregroundStyle(.white)
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, KinSpacing.medium)
-                            .background(KinColors.primary)
-                            .clipShape(
-                                RoundedRectangle(
-                                    cornerRadius: KinRadius.medium
-                                )
-                            )
-                            .contentShape(
-                                RoundedRectangle(
-                                    cornerRadius: KinRadius.medium
-                                )
-                            )
-                        }
-                        .buttonStyle(.plain)
-                        .disabled(isSaving)
+
+                    hero(topInset: geometry.safeAreaInsets.top)
+
+                    VStack(spacing: KinSpacing.medium) {
+                        categoryCard
+                        ingredientsCard
+                        stepsCard
+                        detailsCard
+                        dietaryCard
+                        aboutCard
                     }
                     .padding(KinSpacing.large)
+                    .padding(.top, KinSpacing.small)
+                    .padding(.bottom, KinSpacing.large)
+                    .frame(maxWidth: .infinity)
+                    .background(
+                        UnevenRoundedRectangle(
+                            topLeadingRadius: KinRadius.xLarge,
+                            topTrailingRadius: KinRadius.xLarge
+                        )
+                        .fill(KinColors.paper)
+                        .shadow(color: .black.opacity(0.12), radius: 10, y: -2)
+                    )
+                    // Tucks up over the bottom of the photo.
+                    .padding(.top, -KinSpacing.xLarge)
                 }
             }
-            .background(KinColors.background.ignoresSafeArea())
-            .navigationBarHidden(true)
-            .alert("Unable to Save Recipe", isPresented: $showingError) {
-                Button("OK", role: .cancel) { }
-            } message: {
-                Text(errorMessage ?? "Please try again.")
+            .scrollDismissesKeyboard(.interactively)
+            .scrollEdgeEffectHidden(true, for: .top)
+            .ignoresSafeArea(edges: .top)
+            .background(KinColors.paper.ignoresSafeArea())
+            .safeAreaInset(edge: .bottom) {
+                saveBar
             }
+        }
+        .navigationBarHidden(true)
+        .sensoryFeedback(.selection, trigger: selectedCategory)
+        .sensoryFeedback(.selection, trigger: servings)
+        .sensoryFeedback(.selection, trigger: ingredients.count)
+        .sensoryFeedback(.selection, trigger: instructions.count)
+        .sheet(item: $pasteMode) { mode in
+            PasteListSheet(mode: mode) { text in
+                addPasted(text, mode: mode)
+            }
+        }
+        .onChange(of: selectedPhotoItem) { _, newItem in
+            guard let newItem else {
+                return
+            }
+            Task {
+                do {
+                    if let data = try await newItem.loadTransferable(type: Data.self) {
+                        withAnimation(.easeInOut(duration: 0.25)) {
+                            selectedPhotoData = data
+                        }
+                    }
+                } catch {
+                    errorMessage = "Kin Kitchen was unable to load that photo."
+                    showingError = true
+                }
+            }
+        }
+        .alert("Unable to Save Recipe", isPresented: $showingError) {
+            Button("OK", role: .cancel) { }
+        } message: {
+            Text(errorMessage ?? "Please try again.")
         }
     }
 
-    private var header: some View {
-        HStack(spacing: KinSpacing.medium) {
-            Button {
-                if let onCancel {
-                    onCancel()
-                } else {
-                    dismiss()
-                }
-            } label: {
-                Image(systemName: "chevron.left")
-                    .font(.title2)
-                    .foregroundStyle(KinColors.primaryText)
-                    .frame(width: 48, height: 48)
-                    .background(KinColors.surface)
-                    .clipShape(Circle())
-            }
-            .buttonStyle(.plain)
 
-            Spacer()
+    // MARK: - Hero
 
-            Text("Add Recipe")
-                .font(KinTypography.title3)
-                .foregroundStyle(KinColors.primaryText)
+    private func hero(topInset: CGFloat) -> some View {
 
-            Spacer()
+        VStack(alignment: .leading, spacing: KinSpacing.small) {
 
-            Button {
-                Task { await saveRecipe() }
-            } label: {
-                Group {
-                    if isSaving {
-                        ProgressView().tint(KinColors.primary)
+            HStack {
+                Button("Cancel") {
+                    if let onCancel {
+                        onCancel()
                     } else {
-                        Text("Save")
-                            .font(KinTypography.button)
-                            .foregroundStyle(KinColors.primary)
+                        dismiss()
                     }
                 }
-            }
-            .frame(minWidth: 70, minHeight: 48)
-            .background(KinColors.surface)
-            .clipShape(Capsule())
-            .buttonStyle(.plain)
-            .disabled(isSaving)
-        }
-        .padding(.horizontal, KinSpacing.large)
-        .padding(.vertical, KinSpacing.medium)
-        .background(KinColors.background)
-        .overlay(alignment: .bottom) { Divider() }
-    }
+                .font(KinTypography.callout)
+                .foregroundStyle(.white)
+                .padding(.horizontal, KinSpacing.medium)
+                .padding(.vertical, KinSpacing.small)
+                .background(.black.opacity(0.35), in: Capsule())
+                .buttonStyle(.kinPressable)
 
-    private var recipePhotoPlaceholder: some View {
-
-        VStack(spacing: KinSpacing.medium) {
-
-            if let selectedPhotoData,
-               let image = UIImage(data: selectedPhotoData) {
-
-                Image(uiImage: image)
-                    .resizable()
-                    .scaledToFill()
-                    .frame(maxWidth: .infinity)
-                    .frame(height: 210)
-                    .clipped()
-                    .clipShape(
-                        RoundedRectangle(
-                            cornerRadius: KinRadius.large
-                        )
-                    )
-
-                KinPhotoPicker(
-                    selectedItem: $selectedPhotoItem
-                )
-
-            } else {
+                Spacer()
 
                 PhotosPicker(
                     selection: $selectedPhotoItem,
                     matching: .images
                 ) {
-                    RoundedRectangle(
-                        cornerRadius: KinRadius.large
+                    Label(
+                        selectedPhotoData == nil ? "Add Photo" : "Change Photo",
+                        systemImage: KinIcons.camera
                     )
-                    .fill(KinColors.surface)
-                    .frame(height: 210)
-                    .overlay {
-                        VStack(spacing: KinSpacing.medium) {
-
-                            Image(
-                                systemName: "photo"
-                            )
-                            .font(.system(size: 38))
-                            .foregroundStyle(
-                                KinColors.primary
-                            )
-
-                            Text("Add Recipe Photo")
-                                .font(KinTypography.body)
-                                .foregroundStyle(
-                                    KinColors.primary
-                                )
-                        }
-                    }
+                    .font(KinTypography.footnote.weight(.semibold))
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, KinSpacing.medium)
+                    .padding(.vertical, KinSpacing.small)
+                    .background(.black.opacity(0.35), in: Capsule())
                 }
-                .buttonStyle(.plain)
-            }
-        }
-        .onChange(of: selectedPhotoItem) {
-            _, newItem in
-
-            guard let newItem else {
-                return
+                .buttonStyle(.kinPressable)
             }
 
-            Task {
-                do {
-                    if let data =
-                        try await newItem.loadTransferable(
-                            type: Data.self
-                        ) {
+            Spacer(minLength: KinSpacing.medium)
 
-                        await MainActor.run {
-                            selectedPhotoData = data
-                        }
-                    }
-                } catch {
-                    await MainActor.run {
-                        errorMessage =
-                            "Kin Kitchen was unable to load that photo."
-                        showingError = true
-                    }
-                }
-            }
-        }
-    }
+            Label(selectedCategory.rawValue, systemImage: selectedCategory.symbol)
+                .font(.system(size: 12, weight: .bold))
+                .textCase(.uppercase)
+                .foregroundStyle(.white.opacity(0.9))
+                .contentTransition(.opacity)
+                .animation(.snappy, value: selectedCategory)
 
-    // MARK: - Story and Legacy
-
-    private var legacySection: some View {
-        VStack(
-            alignment: .leading,
-            spacing: KinSpacing.medium
-        ) {
-            Text("Story & Legacy")
-                .font(KinTypography.title)
-                .foregroundStyle(KinColors.primaryText)
-
-            Text(
-                "Preserve the person and story connected to this recipe."
+            // The name is typed right on the photo.
+            TextField(
+                "Recipe Name",
+                text: $recipeName,
+                prompt: Text("Name your recipe")
+                    .foregroundStyle(.white.opacity(0.6)),
+                axis: .vertical
             )
-            .font(KinTypography.caption)
-            .foregroundStyle(KinColors.secondaryText)
-
-            fieldSection(
-                title: "Original Contributor"
-            ) {
-                TextField(
-                    "Grandma Rose",
-                    text: $originalContributor
-                )
-                .font(KinTypography.body)
-                .foregroundStyle(KinColors.primaryText)
-                .textInputAutocapitalization(.words)
-                .padding(KinSpacing.medium)
-                .background(KinColors.surface)
-                .clipShape(
-                    RoundedRectangle(
-                        cornerRadius: KinRadius.medium
-                    )
-                )
-            }
-
-            fieldSection(
-                title: "Recipe Story"
-            ) {
-                TextEditor(
-                    text: $recipeStory
-                )
-                .font(KinTypography.body)
-                .foregroundStyle(KinColors.primaryText)
-                .frame(minHeight: 140)
-                .padding(KinSpacing.small)
-                .scrollContentBackground(.hidden)
-                .background(KinColors.surface)
-                .clipShape(
-                    RoundedRectangle(
-                        cornerRadius: KinRadius.medium
-                    )
-                )
-            }
-        }
-    }
-    
-    private var servingsSection: some View {
-        HStack {
-            Text("Servings")
-                .font(KinTypography.title)
-                .foregroundStyle(KinColors.primaryText)
-
-            Spacer()
-
-            HStack(spacing: 0) {
-                Button {
-                    if servings > 1 { servings -= 1 }
-                } label: {
-                    Image(systemName: "minus")
-                        .frame(width: 48, height: 44)
-                }
-
-                Text("\(servings)")
-                    .font(KinTypography.body)
-                    .frame(width: 52, height: 44)
-
-                Button {
-                    servings += 1
-                } label: {
-                    Image(systemName: "plus")
-                        .frame(width: 48, height: 44)
+            .font(KinTypography.title)
+            .foregroundStyle(.white)
+            .tint(.white)
+            .lineLimit(1...2)
+            .submitLabel(.done)
+            .textInputAutocapitalization(.words)
+            .focused($isNameFocused)
+            .onChange(of: recipeName) { _, newValue in
+                // Return closes the keyboard instead of a new line.
+                if newValue.contains("\n") {
+                    recipeName = newValue.replacingOccurrences(of: "\n", with: "")
+                    isNameFocused = false
                 }
             }
-            .foregroundStyle(KinColors.primaryText)
-            .background(KinColors.surface)
-            .clipShape(RoundedRectangle(cornerRadius: KinRadius.medium))
-        }
-    }
+            .accessibilityLabel("Recipe Name")
 
-    private var timesSection: some View {
-        HStack(alignment: .top, spacing: KinSpacing.medium) {
-            fieldSection(title: "Prep Time") {
-                timeField(placeholder: "15", text: $prepTime)
-            }
-
-            fieldSection(title: "Cook Time") {
-                timeField(placeholder: "30", text: $cookTime)
-            }
-        }
-    }
-
-    private func timeField(placeholder: String, text: Binding<String>) -> some View {
-        HStack {
-            TextField(placeholder, text: text)
-                .keyboardType(.numberPad)
-
-            Text("min")
-                .foregroundStyle(KinColors.secondaryText)
-        }
-        .font(KinTypography.body)
-        .padding(KinSpacing.medium)
-        .background(KinColors.surface)
-        .clipShape(RoundedRectangle(cornerRadius: KinRadius.medium))
-    }
-
-    private var categorySection: some View {
-        VStack(alignment: .leading, spacing: KinSpacing.small) {
-            Text("Category")
-                .font(KinTypography.title)
-                .foregroundStyle(KinColors.primaryText)
-
-            Menu {
-                ForEach(RecipeCategory.allCases) { category in
-                    Button(category.rawValue) { selectedCategory = category }
-                }
-            } label: {
-                HStack {
-                    Text(selectedCategory.rawValue)
-                        .font(KinTypography.body)
-                        .foregroundStyle(KinColors.primaryText)
-
-                    Spacer()
-
-                    Image(systemName: "chevron.down")
-                        .foregroundStyle(KinColors.primary)
-                }
-                .padding(KinSpacing.medium)
-                .background(KinColors.surface)
-                .clipShape(RoundedRectangle(cornerRadius: KinRadius.medium))
-            }
-        }
-    }
-
-    private var dietarySection: some View {
-        VStack(alignment: .leading, spacing: KinSpacing.small) {
-            Text("Dietary")
-                .font(KinTypography.title)
-                .foregroundStyle(KinColors.primaryText)
-
-            RecipeDietaryTagPicker(
-                selection: $selectedRestrictionIds
-            )
-        }
-    }
-
-    private var ingredientsSection: some View {
-
-        VStack(
-            alignment: .leading,
-            spacing: KinSpacing.medium
-        ) {
-
-            Text("Ingredients")
-                .font(KinTypography.title)
-                .foregroundStyle(KinColors.primaryText)
-
-            ForEach(ingredients) { ingredient in
-                if let index = ingredients.firstIndex(
-                    where: { $0.id == ingredient.id }
-                ) {
-                    ingredientRow(index: index)
-                        .id(ingredient.id)
-                }
-            }
-
-            // MARK: - Bottom Drop Zone
             Rectangle()
-                .fill(
-                    ingredientEndDropTargeted
-                        ? KinColors.error
-                        : Color.clear
-                )
-                .frame(height: 6)
-                .contentShape(Rectangle())
-                .dropDestination(
-                    for: IngredientDragItem.self
-                ) { items, _ in
+                .fill(.white.opacity(isNameFocused ? 0.9 : 0.4))
+                .frame(height: 1.5)
+                .animation(.easeOut(duration: 0.2), value: isNameFocused)
 
-                    guard
-                        let draggedItem = items.first,
-                        let sourceIndex = ingredients.firstIndex(
-                            where: {
-                                $0.id == draggedItem.id
-                            }
-                        )
-                    else {
-                        clearIngredientDragState()
-                        return false
+            Label(heroSummary, systemImage: KinIcons.servings)
+                .font(KinTypography.footnote.weight(.semibold))
+                .foregroundStyle(.white.opacity(0.9))
+                .lineLimit(1)
+                .padding(.top, KinSpacing.xxSmall)
+        }
+        .kinTextOnPhoto()
+        .padding(.horizontal, KinSpacing.large)
+        .padding(.top, topInset + KinSpacing.small)
+        .padding(.bottom, KinSpacing.xLarge + KinSpacing.large)
+        .frame(height: Self.heroHeight + topInset)
+        .background {
+            heroBackground
+                .accessibilityHidden(true)
+        }
+        .clipped()
+    }
+
+    private var heroSummary: String {
+        var parts = ["Serves \(servings)"]
+        if let prep = Int(prepTime), prep > 0 {
+            parts.append("Prep \(RecipeTimeChoices.text(prep))")
+        }
+        if let cook = Int(cookTime), cook > 0 {
+            parts.append("Cook \(RecipeTimeChoices.text(cook))")
+        }
+        return parts.joined(separator: " · ")
+    }
+
+    private var heroBackground: some View {
+
+        Color.clear
+            .overlay {
+                if let selectedPhotoData,
+                   let image = UIImage(data: selectedPhotoData) {
+                    Image(uiImage: image)
+                        .resizable()
+                        .scaledToFill()
+                        .transition(.opacity)
+                } else {
+                    // Warm placeholder with the category's icon.
+                    LinearGradient(
+                        colors: [
+                            KinColors.success.opacity(0.9),
+                            KinColors.accent.opacity(0.85)
+                        ],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                    .overlay(alignment: .topTrailing) {
+                        Image(systemName: selectedCategory.symbol)
+                            .font(.system(size: 150, weight: .bold))
+                            .foregroundStyle(.white.opacity(0.14))
+                            .rotationEffect(.degrees(-12))
+                            .offset(x: 30, y: 50)
+                            .contentTransition(.symbolEffect(.replace))
+                            .animation(.snappy, value: selectedCategory)
                     }
-
-                    withAnimation {
-                        let moved = ingredients.remove(
-                            at: sourceIndex
-                        )
-
-                        ingredients.append(moved)
-                    }
-
-                    ingredientEndDropTargeted = false
-                    clearIngredientDragState()
-
-                    return true
-
-                } isTargeted: { targeted in
-                    ingredientEndDropTargeted = targeted
                 }
-
-            Button {
-                ingredients.append(
-                    IngredientDraft()
-                )
-            } label: {
-                Label(
-                    "Add Ingredient",
-                    systemImage: "plus"
-                )
-                .font(KinTypography.button)
-                .foregroundStyle(KinColors.primary)
-                .frame(maxWidth: .infinity)
-                .padding(
-                    .vertical,
-                    KinSpacing.medium
-                )
-                .overlay {
-                    RoundedRectangle(
-                        cornerRadius: KinRadius.medium
-                    )
-                    .stroke(
-                        KinColors.primary,
-                        lineWidth: 1
-                    )
-                }
-                .contentShape(
-                        RoundedRectangle(
-                            cornerRadius: KinRadius.medium
-                        )
-                    )
             }
-            .buttonStyle(.plain)
+            .overlay {
+                LinearGradient(
+                    stops: [
+                        .init(color: .black.opacity(0.35), location: 0),
+                        .init(color: .clear, location: 0.3),
+                        .init(color: .clear, location: 0.45),
+                        .init(color: .black.opacity(0.6), location: 1)
+                    ],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+            }
+            .clipped()
+    }
+
+
+    // MARK: - Category
+
+    private var categoryCard: some View {
+
+        KinFormCard(
+            title: "What kind of dish?",
+            systemImage: "fork.knife",
+            tint: KinColors.primary
+        ) {
+            LazyVGrid(
+                columns: Array(
+                    repeating: GridItem(.flexible(), spacing: KinSpacing.small),
+                    count: 4
+                ),
+                spacing: KinSpacing.small
+            ) {
+                ForEach(RecipeCategory.allCases) { category in
+                    categoryTile(category)
+                }
+            }
+        }
+    }
+
+    private func categoryTile(_ category: RecipeCategory) -> some View {
+
+        let isSelected = selectedCategory == category
+
+        return Button {
+            withAnimation(.snappy(duration: 0.2)) {
+                selectedCategory = category
+            }
+        } label: {
+            VStack(spacing: KinSpacing.xSmall) {
+                Image(systemName: category.symbol)
+                    .font(.system(size: 18, weight: .semibold))
+                    .frame(height: 22)
+                Text(category.rawValue)
+                    .font(KinTypography.caption)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
+            }
+            .foregroundStyle(isSelected ? .white : KinColors.primaryText)
+            .frame(maxWidth: .infinity, minHeight: 62)
+            .padding(.horizontal, KinSpacing.xxSmall)
+            .background(
+                isSelected ? KinColors.primary : KinColors.background,
+                in: RoundedRectangle(cornerRadius: KinRadius.medium)
+            )
+        }
+        .buttonStyle(.kinPressable)
+        .accessibilityLabel(category.rawValue)
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
+    }
+
+
+    // MARK: - Ingredients
+
+    private var ingredientsCard: some View {
+
+        KinFormCard(
+            title: "Ingredients",
+            systemImage: KinIcons.ingredients,
+            tint: KinColors.success,
+            subtitle: "Amount, unit, then the ingredient. Drag ≡ to reorder."
+        ) {
+
+            VStack(spacing: KinSpacing.small) {
+
+                ForEach(ingredients) { ingredient in
+                    if let index = ingredients.firstIndex(where: { $0.id == ingredient.id }) {
+                        ingredientRow(index: index)
+                            .transition(.opacity.combined(with: .move(edge: .top)))
+                    }
+                }
+
+                // Drop here to move an ingredient to the end.
+                Rectangle()
+                    .fill(ingredientEndDropTargeted ? KinColors.primary : Color.clear)
+                    .frame(height: 4)
+                    .contentShape(Rectangle())
+                    .dropDestination(for: IngredientDragItem.self) { items, _ in
+                        guard
+                            let draggedItem = items.first,
+                            let sourceIndex = ingredients.firstIndex(where: { $0.id == draggedItem.id })
+                        else {
+                            clearIngredientDragState()
+                            return false
+                        }
+                        withAnimation {
+                            let moved = ingredients.remove(at: sourceIndex)
+                            ingredients.append(moved)
+                        }
+                        ingredientEndDropTargeted = false
+                        clearIngredientDragState()
+                        return true
+                    } isTargeted: { targeted in
+                        ingredientEndDropTargeted = targeted
+                    }
+
+                addRowButtons(
+                    addTitle: "Add Ingredient",
+                    add: { addIngredient(after: nil) },
+                    paste: { pasteMode = .ingredients }
+                )
+            }
         }
     }
 
     private func ingredientRow(index: Int) -> some View {
         let ingredient = ingredients[index]
 
-        return VStack(spacing: KinSpacing.small) {
-            HStack(spacing: KinSpacing.small) {
-                // Kitchen keyboards: fractions for the amount, common
-                // units for the unit, then on to the name.
-                KinMeasureFields(
-                    quantity: $ingredients[index].quantity,
-                    unit: $ingredients[index].unit
-                ) {
-                    focusedIngredientNameId = ingredient.id
-                }
+        return HStack(spacing: KinSpacing.small) {
 
-                TextField(
-                    "Ingredient",
-                    text: $ingredients[index].name
-                )
-                .focused(
-                    $focusedIngredientNameId,
-                    equals: ingredient.id
-                )
-
-                Image(systemName: "line.3.horizontal")
-                    .font(.title3)
-                    .foregroundStyle(KinColors.secondaryText)
-                    .frame(width: 40, height: 44)
+            // Kitchen keyboards: fractions for the amount, common
+            // units for the unit, then on to the name.
+            KinMeasureFields(
+                quantity: $ingredients[index].quantity,
+                unit: $ingredients[index].unit,
+                quantityWidth: 58,
+                unitWidth: 66
+            ) {
+                focusedIngredientNameId = ingredient.id
             }
-            .font(KinTypography.body)
-            .foregroundStyle(KinColors.primaryText)
+
+            TextField(
+                "Ingredient",
+                text: $ingredients[index].name
+            )
+            .focused($focusedIngredientNameId, equals: ingredient.id)
+            .submitLabel(.next)
+            .onSubmit {
+                // Return goes to the next ingredient, adding one at
+                // the end.
+                addIngredient(after: ingredient.id)
+            }
 
             if ingredients.count > 1 {
-                HStack {
-                    Spacer()
-
-                    Button {
-                        ingredients.remove(at: index)
-                    } label: {
-                        Label(
-                            "Remove",
-                            systemImage: "trash"
-                        )
-                        .font(KinTypography.caption)
-                        .foregroundStyle(KinColors.error)
+                Button {
+                    withAnimation(.snappy) {
+                        ingredients.removeAll { $0.id == ingredient.id }
                     }
-                    .buttonStyle(.plain)
+                } label: {
+                    Image(systemName: "minus.circle.fill")
+                        .foregroundStyle(KinColors.secondaryText.opacity(0.5))
                 }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Remove \(ingredient.name.isEmpty ? "ingredient" : ingredient.name)")
             }
+
+            Image(systemName: "line.3.horizontal")
+                .foregroundStyle(KinColors.secondaryText.opacity(0.6))
+                .frame(width: 24, height: 40)
+                .accessibilityHidden(true)
         }
-        .padding(KinSpacing.medium)
-        .background(KinColors.surface)
-        .clipShape(
-            RoundedRectangle(
-                cornerRadius: KinRadius.medium
-            )
+        .font(KinTypography.body)
+        .foregroundStyle(KinColors.primaryText)
+        .padding(.horizontal, KinSpacing.small)
+        .padding(.vertical, KinSpacing.xSmall)
+        .background(
+            KinColors.background,
+            in: RoundedRectangle(cornerRadius: KinRadius.medium)
         )
         .contentShape(Rectangle())
-        .draggable(
-            IngredientDragItem(
-                id: ingredient.id
-            )
-        ){
-            ingredientCardPreview(
-                ingredient
-            )
-            .onAppear {
-                draggedIngredientID = ingredient.id
-                dismissKeyboard()
-            }
+        .draggable(IngredientDragItem(id: ingredient.id)) {
+            ingredientCardPreview(ingredient)
+                .onAppear {
+                    draggedIngredientID = ingredient.id
+                    dismissKeyboard()
+                }
         }
-        .overlay(
-            alignment:
-                ingredientDropPosition == .below
-                    ? .bottom
-                    : .top
-        ) {
+        .overlay(alignment: ingredientDropPosition == .below ? .bottom : .top) {
             if ingredientDropTargetID == ingredient.id,
                draggedIngredientID != ingredient.id {
-
                 Rectangle()
                     .fill(KinColors.primary)
                     .frame(height: 3)
-                    .offset(
-                        y:
-                            ingredientDropPosition == .below
-                                ? 6
-                                : -6
-                    )
+                    .offset(y: ingredientDropPosition == .below ? 5 : -5)
             }
         }
-        .dropDestination(
-            for: IngredientDragItem.self
-        ) { items, location in
+        .dropDestination(for: IngredientDragItem.self) { items, location in
             guard let draggedItem = items.first else {
                 clearIngredientDragState()
                 return false
             }
-
-            let draggedID = draggedItem.id
-
-            let position: RecipeDropPosition =
-                location.y > 44
-                    ? .below
-                    : .above
-
             moveIngredient(
-                draggedID: draggedID,
+                draggedID: draggedItem.id,
                 targetID: ingredient.id,
-                position: position
+                position: location.y > 24 ? .below : .above
             )
-
             clearIngredientDragState()
-
             return true
         } isTargeted: { targeted in
             if targeted {
-                ingredientDropTargetID =
-                    ingredient.id
-            } else if ingredientDropTargetID ==
-                        ingredient.id {
-
+                ingredientDropTargetID = ingredient.id
+            } else if ingredientDropTargetID == ingredient.id {
                 ingredientDropTargetID = nil
                 ingredientDropPosition = nil
             }
         }
         .onDrop(
             of: [.kinKitchenIngredient],
-            delegate:
-                IngredientHoverDropDelegate(
-                    targetID: ingredient.id,
-                    onDragLocationChanged: { _ in },
-                    draggedID: $draggedIngredientID,
-                    targetIDBinding: $ingredientDropTargetID,
-                    position: $ingredientDropPosition
-                )
+            delegate: IngredientHoverDropDelegate(
+                targetID: ingredient.id,
+                onDragLocationChanged: { _ in },
+                draggedID: $draggedIngredientID,
+                targetIDBinding: $ingredientDropTargetID,
+                position: $ingredientDropPosition
+            )
         )
     }
+
+    /// Adds an empty ingredient after `id` (or at the end) and puts
+    /// the cursor in it. Moves to the next one if it's already empty.
+    private func addIngredient(after id: UUID?) {
+        let index = id.flatMap { id in ingredients.firstIndex { $0.id == id } }
+            ?? ingredients.count - 1
+
+        if index + 1 < ingredients.count {
+            focusedIngredientNameId = ingredients[index + 1].id
+            return
+        }
+
+        if let last = ingredients.last, last.isEmpty, id == nil {
+            focusedIngredientNameId = last.id
+            return
+        }
+
+        let draft = IngredientDraft()
+        withAnimation(.snappy) {
+            ingredients.append(draft)
+        }
+        focusedIngredientNameId = draft.id
+    }
+
+
+    // MARK: - Steps
+
+    private var stepsCard: some View {
+
+        KinFormCard(
+            title: "Steps",
+            systemImage: KinIcons.instructions,
+            tint: KinColors.warning,
+            subtitle: "Return starts the next step. Drag ≡ to reorder."
+        ) {
+
+            VStack(spacing: KinSpacing.small) {
+
+                ForEach(instructions) { instruction in
+                    if let index = instructions.firstIndex(where: { $0.id == instruction.id }) {
+                        instructionRow(index: index)
+                            .transition(.opacity.combined(with: .move(edge: .top)))
+                    }
+                }
+
+                // Drop here to move a step to the end.
+                Rectangle()
+                    .fill(instructionEndDropTargeted ? KinColors.primary : Color.clear)
+                    .frame(height: 4)
+                    .contentShape(Rectangle())
+                    .dropDestination(for: InstructionDragItem.self) { items, _ in
+                        guard
+                            let draggedItem = items.first,
+                            let sourceIndex = instructions.firstIndex(where: { $0.id == draggedItem.id })
+                        else {
+                            clearInstructionDragState()
+                            return false
+                        }
+                        withAnimation {
+                            let moved = instructions.remove(at: sourceIndex)
+                            instructions.append(moved)
+                        }
+                        instructionEndDropTargeted = false
+                        clearInstructionDragState()
+                        return true
+                    } isTargeted: { targeted in
+                        instructionEndDropTargeted = targeted
+                    }
+
+                addRowButtons(
+                    addTitle: "Add Step",
+                    add: { addStep() },
+                    paste: { pasteMode = .steps }
+                )
+            }
+        }
+    }
+
+    private func instructionRow(index: Int) -> some View {
+        let instruction = instructions[index]
+
+        return HStack(alignment: .top, spacing: KinSpacing.small) {
+
+            Text("\(index + 1)")
+                .font(KinTypography.headline)
+                .foregroundStyle(.white)
+                .frame(width: 28, height: 28)
+                .background(KinColors.warning, in: Circle())
+                .padding(.top, 6)
+
+            TextField(
+                "Describe this step",
+                text: $instructions[index].text,
+                axis: .vertical
+            )
+            .font(KinTypography.body)
+            .foregroundStyle(KinColors.primaryText)
+            .lineLimit(1...8)
+            .padding(.vertical, 8)
+            .focused($focusedStepId, equals: instruction.id)
+            .onChange(of: instructions[index].text) { _, newValue in
+                splitStep(id: instruction.id, text: newValue)
+            }
+
+            if instructions.count > 1 {
+                Button {
+                    withAnimation(.snappy) {
+                        instructions.removeAll { $0.id == instruction.id }
+                    }
+                } label: {
+                    Image(systemName: "minus.circle.fill")
+                        .foregroundStyle(KinColors.secondaryText.opacity(0.5))
+                }
+                .buttonStyle(.plain)
+                .padding(.top, 10)
+                .accessibilityLabel("Remove step \(index + 1)")
+            }
+
+            Image(systemName: "line.3.horizontal")
+                .foregroundStyle(KinColors.secondaryText.opacity(0.6))
+                .frame(width: 24, height: 40)
+                .accessibilityHidden(true)
+        }
+        .padding(.horizontal, KinSpacing.small)
+        .padding(.vertical, KinSpacing.xxSmall)
+        .background(
+            KinColors.background,
+            in: RoundedRectangle(cornerRadius: KinRadius.medium)
+        )
+        .contentShape(Rectangle())
+        .draggable(InstructionDragItem(id: instruction.id)) {
+            instructionCardPreview(instruction: instruction, index: index)
+                .onAppear {
+                    draggedInstructionID = instruction.id
+                    dismissKeyboard()
+                }
+        }
+        .overlay(alignment: instructionDropPosition == .below ? .bottom : .top) {
+            if instructionDropTargetID == instruction.id,
+               draggedInstructionID != instruction.id {
+                Rectangle()
+                    .fill(KinColors.primary)
+                    .frame(height: 3)
+                    .offset(y: instructionDropPosition == .below ? 5 : -5)
+            }
+        }
+        .dropDestination(for: InstructionDragItem.self) { items, location in
+            guard let draggedItem = items.first else {
+                clearInstructionDragState()
+                return false
+            }
+            moveInstruction(
+                draggedID: draggedItem.id,
+                targetID: instruction.id,
+                position: location.y > 24 ? .below : .above
+            )
+            clearInstructionDragState()
+            return true
+        } isTargeted: { targeted in
+            if targeted {
+                instructionDropTargetID = instruction.id
+            } else if instructionDropTargetID == instruction.id {
+                instructionDropTargetID = nil
+                instructionDropPosition = nil
+            }
+        }
+        .onDrop(
+            of: [.kinKitchenInstruction],
+            delegate: InstructionHoverDropDelegate(
+                targetID: instruction.id,
+                onDragLocationChanged: { _ in },
+                draggedID: $draggedInstructionID,
+                targetIDBinding: $instructionDropTargetID,
+                position: $instructionDropPosition
+            )
+        )
+    }
+
+    /// Return in a step starts the next one; pasting several lines
+    /// makes one step per line.
+    private func splitStep(id: UUID, text: String) {
+
+        guard
+            text.contains(where: \.isNewline),
+            let index = instructions.firstIndex(where: { $0.id == id })
+        else {
+            return
+        }
+
+        let lines = text.components(separatedBy: .newlines)
+        let first = IngredientLineParser.strippingListMarker(lines[0])
+        let rest = IngredientLineParser.steps(from: lines.dropFirst().joined(separator: "\n"))
+
+        instructions[index].text = first
+
+        let newSteps = rest.isEmpty
+            ? [InstructionDraft()]
+            : rest.map { InstructionDraft(text: $0) }
+
+        // Typing Return on a step that's followed by an empty one
+        // just moves there.
+        if rest.isEmpty,
+           index + 1 < instructions.count,
+           instructions[index + 1].text.isEmpty {
+            focusedStepId = instructions[index + 1].id
+            return
+        }
+
+        withAnimation(.snappy) {
+            instructions.insert(contentsOf: newSteps, at: index + 1)
+        }
+        focusedStepId = newSteps.last?.id
+    }
+
+    private func addStep() {
+        if let last = instructions.last, last.text.isEmpty {
+            focusedStepId = last.id
+            return
+        }
+        let draft = InstructionDraft()
+        withAnimation(.snappy) {
+            instructions.append(draft)
+        }
+        focusedStepId = draft.id
+    }
+
+
+    /// "Add" and "Paste a List" side by side under a list.
+    private func addRowButtons(
+        addTitle: String,
+        add: @escaping () -> Void,
+        paste: @escaping () -> Void
+    ) -> some View {
+
+        HStack(spacing: KinSpacing.small) {
+
+            Button(action: add) {
+                Label(addTitle, systemImage: KinIcons.add)
+                    .font(KinTypography.callout.weight(.semibold))
+                    .foregroundStyle(KinColors.primary)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, KinSpacing.medium)
+                    .background(
+                        KinColors.primary.opacity(0.1),
+                        in: RoundedRectangle(cornerRadius: KinRadius.medium)
+                    )
+            }
+            .buttonStyle(.kinPressable)
+
+            Button(action: paste) {
+                Label("Paste a List", systemImage: "doc.on.clipboard")
+                    .font(KinTypography.callout.weight(.semibold))
+                    .foregroundStyle(KinColors.primaryText)
+                    .padding(.vertical, KinSpacing.medium)
+                    .padding(.horizontal, KinSpacing.medium)
+                    .background(
+                        KinColors.background,
+                        in: RoundedRectangle(cornerRadius: KinRadius.medium)
+                    )
+            }
+            .buttonStyle(.kinPressable)
+        }
+    }
+
+    /// Adds pasted lines, replacing the empty row left at the end.
+    private func addPasted(_ text: String, mode: PasteListSheet.Mode) {
+        switch mode {
+        case .ingredients:
+            let parsed = IngredientLineParser.ingredients(from: text).map {
+                IngredientDraft(quantity: $0.quantity, unit: $0.unit, name: $0.name)
+            }
+            guard !parsed.isEmpty else { return }
+            withAnimation(.snappy) {
+                ingredients.removeAll(where: \.isEmpty)
+                ingredients.append(contentsOf: parsed)
+            }
+        case .steps:
+            let parsed = IngredientLineParser.steps(from: text).map {
+                InstructionDraft(text: $0)
+            }
+            guard !parsed.isEmpty else { return }
+            withAnimation(.snappy) {
+                instructions.removeAll { $0.text.trimmingCharacters(in: .whitespaces).isEmpty }
+                instructions.append(contentsOf: parsed)
+            }
+        }
+    }
+
+
+    // MARK: - Details
+
+    private var detailsCard: some View {
+
+        KinFormCard(
+            title: "Servings & Time",
+            systemImage: "clock.fill",
+            tint: KinColors.primary
+        ) {
+
+            VStack(alignment: .leading, spacing: KinSpacing.medium) {
+
+                HStack(spacing: KinSpacing.medium) {
+                    Text("Serves \(servings)")
+                        .font(KinTypography.body)
+                        .foregroundStyle(KinColors.primaryText)
+                        .contentTransition(.numericText())
+
+                    Spacer()
+
+                    stepperButton("minus", label: "Fewer servings", isEnabled: servings > 1) {
+                        servings -= 1
+                    }
+                    stepperButton("plus", label: "More servings", isEnabled: servings < 100) {
+                        servings += 1
+                    }
+                }
+
+                Divider()
+                    .overlay(KinColors.secondaryText.opacity(0.15))
+
+                timeRow("Prep Time", minutes: $prepTime, choices: RecipeTimeChoices.prep)
+
+                timeRow("Cook Time", minutes: $cookTime, choices: RecipeTimeChoices.cook)
+            }
+        }
+    }
+
+    private func timeRow(
+        _ title: String,
+        minutes: Binding<String>,
+        choices: [Int]
+    ) -> some View {
+
+        VStack(alignment: .leading, spacing: KinSpacing.small) {
+
+            HStack {
+                Text(title)
+                    .font(KinTypography.caption.weight(.semibold))
+                    .textCase(.uppercase)
+                    .foregroundStyle(KinColors.secondaryText)
+
+                Spacer()
+
+                // Any other time, in minutes.
+                HStack(spacing: KinSpacing.xSmall) {
+                    TextField("–", text: minutes)
+                        .keyboardType(.numberPad)
+                        .multilineTextAlignment(.trailing)
+                        .frame(width: 44)
+                    Text("min")
+                        .foregroundStyle(KinColors.secondaryText)
+                }
+                .font(KinTypography.callout)
+                .padding(.horizontal, KinSpacing.small)
+                .padding(.vertical, KinSpacing.xSmall)
+                .background(
+                    KinColors.background,
+                    in: RoundedRectangle(cornerRadius: KinRadius.small)
+                )
+                .accessibilityLabel("\(title) in minutes")
+            }
+
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: KinSpacing.small) {
+                    ForEach(choices, id: \.self) { choice in
+                        KinChoiceChip(
+                            title: RecipeTimeChoices.text(choice),
+                            isSelected: Int(minutes.wrappedValue) == choice
+                        ) {
+                            withAnimation(.snappy) {
+                                // Tapping the chosen time clears it.
+                                minutes.wrappedValue =
+                                    Int(minutes.wrappedValue) == choice ? "" : String(choice)
+                            }
+                        }
+                    }
+                }
+                .padding(.vertical, 2)
+            }
+            .scrollClipDisabled()
+        }
+    }
+
+    private func stepperButton(
+        _ systemImage: String,
+        label: String,
+        isEnabled: Bool,
+        action: @escaping () -> Void
+    ) -> some View {
+
+        Button {
+            withAnimation(.snappy) {
+                action()
+            }
+        } label: {
+            Image(systemName: systemImage)
+                .font(.system(size: 15, weight: .bold))
+                .foregroundStyle(isEnabled ? KinColors.primary : KinColors.secondaryText.opacity(0.4))
+                .frame(width: 40, height: 40)
+                .background(KinColors.primary.opacity(isEnabled ? 0.12 : 0.05), in: Circle())
+        }
+        .buttonStyle(.kinPressable)
+        .disabled(!isEnabled)
+        .accessibilityLabel(label)
+    }
+
+
+    // MARK: - Dietary
+
+    private var dietaryCard: some View {
+
+        KinFormCard(
+            title: "Dietary",
+            systemImage: KinIcons.dietary,
+            tint: KinColors.success,
+            subtitle: "Optional. Tag what this recipe fits, like Vegetarian."
+        ) {
+            RecipeDietaryTagPicker(
+                selection: $selectedRestrictionIds
+            )
+        }
+    }
+
+
+    // MARK: - About and Story
+
+    private var aboutCard: some View {
+
+        KinFormCard(
+            title: "About This Recipe",
+            systemImage: "text.alignleft",
+            tint: KinColors.secondary,
+            subtitle: "Optional"
+        ) {
+
+            VStack(alignment: .leading, spacing: KinSpacing.medium) {
+
+                noteEditor(
+                    text: $recipeDescription,
+                    placeholder: "A short description: what it is, when you make it...",
+                    minHeight: 90
+                )
+
+                Button {
+                    withAnimation(.snappy) {
+                        isStoryShown.toggle()
+                    }
+                } label: {
+                    HStack {
+                        Label("Story & Legacy", systemImage: "book.closed.fill")
+                            .font(KinTypography.callout.weight(.semibold))
+                            .foregroundStyle(KinColors.primaryText)
+                        Spacer()
+                        Image(systemName: "chevron.down")
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundStyle(KinColors.secondaryText)
+                            .rotationEffect(.degrees(showsStory ? 180 : 0))
+                    }
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityHint("Who it came from and the story behind it")
+
+                if showsStory {
+
+                    VStack(alignment: .leading, spacing: KinSpacing.small) {
+
+                        TextField("Who it came from, e.g. Grandma Rose", text: $originalContributor)
+                            .font(KinTypography.body)
+                            .foregroundStyle(KinColors.primaryText)
+                            .textInputAutocapitalization(.words)
+                            .padding(KinSpacing.medium)
+                            .background(
+                                KinColors.background,
+                                in: RoundedRectangle(cornerRadius: KinRadius.medium)
+                            )
+
+                        noteEditor(
+                            text: $recipeStory,
+                            placeholder: "The story behind it: the first time you had it, who made it best...",
+                            minHeight: 120
+                        )
+                    }
+                    .transition(.opacity.combined(with: .move(edge: .top)))
+                }
+            }
+        }
+    }
+
+    /// Open when asked, or once anything's been written there.
+    private var showsStory: Bool {
+        isStoryShown || !originalContributor.isEmpty || !recipeStory.isEmpty
+    }
+
+    private func noteEditor(
+        text: Binding<String>,
+        placeholder: String,
+        minHeight: CGFloat
+    ) -> some View {
+
+        ZStack(alignment: .topLeading) {
+
+            if text.wrappedValue.isEmpty {
+                Text(placeholder)
+                    .font(KinTypography.callout)
+                    .foregroundStyle(KinColors.secondaryText.opacity(0.7))
+                    .padding(.horizontal, KinSpacing.medium + 5)
+                    .padding(.vertical, KinSpacing.medium + 8)
+                    .allowsHitTesting(false)
+            }
+
+            TextEditor(text: text)
+                .font(KinTypography.callout)
+                .foregroundStyle(KinColors.primaryText)
+                .scrollContentBackground(.hidden)
+                .padding(.horizontal, KinSpacing.medium)
+                .padding(.vertical, KinSpacing.small)
+                .frame(minHeight: minHeight)
+        }
+        .background(
+            KinColors.background,
+            in: RoundedRectangle(cornerRadius: KinRadius.medium)
+        )
+    }
+
+
+    // MARK: - Save Bar
+
+    /// Pinned at the bottom so Save is always in reach.
+    private var saveBar: some View {
+
+        VStack(spacing: KinSpacing.small) {
+
+            if let missingText {
+                Text(missingText)
+                    .font(KinTypography.caption)
+                    .foregroundStyle(KinColors.secondaryText)
+                    .contentTransition(.opacity)
+            }
+
+            KinPrimaryButton(
+                title: isSaving ? "Saving..." : "Save Recipe"
+            ) {
+                focusedIngredientNameId = nil
+                focusedStepId = nil
+                Task {
+                    await saveRecipe()
+                }
+            }
+            .disabled(isSaving || missingText != nil)
+            .opacity(isSaving || missingText != nil ? 0.5 : 1)
+            .animation(.easeOut(duration: 0.2), value: missingText)
+        }
+        .padding(.horizontal, KinSpacing.large)
+        .padding(.vertical, KinSpacing.small)
+        .background {
+            KinColors.paper
+                .ignoresSafeArea()
+                .shadow(color: .black.opacity(0.08), radius: 8, y: -2)
+        }
+    }
+
+
+    // MARK: - Drag and Drop
 
     private func ingredientCardPreview(_ ingredient: IngredientDraft) -> some View {
         HStack(spacing: KinSpacing.small) {
@@ -730,214 +1148,6 @@ struct AddRecipeView: View {
         draggedIngredientID = nil
         ingredientDropTargetID = nil
         ingredientDropPosition = nil
-    }
-
-    private var instructionsSection: some View {
-
-        VStack(
-            alignment: .leading,
-            spacing: KinSpacing.medium
-        ) {
-
-            Text("Instructions")
-                .font(KinTypography.title)
-                .foregroundStyle(KinColors.primaryText)
-
-            ForEach(instructions) { instruction in
-                if let index = instructions.firstIndex(
-                    where: { $0.id == instruction.id }
-                ) {
-                    instructionRow(index: index)
-                        .id(instruction.id)
-                }
-            }
-
-            // MARK: - Bottom Drop Zone
-            Rectangle()
-                .fill(
-                    instructionEndDropTargeted
-                        ? KinColors.error
-                        : Color.clear
-                )
-                .frame(height: 6)
-                .contentShape(Rectangle())
-                .dropDestination(
-                    for: InstructionDragItem.self
-                ) { items, _ in
-
-                    guard
-                        let draggedItem = items.first,
-                        let sourceIndex = instructions.firstIndex(
-                            where: {
-                                $0.id == draggedItem.id
-                            }
-                        )
-                    else {
-                        clearInstructionDragState()
-                        return false
-                    }
-
-                    withAnimation {
-                        let moved = instructions.remove(
-                            at: sourceIndex
-                        )
-
-                        instructions.append(moved)
-                    }
-
-                    instructionEndDropTargeted = false
-                    clearInstructionDragState()
-
-                    return true
-
-                } isTargeted: { targeted in
-                    instructionEndDropTargeted = targeted
-                }
-
-            Button {
-                instructions.append(
-                    InstructionDraft()
-                )
-            } label: {
-                Label(
-                    "Add Instruction",
-                    systemImage: "plus"
-                )
-                .font(KinTypography.button)
-                .foregroundStyle(KinColors.primary)
-                .frame(maxWidth: .infinity)
-                .padding(
-                    .vertical,
-                    KinSpacing.medium
-                )
-                .overlay {
-                    RoundedRectangle(
-                        cornerRadius: KinRadius.medium
-                    )
-                    .stroke(
-                        KinColors.primary,
-                        lineWidth: 1
-                    )
-                }
-                .contentShape(
-                        RoundedRectangle(
-                            cornerRadius: KinRadius.medium
-                        )
-                    )
-            }
-            .buttonStyle(.plain)
-        }
-    }
-
-    private func instructionRow(index: Int) -> some View {
-        let instruction = instructions[index]
-
-        return HStack(alignment: .top, spacing: KinSpacing.medium) {
-            Text("\(index + 1)")
-                .font(KinTypography.title3)
-                .foregroundStyle(KinColors.primary)
-                .frame(width: 32, height: 44)
-
-            TextField(
-                "Describe this step",
-                text: $instructions[index].text,
-                axis: .vertical
-            )
-            .font(KinTypography.body)
-            .foregroundStyle(KinColors.primaryText)
-            .lineLimit(2...5)
-
-            VStack(spacing: KinSpacing.small) {
-                Image(systemName: "line.3.horizontal")
-                    .font(.title3)
-                    .foregroundStyle(KinColors.secondaryText)
-                    .frame(width: 40, height: 40)
-                    .contentShape(Rectangle())
-
-                if instructions.count > 1 {
-                    Button {
-                        instructions.remove(at: index)
-                    } label: {
-                        Image(systemName: "trash")
-                            .font(.caption)
-                            .foregroundStyle(KinColors.error)
-                    }
-                    .buttonStyle(.plain)
-                }
-            }
-        }
-        .padding(KinSpacing.medium)
-        .background(KinColors.surface)
-        .clipShape(RoundedRectangle(cornerRadius: KinRadius.medium))
-        .contentShape(Rectangle())
-        .draggable(
-            InstructionDragItem(
-                id: instruction.id
-            )
-        ) {
-            instructionCardPreview(
-                instruction: instruction,
-                index: index
-            )
-            .onAppear {
-                draggedInstructionID = instruction.id
-                dismissKeyboard()
-            }
-        }
-        .overlay(alignment: instructionDropPosition == .below ? .bottom : .top) {
-            if instructionDropTargetID == instruction.id &&
-                draggedInstructionID != instruction.id {
-                Rectangle()
-                    .fill(KinColors.primary)
-                    .frame(height: 3)
-                    .offset(y: instructionDropPosition == .below ? 6 : -6)
-            }
-        }
-        .dropDestination(
-            for: InstructionDragItem.self
-        ) { items, location in
-            guard let draggedItem = items.first else {
-                clearInstructionDragState()
-                return false
-            }
-
-            let draggedID = draggedItem.id
-
-            let position: RecipeDropPosition =
-                location.y > 44
-                    ? .below
-                    : .above
-
-            moveInstruction(
-                draggedID: draggedID,
-                targetID: instruction.id,
-                position: position
-            )
-
-            clearInstructionDragState()
-
-            return true
-        } isTargeted: { targeted in
-            if targeted {
-                instructionDropTargetID =
-                    instruction.id
-            } else if instructionDropTargetID ==
-                        instruction.id {
-                instructionDropTargetID = nil
-                instructionDropPosition = nil
-            }
-        }
-        .onDrop(
-            of: [.kinKitchenInstruction],
-            delegate:
-                InstructionHoverDropDelegate(
-                targetID: instruction.id,
-                onDragLocationChanged: { _ in },
-                draggedID: $draggedInstructionID,
-                targetIDBinding: $instructionDropTargetID,
-                position: $instructionDropPosition
-            )
-        )
     }
 
     private func instructionCardPreview(
@@ -1005,20 +1215,6 @@ struct AddRecipeView: View {
         draggedInstructionID = nil
         instructionDropTargetID = nil
         instructionDropPosition = nil
-    }
-
-    private func fieldSection<Content: View>(
-        title: String,
-        @ViewBuilder content: () -> Content
-    ) -> some View {
-        VStack(alignment: .leading, spacing: KinSpacing.small) {
-            Text(title)
-                .font(KinTypography.caption)
-                .foregroundStyle(KinColors.secondaryText)
-
-            content()
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private func validateForm() -> String? {
@@ -1308,6 +1504,139 @@ struct AddRecipeView: View {
 }
 
 
+// MARK: - Times
+
+/// Prep and cook time chips.
+nonisolated enum RecipeTimeChoices {
+
+    static let prep = [5, 10, 15, 20, 30, 45, 60]
+    static let cook = [10, 15, 20, 30, 45, 60, 90, 120]
+
+    /// "15 min", "1 hr", "1 hr 30 min".
+    static func text(_ minutes: Int) -> String {
+        guard minutes >= 60 else {
+            return "\(minutes) min"
+        }
+        let hours = minutes / 60
+        let rest = minutes % 60
+        return rest == 0 ? "\(hours) hr" : "\(hours) hr \(rest) min"
+    }
+}
+
+
+// MARK: - Paste a List
+
+/// Paste a list copied from a website or a note. Each line becomes an
+/// ingredient (with the amount and unit read off the front) or a step.
+private struct PasteListSheet: View {
+
+    enum Mode: String, Identifiable {
+        case ingredients
+        case steps
+
+        var id: String { rawValue }
+    }
+
+    let mode: Mode
+    let onAdd: (String) -> Void
+
+    @Environment(\.dismiss) private var dismiss
+    @State private var text = ""
+    @FocusState private var isFocused: Bool
+
+    private var count: Int {
+        IngredientLineParser.lines(from: text).count
+    }
+
+    private var preview: [IngredientLineParser.Ingredient] {
+        Array(IngredientLineParser.ingredients(from: text).prefix(6))
+    }
+
+    var body: some View {
+
+        NavigationStack {
+
+            ScrollView {
+
+                VStack(alignment: .leading, spacing: KinSpacing.medium) {
+
+                    Text(
+                        mode == .ingredients
+                            ? "One ingredient per line, like \"2 cups flour\". Amounts and units are filled in for you."
+                            : "One step per line. Numbers and bullets are removed."
+                    )
+                    .font(KinTypography.footnote)
+                    .foregroundStyle(KinColors.secondaryText)
+
+                    TextEditor(text: $text)
+                        .font(KinTypography.callout)
+                        .scrollContentBackground(.hidden)
+                        .focused($isFocused)
+                        .padding(KinSpacing.small)
+                        .frame(minHeight: 220)
+                        .background(
+                            KinColors.surface,
+                            in: RoundedRectangle(cornerRadius: KinRadius.medium)
+                        )
+
+                    if UIPasteboard.general.hasStrings, text.isEmpty {
+                        Button {
+                            text = UIPasteboard.general.string ?? ""
+                        } label: {
+                            Label("Paste from Clipboard", systemImage: "doc.on.clipboard")
+                                .font(KinTypography.callout.weight(.semibold))
+                        }
+                        .tint(KinColors.primary)
+                    }
+
+                    if mode == .ingredients, !preview.isEmpty {
+                        VStack(alignment: .leading, spacing: KinSpacing.xSmall) {
+                            Text("Preview")
+                                .font(KinTypography.caption.weight(.semibold))
+                                .textCase(.uppercase)
+                                .foregroundStyle(KinColors.secondaryText)
+
+                            ForEach(Array(preview.enumerated()), id: \.offset) { _, item in
+                                HStack(spacing: KinSpacing.small) {
+                                    Text([item.quantity, item.unit].filter { !$0.isEmpty }.joined(separator: " "))
+                                        .foregroundStyle(KinColors.primary)
+                                        .frame(width: 90, alignment: .leading)
+                                    Text(item.name)
+                                        .foregroundStyle(KinColors.primaryText)
+                                }
+                                .font(KinTypography.callout)
+                            }
+                        }
+                    }
+                }
+                .padding(KinSpacing.large)
+            }
+            .background(KinColors.background)
+            .navigationTitle(mode == .ingredients ? "Paste Ingredients" : "Paste Steps")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") {
+                        dismiss()
+                    }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button(count == 0 ? "Add" : "Add \(count)") {
+                        onAdd(text)
+                        dismiss()
+                    }
+                    .fontWeight(.semibold)
+                    .disabled(count == 0)
+                }
+            }
+            .onAppear {
+                isFocused = true
+            }
+        }
+    }
+}
+
+
 private struct IngredientDraft: Identifiable {
     let id: UUID
     var quantity: String
@@ -1324,6 +1653,11 @@ private struct IngredientDraft: Identifiable {
         self.quantity = quantity
         self.unit = unit
         self.name = name
+    }
+
+    var isEmpty: Bool {
+        quantity.isEmpty && unit.isEmpty
+            && name.trimmingCharacters(in: .whitespaces).isEmpty
     }
 }
 

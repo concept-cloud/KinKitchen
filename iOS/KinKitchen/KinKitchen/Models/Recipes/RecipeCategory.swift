@@ -70,3 +70,22 @@ extension Recipe {
         )
     }
 }
+
+
+// MARK: - Icon
+
+extension RecipeCategory {
+
+    var symbol: String {
+        switch self {
+        case .breakfast: return "sunrise.fill"
+        case .lunch: return "takeoutbag.and.cup.and.straw.fill"
+        case .dinner: return "fork.knife"
+        case .sideDish: return "carrot.fill"
+        case .dessert: return "birthday.cake.fill"
+        case .snack: return "popcorn.fill"
+        case .drink: return "cup.and.saucer.fill"
+        case .other: return "sparkles"
+        }
+    }
+}

@@ -104,7 +104,7 @@ struct AddGatheringView: View {
 
                         whereCard
 
-                        EventFormCard(
+                        KinFormCard(
                             title: "Dietary Needs",
                             systemImage: "heart.fill",
                             tint: DietarySection.allergens.tint
@@ -352,7 +352,7 @@ private extension AddGatheringView {
 
     var typeCard: some View {
 
-        EventFormCard(
+        KinFormCard(
             title: "What kind of event?",
             systemImage: "sparkles",
             tint: KinColors.primary
@@ -371,7 +371,7 @@ private extension AddGatheringView {
 
     var whenCard: some View {
 
-        EventFormCard(
+        KinFormCard(
             title: "When",
             systemImage: KinIcons.calendar,
             tint: KinColors.warning,
@@ -386,7 +386,7 @@ private extension AddGatheringView {
 
                 chipRow {
                     ForEach(EventDateChoices.quickDates(), id: \.self) { choice in
-                        EventChoiceChip(
+                        KinChoiceChip(
                             title: choice.title,
                             isSelected: !isCalendarShown
                                 && Calendar.current.isDate(date, inSameDayAs: choice.date)
@@ -398,7 +398,7 @@ private extension AddGatheringView {
                         }
                     }
 
-                    EventChoiceChip(
+                    KinChoiceChip(
                         title: "Pick a Date",
                         systemImage: KinIcons.calendar,
                         isSelected: isCalendarShown || !isQuickDate
@@ -439,7 +439,7 @@ private extension AddGatheringView {
                     chipRow {
                         ForEach(EventDateChoices.quickHours, id: \.self) { hour in
                             let option = EventDateChoices.time(hour: hour, on: time)
-                            EventChoiceChip(
+                            KinChoiceChip(
                                 title: option.formatted(.dateTime.hour()),
                                 isSelected: isSameTime(time, option)
                             ) {
@@ -493,7 +493,7 @@ private extension AddGatheringView {
 
             chipRow {
                 ForEach(EventDateRange.quickLengths, id: \.self) { days in
-                    EventChoiceChip(
+                    KinChoiceChip(
                         title: EventDateRange.lengthText(days),
                         isSelected: !isEndCalendarShown && rangeDays == days
                     ) {
@@ -504,7 +504,7 @@ private extension AddGatheringView {
                     }
                 }
 
-                EventChoiceChip(
+                KinChoiceChip(
                     title: "Pick Last Day",
                     systemImage: KinIcons.calendar,
                     isSelected: isEndCalendarShown
@@ -573,7 +573,7 @@ private extension AddGatheringView {
 
     var whereCard: some View {
 
-        EventFormCard(
+        KinFormCard(
             title: "Where",
             systemImage: KinIcons.location,
             tint: KinColors.success
@@ -621,7 +621,7 @@ private extension AddGatheringView {
 
     var detailsCard: some View {
 
-        EventFormCard(
+        KinFormCard(
             title: "Details",
             systemImage: "text.alignleft",
             tint: KinColors.secondary,
@@ -638,7 +638,7 @@ private extension AddGatheringView {
 
                 chipRow {
                     ForEach((eventType ?? .other).themeSuggestions, id: \.self) { idea in
-                        EventChoiceChip(
+                        KinChoiceChip(
                             title: idea,
                             isSelected: theme == idea
                         ) {
@@ -693,7 +693,7 @@ private extension AddGatheringView {
 
     var guestsCard: some View {
 
-        EventFormCard(
+        KinFormCard(
             title: "Guests",
             systemImage: KinIcons.participants,
             tint: KinColors.primary
@@ -730,7 +730,7 @@ private extension AddGatheringView {
     /// much to make.
     var familyCard: some View {
 
-        EventFormCard(
+        KinFormCard(
             title: "Family Size",
             systemImage: "house.fill",
             tint: KinColors.success
