@@ -16,6 +16,7 @@ enum GatheringService {
     static func createGathering(
         name: String,
         theme: String?,
+        eventType: KinEventType?,
         coverImagePath: String?,
         description: String?,
         location: String?,
@@ -39,6 +40,7 @@ enum GatheringService {
                     cleanedOptionalString(
                         theme
                     ),
+                eventType: eventType,
                 coverImagePath:
                     cleanedOptionalString(
                         coverImagePath
@@ -322,6 +324,7 @@ enum GatheringService {
         id gatheringId: UUID,
         name: String,
         theme: String?,
+        eventType: KinEventType?,
         coverImagePath: String?,
         description: String?,
         location: String?,
@@ -334,6 +337,8 @@ enum GatheringService {
             let gatheringId: UUID
             let name: String
             let theme: String?
+            /// nil keeps the event's current type.
+            let eventType: KinEventType?
             let coverImagePath: String?
             let description: String?
             let location: String?
@@ -352,6 +357,9 @@ enum GatheringService {
 
                 case theme =
                     "p_theme"
+
+                case eventType =
+                    "p_event_type"
 
                 case coverImagePath =
                     "p_cover_image_path"
@@ -381,6 +389,7 @@ enum GatheringService {
                     cleanedOptionalString(
                         theme
                     ),
+                eventType: eventType,
                 coverImagePath:
                     cleanedOptionalString(
                         coverImagePath

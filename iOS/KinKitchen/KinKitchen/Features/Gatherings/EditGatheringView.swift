@@ -21,6 +21,7 @@ struct EditGatheringView: View {
 
     @State private var name: String
     @State private var theme: String
+    @State private var eventType: KinEventType?
     @State private var date: Date
     @State private var time: Date
     @State private var location: String
@@ -71,6 +72,11 @@ struct EditGatheringView: View {
         _theme = State(
             initialValue:
                 gathering.theme ?? ""
+        )
+
+        _eventType = State(
+            initialValue:
+                gathering.eventType
         )
 
         _date = State(
@@ -526,6 +532,18 @@ private extension EditGatheringView {
                     "Event Name",
                 text:
                     $name
+            )
+
+
+            // MARK: Event Type
+
+            fieldLabel(
+                "Event Type"
+            )
+
+            KinEventTypePicker(
+                selection:
+                    $eventType
             )
 
 
@@ -1394,6 +1412,8 @@ private extension EditGatheringView {
                             cleaned(
                                 theme
                             ),
+                        eventType:
+                            eventType,
                         coverImagePath:
                             finalCoverImagePath,
                         description:
@@ -1875,6 +1895,8 @@ private enum EditGatheringPhotoError:
                         "Sunday Family Dinner",
                     theme:
                         "Family Night",
+                    eventType:
+                        .dinnerParty,
                     coverImagePath:
                         nil,
                     description:

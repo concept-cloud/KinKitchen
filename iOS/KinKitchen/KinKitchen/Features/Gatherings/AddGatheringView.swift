@@ -17,6 +17,7 @@ struct AddGatheringView: View {
 
     @State private var name = ""
     @State private var theme = ""
+    @State private var eventType: KinEventType?
     @State private var date = Date()
     @State private var time = Date()
     @State private var location = ""
@@ -303,6 +304,15 @@ private extension AddGatheringView {
             KinTextField(
                 title: "Event Name",
                 text: $name
+            )
+
+
+            fieldLabel(
+                "Event Type"
+            )
+
+            KinEventTypePicker(
+                selection: $eventType
             )
 
 
@@ -821,6 +831,14 @@ private extension AddGatheringView {
             return
         }
 
+        guard let eventType else {
+
+            errorMessage =
+                "Please choose an event type."
+
+            return
+        }
+
         let startsAt =
             combinedDateAndTime()
 
@@ -859,6 +877,8 @@ private extension AddGatheringView {
                             cleaned(
                                 theme
                             ),
+                        eventType:
+                            eventType,
                         coverImagePath:
                             coverImagePath,
                         description:

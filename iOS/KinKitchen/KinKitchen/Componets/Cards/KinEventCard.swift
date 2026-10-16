@@ -9,7 +9,7 @@ import SwiftUI
 
 /// An event (gathering) as a card, the same on Home and the Events
 /// tab: the cover photo fills the card and fades under the details on
-/// the left. Shows the user's role, date, place and the newest unread
+/// the left. Shows the event type, the user's role, date, place and the newest unread
 /// update. Past events show past-tense roles and Completed/Cancelled.
 ///
 /// Only the look; wrap it in a Button or NavigationLink to open it.
@@ -33,6 +33,10 @@ struct KinEventCard: View {
             alignment: .leading,
             spacing: KinSpacing.xSmall
         ) {
+
+            if let eventType = event.eventType {
+                KinEventTypeLabel(type: eventType)
+            }
 
             HStack(
                 alignment: .top,
@@ -198,6 +202,7 @@ struct KinEventCard: View {
     private var accessibilityText: String {
         [
             event.name,
+            event.eventType?.title,
             KinEventCard.roleText(for: item),
             dateText,
             location,

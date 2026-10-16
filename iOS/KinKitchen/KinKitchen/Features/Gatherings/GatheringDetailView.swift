@@ -360,6 +360,19 @@ private extension GatheringDetailView {
             spacing: KinSpacing.small
         ) {
 
+            if let eventType =
+                gathering.eventType {
+
+                KinEventTypeLabel(
+                    type: eventType
+                )
+                .kinChangeHighlight(
+                    highlightedFields.contains(
+                        .eventType
+                    )
+                )
+            }
+
             HStack(
                 alignment: .firstTextBaseline,
                 spacing: KinSpacing.medium

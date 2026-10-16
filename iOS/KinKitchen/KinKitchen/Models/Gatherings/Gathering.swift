@@ -20,6 +20,8 @@ struct Gathering:
 
     var name: String
     var theme: String?
+    /// nil for events made before event types.
+    var eventType: KinEventType? = nil
     var coverImagePath: String?
     var description: String?
     var location: String?
@@ -43,6 +45,9 @@ struct Gathering:
         case name
 
         case theme
+
+        case eventType =
+            "event_type"
 
         case coverImagePath =
             "cover_image_path"
@@ -185,6 +190,7 @@ struct GatheringCreate:
 
     let name: String
     let theme: String?
+    let eventType: KinEventType?
     let coverImagePath: String?
     let description: String?
     let location: String?
@@ -202,6 +208,9 @@ struct GatheringCreate:
         case name
 
         case theme
+
+        case eventType =
+            "event_type"
 
         case coverImagePath =
             "cover_image_path"
@@ -226,6 +235,7 @@ struct GatheringUpdate:
 
     let name: String
     let theme: String?
+    let eventType: KinEventType?
     let coverImagePath: String?
     let description: String?
     let location: String?
@@ -240,6 +250,9 @@ struct GatheringUpdate:
         case name
 
         case theme
+
+        case eventType =
+            "event_type"
 
         case coverImagePath =
             "cover_image_path"

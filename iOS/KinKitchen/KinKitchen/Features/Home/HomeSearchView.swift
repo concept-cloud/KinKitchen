@@ -82,7 +82,7 @@ struct HomeSearchView: View {
 
         let matchedGatherings =
             HomeSearch.filter(gatherings, query: trimmed) {
-                [$0.gathering.name, $0.gathering.location, $0.gathering.theme]
+                [$0.gathering.name, $0.gathering.location, $0.gathering.theme, $0.gathering.eventType?.title]
             }
 
         if trimmed.isEmpty {
