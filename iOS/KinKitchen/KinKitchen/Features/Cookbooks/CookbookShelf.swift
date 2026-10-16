@@ -35,53 +35,48 @@ nonisolated enum CookbookShelfLayout {
 
 // MARK: - Shelf
 
-/// A wooden plank the books stand on: a lit top edge, a grained front
-/// lip, and a shadow on the wall below.
+/// A honey-oak plank the books stand on: a lit top, a soft contact
+/// shadow where the books sit, a bright front edge, and shade falling
+/// on the wall below. No drawn grain, so it stays clean.
 struct KinWoodShelf: View {
 
-    private static let light = Color(red: 0.69, green: 0.48, blue: 0.30)
-    private static let mid = Color(red: 0.55, green: 0.36, blue: 0.21)
-    private static let dark = Color(red: 0.40, green: 0.25, blue: 0.14)
+    private static let top = Color(red: 0.74, green: 0.53, blue: 0.33)
+    private static let topBack = Color(red: 0.52, green: 0.35, blue: 0.21)
+    private static let front = Color(red: 0.62, green: 0.42, blue: 0.25)
+    private static let frontLow = Color(red: 0.45, green: 0.29, blue: 0.16)
 
     var body: some View {
 
         VStack(spacing: 0) {
 
-            // Top surface, seen from slightly above.
+            // Top surface: darker at the back, where the books stand.
             LinearGradient(
-                colors: [Self.light, Self.mid],
+                colors: [Self.topBack, Self.top],
                 startPoint: .top,
                 endPoint: .bottom
             )
-            .frame(height: 9)
+            .frame(height: 10)
 
-            // Front lip with wood grain.
+            // Front edge: a thin highlight, then the face.
+            VStack(spacing: 0) {
+                Color(red: 0.86, green: 0.67, blue: 0.45)
+                    .frame(height: 1)
+                LinearGradient(
+                    colors: [Self.front, Self.frontLow],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+            }
+            .frame(height: 16)
+
+            // Shade the shelf casts on the wall below.
             LinearGradient(
-                colors: [Self.mid, Self.dark],
+                colors: [.black.opacity(0.4), .black.opacity(0)],
                 startPoint: .top,
                 endPoint: .bottom
             )
-            .overlay {
-                Canvas { context, size in
-                    for row in stride(from: 3.0, to: size.height, by: 4) {
-                        var path = Path()
-                        path.move(to: CGPoint(x: 0, y: row))
-                        var x: CGFloat = 0
-                        while x < size.width {
-                            x += 24
-                            path.addQuadCurve(
-                                to: CGPoint(x: x, y: row),
-                                control: CGPoint(x: x - 12, y: row + (Int(x / 24) % 2 == 0 ? 1.2 : -1.2))
-                            )
-                        }
-                        context.stroke(path, with: .color(.black.opacity(0.12)), lineWidth: 0.7)
-                    }
-                }
-            }
-            .frame(height: 14)
+            .frame(height: 28)
         }
-        .clipShape(RoundedRectangle(cornerRadius: 3))
-        .shadow(color: .black.opacity(0.28), radius: 6, y: 7)
         .accessibilityHidden(true)
     }
 }
@@ -89,49 +84,44 @@ struct KinWoodShelf: View {
 
 // MARK: - Bookcase Wall
 
-/// The back of the bookcase: warm wood boards behind the shelves.
+/// The back of the bookcase: smooth dark walnut, lit from the top and
+/// darker toward the edges.
 struct KinBookcaseWall: View {
 
     var body: some View {
 
         LinearGradient(
             colors: [
-                Color(red: 0.36, green: 0.23, blue: 0.14),
-                Color(red: 0.45, green: 0.30, blue: 0.18),
-                Color(red: 0.33, green: 0.21, blue: 0.12)
+                Color(red: 0.30, green: 0.19, blue: 0.11),
+                Color(red: 0.25, green: 0.16, blue: 0.09),
+                Color(red: 0.19, green: 0.12, blue: 0.07)
             ],
             startPoint: .top,
             endPoint: .bottom
         )
-        .overlay {
-            // Vertical boards with a little grain.
-            Canvas { context, size in
-                let boardWidth: CGFloat = 78
-                var x: CGFloat = boardWidth
-                while x < size.width {
-                    var seam = Path()
-                    seam.move(to: CGPoint(x: x, y: 0))
-                    seam.addLine(to: CGPoint(x: x, y: size.height))
-                    context.stroke(seam, with: .color(.black.opacity(0.22)), lineWidth: 1)
-                    x += boardWidth
-                }
-                var grain = Path()
-                var gx: CGFloat = 9
-                while gx < size.width {
-                    grain.move(to: CGPoint(x: gx, y: 0))
-                    grain.addLine(to: CGPoint(x: gx + 2, y: size.height))
-                    gx += 13
-                }
-                context.stroke(grain, with: .color(.white.opacity(0.025)), lineWidth: 1)
-            }
-        }
-        // Lamp light from the top.
+        // Warm lamp light near the top.
         .overlay {
             RadialGradient(
-                colors: [Color(red: 1, green: 0.85, blue: 0.6).opacity(0.18), .clear],
-                center: .top,
+                colors: [
+                    Color(red: 1, green: 0.82, blue: 0.55).opacity(0.22),
+                    .clear
+                ],
+                center: UnitPoint(x: 0.5, y: 0.05),
                 startRadius: 0,
-                endRadius: 420
+                endRadius: 460
+            )
+        }
+        // Darker toward the sides, like the inside of a cabinet.
+        .overlay {
+            LinearGradient(
+                stops: [
+                    .init(color: .black.opacity(0.35), location: 0),
+                    .init(color: .clear, location: 0.18),
+                    .init(color: .clear, location: 0.82),
+                    .init(color: .black.opacity(0.35), location: 1)
+                ],
+                startPoint: .leading,
+                endPoint: .trailing
             )
         }
         .accessibilityHidden(true)

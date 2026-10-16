@@ -277,9 +277,11 @@ private extension CookbooksView {
             .padding(.horizontal, KinSpacing.xLarge)
 
             // Books stand on the plank's top edge, which runs the
-            // full width like a real bookcase.
+            // full width like a real bookcase. The shade below hangs
+            // into the space before the next shelf.
             KinWoodShelf()
-                .padding(.top, -4)
+                .padding(.top, -6)
+                .padding(.bottom, -28)
         }
     }
 
